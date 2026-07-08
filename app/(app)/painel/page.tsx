@@ -79,7 +79,7 @@ export default async function PainelPage() {
       <Topbar title="Painel" />
       <div className="px-8 py-8 max-w-[1240px] w-full">
         {/* KPIs - grid 4 colunas */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
           <KpiCard icon="doc" value={totAtivas} label="Contas ativas" variacao={variacaoPct(totAtivas, metricaAnterior?.contas_ativas ?? null)} />
           <KpiCard icon="calendar" value={totAberto} label={`A lançar em ${formatarPeriodo(mes, ano).split("/")[0].toLowerCase()}`} variacao={variacaoPct(totAberto, metricaAnterior?.a_lancar ?? null)} />
           <KpiCard icon="hourglass" value={totLancado} label="Aguardando pagamento" variacao={variacaoPct(totLancado, metricaAnterior?.aguardando_pagamento ?? null)} />
@@ -88,21 +88,21 @@ export default async function PainelPage() {
 
         <div className="flex items-center gap-2 mb-5">
           <h2 className="text-[20px] font-semibold text-[#1a1a1a]">Situação por tipo de conta</h2>
-          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#999" strokeWidth="1.6"><circle cx="10" cy="10" r="7.5" /><path d="M10 9v4.5M10 6.7v.1" /></svg>
-          <span className="ml-auto text-[13px] text-[#666] flex items-center gap-1.5 border border-linha rounded-md px-3 py-1.5 bg-white">
-            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#666" strokeWidth="1.6"><rect x="3.5" y="5" width="13" height="12" rx="1.5" /><path d="M3.5 8.5h13" /></svg>
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#adb5bd" strokeWidth="1.6"><circle cx="10" cy="10" r="7.5" /><path d="M10 9v4.5M10 6.7v.1" /></svg>
+          <span className="ml-auto text-[13px] text-[#6c757d] flex items-center gap-1.5 border border-linha rounded-md px-3 py-1.5 bg-white">
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#6c757d" strokeWidth="1.6"><rect x="3.5" y="5" width="13" height="12" rx="1.5" /><path d="M3.5 8.5h13" /></svg>
             Este mês ({periodoFormatado})
           </span>
         </div>
 
         {/* grid 2 linhas x 3 colunas (7 tipos, o ultimo quebra pra proxima linha) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
           {porTipo.map(({ t, ativas, mapear, aberto, lancado, atrasadas }) => {
             const T = TIPOS[t];
             const base = ativas || 1;
             return (
               <Link href={`/contas?tipo=${t}`} key={t}
-                className="bg-white border border-linha rounded-lg p-6 shadow-leve hover:shadow-media transition block">
+                className="bg-white border border-linha rounded-xl p-6 shadow-leve hover:shadow-media transition block">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-14 h-14 rounded-lg grid place-items-center shrink-0" style={{ background: T.bg }}>
                     <TipoIcon tipo={t} size={26} color={T.c} />
@@ -140,11 +140,11 @@ export default async function PainelPage() {
                     </div>
                     <div className="min-w-0">
                       <b className="font-semibold">{l.codigo}</b>
-                      <small className="block text-[#999] text-[11px] mt-0.5 truncate">
+                      <small className="block text-[#adb5bd] text-[11px] mt-0.5 truncate">
                         {[l.empresa, l.cidade && l.uf ? `${l.cidade}/${l.uf}` : null].filter(Boolean).join(" · ") || "sem dados adicionais"}
                       </small>
                     </div>
-                    <span className="ml-auto text-[11px] text-[#999] font-mono shrink-0">
+                    <span className="ml-auto text-[11px] text-[#adb5bd] font-mono shrink-0">
                       {l.encerrada_em ? new Date(l.encerrada_em).toLocaleDateString("pt-br") : "—"}
                     </span>
                   </li>
@@ -164,11 +164,11 @@ function LinhaProgresso({ cor, label, valor, base }: { cor: string; label: strin
     <div>
       <div className="flex items-center gap-1.5 mb-1">
         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: cor }} />
-        <span className="text-[12px] text-[#666] font-medium">{label}</span>
+        <span className="text-[12px] text-[#6c757d] font-medium">{label}</span>
         <span className="ml-auto text-[12px] font-semibold text-[#1a1a1a]">{valor}</span>
-        <span className="text-[12px] text-[#999]">({pct}%)</span>
+        <span className="text-[12px] text-[#adb5bd]">({pct}%)</span>
       </div>
-      <div className="h-1.5 rounded-full bg-[#f0f0f0] overflow-hidden">
+      <div className="h-1.5 rounded-full bg-[#f1f3f5] overflow-hidden">
         <div className="h-full rounded-full" style={{ width: `${Math.min(pct, 100)}%`, background: cor }} />
       </div>
     </div>
@@ -184,16 +184,16 @@ const KPI_ICONS: Record<string, React.ReactNode> = {
 
 function KpiCard({ icon, value, label, variacao }: { icon: string; value: number; label: string; variacao: number | null }) {
   return (
-    <div className="relative bg-white border border-linha rounded-lg p-6 shadow-leve overflow-hidden">
+    <div className="relative bg-white border border-linha rounded-xl p-6 shadow-leve overflow-hidden">
       <span className="absolute left-0 top-0 bottom-0 w-1 bg-amarelo" />
       <div className="w-12 h-12 rounded-lg grid place-items-center mb-4" style={{ background: "#fff3cd" }}>
-        <svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="#999" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{KPI_ICONS[icon]}</svg>
+        <svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="#adb5bd" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{KPI_ICONS[icon]}</svg>
       </div>
-      <div className="text-[40px] font-bold text-[#1a1a1a] leading-none">{value}</div>
-      <div className="text-[13px] text-[#666] font-medium mt-2">{label}</div>
+      <div className="text-3xl font-bold text-gray-900 leading-none">{value}</div>
+      <div className="text-sm text-gray-500 font-medium mt-2">{label}</div>
       {variacao !== null ? (
-        <div className={`text-[12px] font-medium mt-1.5 flex items-center gap-1 ${variacao > 0 ? "text-ok" : variacao < 0 ? "text-alerr" : "text-[#999]"}`}>
-          {variacao > 0 ? "↑" : variacao < 0 ? "↓" : "—"} {Math.abs(variacao)}% <span className="text-[#999] font-normal">vs. mês anterior</span>
+        <div className={`text-[12px] font-medium mt-1.5 flex items-center gap-1 ${variacao > 0 ? "text-ok" : variacao < 0 ? "text-alerr" : "text-[#adb5bd]"}`}>
+          {variacao > 0 ? "↑" : variacao < 0 ? "↓" : "—"} {Math.abs(variacao)}% <span className="text-[#adb5bd] font-normal">vs. mês anterior</span>
         </div>
       ) : (
         <div className="text-[11px] text-[#bbb] font-normal mt-1.5">sem dado do mês anterior ainda</div>

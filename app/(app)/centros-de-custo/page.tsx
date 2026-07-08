@@ -32,13 +32,13 @@ export default async function CentrosDeCustoPage() {
     <>
       <div className="px-8 py-8">
         <h1 className="text-[32px] font-bold text-[#1a1a1a] leading-none">Centros de custo</h1>
-        <p className="text-[14px] text-[#666] mt-2.5">Gasto acumulado de {ano} por loja, com base nos lançamentos reais</p>
+        <p className="text-[14px] text-[#6c757d] mt-2.5">Gasto acumulado de {ano} por loja, com base nos lançamentos reais</p>
       </div>
       <div className="px-8 pb-8 max-w-[900px]">
         <div className="card overflow-hidden">
           <table className="w-full border-collapse">
             <thead>
-              <tr className="bg-[#f5f5f5] h-12">
+              <tr className="bg-[#f1f3f5] h-12">
                 <th className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">Loja</th>
                 <th className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">Lançamentos</th>
                 <th className="text-right text-[12px] font-semibold text-[#1a1a1a] px-4">Total {ano}</th>
@@ -47,18 +47,18 @@ export default async function CentrosDeCustoPage() {
             </thead>
             <tbody>
               {ranking.map((r, i) => (
-                <tr key={i} className="h-12 border-b border-[#f0f0f0] last:border-0 hover:bg-[#f9f9f9]">
+                <tr key={i} className="h-12 border-b border-[#f1f3f5] last:border-0 hover:bg-[#f8f9fa]">
                   <td className="px-4 text-[13px] font-medium">
                     <Link href="/lojas" className="hover:text-info">{r.codigo}</Link>
-                    <small className="block text-[#999] text-[11px] font-mono">{r.coban}</small>
+                    <small className="block text-[#adb5bd] text-[11px] font-mono">{r.coban}</small>
                   </td>
-                  <td className="px-4 text-[13px] font-mono text-[#666]">{r.qtd}</td>
+                  <td className="px-4 text-[13px] font-mono text-[#6c757d]">{r.qtd}</td>
                   <td className="px-4 text-[13px] font-mono font-semibold text-right">{money(r.total)}</td>
-                  <td className="px-4 text-[12px] text-[#999] text-right">{totalGeral ? ((r.total / totalGeral) * 100).toFixed(1) : "0"}%</td>
+                  <td className="px-4 text-[12px] text-[#adb5bd] text-right">{totalGeral ? ((r.total / totalGeral) * 100).toFixed(1) : "0"}%</td>
                 </tr>
               ))}
               {ranking.length === 0 && (
-                <tr><td colSpan={4} className="text-center py-12 text-[#999]">Sem lançamentos com valor em {ano}.</td></tr>
+                <tr><td colSpan={4} className="text-center py-12 text-[#adb5bd]">Sem lançamentos com valor em {ano}.</td></tr>
               )}
             </tbody>
           </table>

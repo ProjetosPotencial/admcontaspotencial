@@ -12,7 +12,7 @@ import { money, MES } from "@/lib/format";
 
 function StatusBadge({ status }: { status: string }) {
   if (status === "encerrado") return <span className="badge bg-alerr-bg text-alerr">Encerrada</span>;
-  if (status === "inativo") return <span className="badge bg-[#f5f5f5] text-[#999]">Inativa</span>;
+  if (status === "inativo") return <span className="badge bg-[#f1f3f5] text-[#adb5bd]">Inativa</span>;
   return <span className="badge bg-ok-bg text-ok">Ativa</span>;
 }
 
@@ -49,7 +49,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas }: {
   return (
     <>
       {/* Seção de filtros */}
-      <div className="bg-white border border-linha rounded-lg p-6 mb-6 shadow-leve">
+      <div className="bg-white border border-linha rounded-xl p-6 mb-6 shadow-leve">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-[20px] font-semibold text-[#1a1a1a]">Filtrar contas</h2>
           <button onClick={() => setCriando(true)}
@@ -62,7 +62,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas }: {
           {chips.map((t) => (
             <button key={t} onClick={() => setFTipo(t)}
               className={`px-4 py-2 rounded-full text-[13px] border transition ${
-                fTipo === t ? "bg-amarelo text-[#1a1a1a] border-amarelo font-semibold" : "bg-[#f5f5f5] text-[#1a1a1a] border-linha font-medium hover:bg-white"
+                fTipo === t ? "bg-amarelo text-[#1a1a1a] border-amarelo font-semibold" : "bg-[#f1f3f5] text-[#1a1a1a] border-linha font-medium hover:bg-white"
               }`}>
               {t === "todos" ? "Todos os tipos" : TIPOS[t].n}
             </button>
@@ -71,9 +71,9 @@ export default function ContasClient({ contas, situacaoPorConta, lojas }: {
 
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="relative flex-1 min-w-[220px]">
-            <svg className="absolute left-3.5 top-1/2 -translate-y-1/2" width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="#999" strokeWidth="1.6"><circle cx="8.5" cy="8.5" r="5.5" /><path d="M13 13l4 4" /></svg>
+            <svg className="absolute left-3.5 top-1/2 -translate-y-1/2" width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="#adb5bd" strokeWidth="1.6"><circle cx="8.5" cy="8.5" r="5.5" /><path d="M13 13l4 4" /></svg>
             <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por fornecedor, loja ou código..."
-              className="w-full h-10 bg-[#f9f9f9] border border-linha rounded-md pl-10 pr-3 text-[13px] focus:outline-none focus:border-amarelo focus:ring-[3px] focus:ring-amarelo/10" />
+              className="w-full h-10 bg-[#f8f9fa] border border-linha rounded-md pl-10 pr-3 text-[13px] focus:outline-none focus:border-amarelo focus:ring-[3px] focus:ring-amarelo/10" />
           </div>
           <select value={fCoban} onChange={(e) => setFCoban(e.target.value)}
             className="h-10 bg-white border border-linha rounded-md px-3 text-[13px] text-[#1a1a1a] min-w-[150px]">
@@ -92,7 +92,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas }: {
             <option value="pendente">Em aberto</option><option value="lancado">Aguardando pagamento</option><option value="pago">Pagas</option>
           </select>
           {temFiltro && (
-            <button onClick={limparFiltros} className="flex items-center gap-1.5 text-[13px] text-[#666] hover:text-alerr font-medium">
+            <button onClick={limparFiltros} className="flex items-center gap-1.5 text-[13px] text-[#6c757d] hover:text-alerr font-medium">
               <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 5l10 10M15 5L5 15" /></svg>
               Limpar filtros
             </button>
@@ -101,10 +101,10 @@ export default function ContasClient({ contas, situacaoPorConta, lojas }: {
       </div>
 
       {/* Tabela */}
-      <div className="bg-white border border-linha rounded-lg overflow-hidden shadow-leve">
+      <div className="bg-white border border-linha rounded-xl overflow-hidden shadow-leve">
         <table className="w-full border-collapse">
           <thead>
-            <tr className="bg-[#f5f5f5] h-12">
+            <tr className="bg-[#f1f3f5] h-12">
               {["Loja", "Tipo", "Fornecedor", "Venc.", "Origem", "Status", ""].map((h) => (
                 <th key={h} className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">{h}</th>
               ))}
@@ -112,11 +112,11 @@ export default function ContasClient({ contas, situacaoPorConta, lojas }: {
           </thead>
           <tbody>
             {filtradas.map((c) => (
-              <tr key={c.id} onClick={() => setAberta(c)} className="h-14 cursor-pointer border-b border-[#f0f0f0] last:border-0 hover:bg-[#f9f9f9] transition group relative">
+              <tr key={c.id} onClick={() => setAberta(c)} className="h-14 cursor-pointer border-b border-[#f1f3f5] last:border-0 hover:bg-[#f8f9fa] transition group relative">
                 <td className="px-4 text-[13px] font-medium relative">
                   <span className="absolute left-0 top-0 bottom-0 w-1 bg-amarelo opacity-0 group-hover:opacity-100 transition" />
                   {c.lojas?.codigo ?? "—"}
-                  <small className="block text-[#999] text-[11px] font-mono">{c.lojas?.coban}</small>
+                  <small className="block text-[#adb5bd] text-[11px] font-mono">{c.lojas?.coban}</small>
                 </td>
                 <td className="px-4 text-[13px] font-medium">
                   <span className="inline-flex items-center gap-1.5">
@@ -132,12 +132,12 @@ export default function ContasClient({ contas, situacaoPorConta, lojas }: {
                 <td className="px-4 text-[13px]"><span className="badge bg-info-bg text-info">{ORIGENS[c.origem]}</span></td>
                 <td className="px-4 text-[13px]"><StatusBadge status={c.status} /></td>
                 <td className="px-4 text-right">
-                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#999" strokeWidth="1.6" className="inline group-hover:stroke-amarelo"><path d="M7.5 4.5l6 5.5-6 5.5" /></svg>
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#adb5bd" strokeWidth="1.6" className="inline group-hover:stroke-amarelo"><path d="M7.5 4.5l6 5.5-6 5.5" /></svg>
                 </td>
               </tr>
             ))}
             {filtradas.length === 0 && (
-              <tr><td colSpan={7} className="text-center py-14 text-[#999]">Nenhuma conta com esses filtros.</td></tr>
+              <tr><td colSpan={7} className="text-center py-14 text-[#adb5bd]">Nenhuma conta com esses filtros.</td></tr>
             )}
           </tbody>
         </table>
@@ -261,7 +261,7 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
       <aside className="fixed top-0 right-0 h-screen w-[380px] max-w-[94vw] bg-white border-l border-linha z-50 overflow-y-auto">
         <div className="relative px-5 py-5 border-b border-linha">
           <span className="absolute left-0 right-0 top-0 h-1 bg-amarelo" />
-          <button onClick={onClose} className="absolute right-5 top-5 text-[#999] hover:text-[#1a1a1a]">
+          <button onClick={onClose} className="absolute right-5 top-5 text-[#adb5bd] hover:text-[#1a1a1a]">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 5l10 10M15 5L5 15" /></svg>
           </button>
           <div className="flex items-center gap-3">
@@ -271,7 +271,7 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
             <div>
               <h3 className="text-[20px] font-bold text-[#1a1a1a] leading-tight">Conta de {T?.n}</h3>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[13px] text-[#666]">{conta.lojas?.codigo}</span>
+                <span className="text-[13px] text-[#6c757d]">{conta.lojas?.codigo}</span>
                 <StatusBadgeDrawer status={conta.status} />
               </div>
             </div>
@@ -301,11 +301,11 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
                 <Campo label="Usuário" valor={login ?? "não cadastrado"} mono />
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-[12px] text-[#999] font-medium mb-0.5">Senha</div>
+                    <div className="text-[12px] text-[#adb5bd] font-medium mb-0.5">Senha</div>
                     <div className="text-[13px] font-semibold text-[#1a1a1a] font-mono">{senha ?? "•••••••••"}</div>
                   </div>
                   {!senha && (
-                    <button onClick={revelar} disabled={revelando} className="text-[#999] hover:text-amarelo">
+                    <button onClick={revelar} disabled={revelando} className="text-[#adb5bd] hover:text-amarelo">
                       <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M2 10s3-5.5 8-5.5S18 10 18 10s-3 5.5-8 5.5S2 10 2 10z" /><circle cx="10" cy="10" r="2.3" /></svg>
                     </button>
                   )}
@@ -315,11 +315,11 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
             ) : (
               <div className="space-y-3">
                 <label>
-                  <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Usuário</div>
+                  <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Usuário</div>
                   <input value={novoLogin} onChange={(e) => setNovoLogin(e.target.value)} className="input-padrao w-full font-mono" />
                 </label>
                 <label>
-                  <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Nova senha</div>
+                  <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Nova senha</div>
                   <input value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} placeholder="deixe em branco para manter" className="input-padrao w-full font-mono" />
                 </label>
                 <button onClick={salvarCredencial} disabled={salvandoCred} className="btn-primario w-full">
@@ -356,16 +356,16 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
             ) : (
               <div className="card p-4">
                 <label className="block mb-3">
-                  <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Valor da fatura</div>
+                  <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Valor da fatura</div>
                   <input value={valorLancar} onChange={(e) => setValorLancar(e.target.value)} placeholder="0,00"
                     className="input-padrao w-full font-mono" />
                 </label>
                 <label className="block mb-3">
-                  <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Boleto (PDF ou imagem)</div>
+                  <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Boleto (PDF ou imagem)</div>
                   <input type="file" accept=".pdf,image/*" onChange={(e) => setArquivoBoleto(e.target.files?.[0] ?? null)}
-                    className="w-full text-[12.5px] file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-[#f5f5f5] file:text-[12px] file:font-medium" />
+                    className="w-full text-[12.5px] file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-[#f1f3f5] file:text-[12px] file:font-medium" />
                 </label>
-                <div className="text-[10.5px] text-[#999] mb-3 leading-snug">
+                <div className="text-[10.5px] text-[#adb5bd] mb-3 leading-snug">
                   Baixado do portal do fornecedor. Depois de lançar, a conta entra na fila de Aprovações.
                 </div>
                 {erroLancamento && <div className="text-[12px] text-alerr bg-alerr-bg rounded-md px-3 py-2 mb-3">{erroLancamento}</div>}
@@ -382,7 +382,7 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
           <div className="pt-5 mt-5 border-t border-linha">
             <div className="flex items-center justify-between mb-4">
               <div className="text-[14px] font-semibold text-[#1a1a1a]">Histórico mensal (R$)</div>
-              <span className="text-[12px] text-[#666]">Últimos 12 meses</span>
+              <span className="text-[12px] text-[#6c757d]">Últimos 12 meses</span>
             </div>
             <div className="flex items-stretch gap-1 h-[140px]">
               {Array.from({ length: 12 }).map((_, mi) => {
@@ -392,9 +392,9 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
                 return (
                   <div key={mi} className="flex-1 flex flex-col" title={`${MES[mi]}: ${money(v)}`}>
                     <div className="flex-1 flex items-end">
-                      <div className="w-full rounded-t-sm" style={{ height: `${h}%`, background: v == null ? "#f0f0f0" : "#FFC107" }} />
+                      <div className="w-full rounded-t-sm" style={{ height: `${h}%`, background: v == null ? "#f1f3f5" : "#FFC107" }} />
                     </div>
-                    <span className="text-[9px] text-[#999] font-mono text-center mt-1.5">{MES[mi][0]}</span>
+                    <span className="text-[9px] text-[#adb5bd] font-mono text-center mt-1.5">{MES[mi][0]}</span>
                   </div>
                 );
               })}
@@ -413,14 +413,14 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
 
 function StatusBadgeDrawer({ status }: { status: string }) {
   if (status === "encerrado") return <span className="badge bg-alerr-bg text-alerr">Encerrada</span>;
-  if (status === "inativo") return <span className="badge bg-[#f5f5f5] text-[#999]">Inativa</span>;
+  if (status === "inativo") return <span className="badge bg-[#f1f3f5] text-[#adb5bd]">Inativa</span>;
   return <span className="badge bg-ok-bg text-ok">Ativa</span>;
 }
 
 function Campo({ label, valor, mono }: { label: string; valor: string; mono?: boolean }) {
   return (
     <div>
-      <div className="text-[12px] text-[#999] font-medium mb-0.5">{label}</div>
+      <div className="text-[12px] text-[#adb5bd] font-medium mb-0.5">{label}</div>
       <div className={`text-[13px] font-semibold text-[#1a1a1a] ${mono ? "font-mono !font-normal" : ""}`}>{valor}</div>
     </div>
   );
@@ -445,43 +445,43 @@ function NovaContaDrawer({ lojas, onClose }: { lojas: { id: string; codigo: stri
       <aside className="fixed top-0 right-0 h-screen w-[380px] max-w-[94vw] bg-white border-l border-linha z-50 overflow-y-auto">
         <div className="relative px-5 py-5 border-b border-linha">
           <span className="absolute left-0 right-0 top-0 h-1 bg-amarelo" />
-          <button onClick={onClose} className="absolute right-5 top-5 text-[#999] hover:text-[#1a1a1a]">
+          <button onClick={onClose} className="absolute right-5 top-5 text-[#adb5bd] hover:text-[#1a1a1a]">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 5l10 10M15 5L5 15" /></svg>
           </button>
           <h3 className="text-[20px] font-bold text-[#1a1a1a]">Nova conta</h3>
         </div>
         <div className="p-5 space-y-3.5">
           <label>
-            <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Loja</div>
+            <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Loja</div>
             <select value={state.lojaId} onChange={(e) => updateField("lojaId", e.target.value)} className="input-padrao w-full">
               {lojas.map((l) => <option key={l.id} value={l.id}>{l.codigo}</option>)}
             </select>
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label>
-              <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Tipo</div>
+              <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Tipo</div>
               <select value={state.tipo} onChange={(e) => updateField("tipo", e.target.value)} className="input-padrao w-full">
                 {Object.entries(TIPOS).map(([k, v]) => <option key={k} value={k}>{v.n}</option>)}
               </select>
             </label>
             <label>
-              <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Origem</div>
+              <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Origem</div>
               <select value={state.origem} onChange={(e) => updateField("origem", e.target.value)} className="input-padrao w-full">
                 {Object.entries(ORIGENS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </label>
           </div>
           <label>
-            <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Fornecedor</div>
+            <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Fornecedor</div>
             <input value={state.fornecedor} onChange={(e) => updateField("fornecedor", e.target.value)} placeholder={CAMPOS_TIPO[state.tipo]?.placeholderFornecedor} className="input-padrao w-full" />
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label>
-              <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">{CAMPOS_TIPO[state.tipo]?.labelIdentificador ?? "Identificador"}</div>
+              <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">{CAMPOS_TIPO[state.tipo]?.labelIdentificador ?? "Identificador"}</div>
               <input value={state.identificador} onChange={(e) => updateField("identificador", e.target.value)} placeholder={CAMPOS_TIPO[state.tipo]?.placeholderIdentificador} className="input-padrao w-full font-mono" />
             </label>
             <label>
-              <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Vencimento</div>
+              <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Vencimento</div>
               <input value={state.vencimento} onChange={(e) => updateField("vencimento", e.target.value)} placeholder="1-31" className="input-padrao w-full" />
             </label>
           </div>
@@ -494,14 +494,14 @@ function NovaContaDrawer({ lojas, onClose }: { lojas: { id: string; codigo: stri
             )}
           </label>
           <label>
-            <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Login do portal</div>
+            <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Login do portal</div>
             <input value={state.login} onChange={(e) => updateField("login", e.target.value)} className="input-padrao w-full font-mono" />
           </label>
           <label>
-            <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Senha do portal</div>
+            <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Senha do portal</div>
             <input value={state.senha} onChange={(e) => updateField("senha", e.target.value)} className="input-padrao w-full font-mono" />
           </label>
-          <div className="text-[10.5px] text-[#999] leading-snug">A senha vai direto para o cofre criptografado.</div>
+          <div className="text-[10.5px] text-[#adb5bd] leading-snug">A senha vai direto para o cofre criptografado.</div>
           {error && <div className="text-[12px] text-alerr bg-alerr-bg rounded-md px-3 py-2">{error}</div>}
           <button onClick={handleSalvar} disabled={isLoading} className="btn-primario w-full">
             {isLoading ? "Salvando..." : "Criar conta"}
@@ -513,6 +513,6 @@ function NovaContaDrawer({ lojas, onClose }: { lojas: { id: string; codigo: stri
 }
 
 function SituacaoBadgeInline({ situacao }: { situacao: string }) {
-  const s = SITUACAO[situacao] ?? { label: situacao, cls: "bg-[#f5f5f5] text-[#999]" };
+  const s = SITUACAO[situacao] ?? { label: situacao, cls: "bg-[#f1f3f5] text-[#adb5bd]" };
   return <span className={`badge mt-1 ${s.cls}`}>{s.label}</span>;
 }

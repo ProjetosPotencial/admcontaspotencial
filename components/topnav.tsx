@@ -27,7 +27,7 @@ export default function TopNav({ nome, notificacoes = 0 }: { nome: string; notif
   }
 
   return (
-    <header className="h-16 bg-[#1a1a1a] px-6 flex items-center justify-between shrink-0 sticky top-0 z-30">
+    <header className="h-16 bg-ebano px-6 flex items-center justify-between shrink-0 sticky top-0 z-30">
       <div className="flex items-center gap-10">
         <Link href="/painel" className="flex items-center gap-2.5 shrink-0">
           <svg width="26" height="26" viewBox="0 0 72 72" fill="none">
@@ -66,14 +66,14 @@ export default function TopNav({ nome, notificacoes = 0 }: { nome: string; notif
                   <p className="text-[13px] text-[#1a1a1a] font-medium leading-snug">
                     <b className="text-alerr">{notificacoes}</b> {notificacoes === 1 ? "item precisa" : "itens precisam"} de atenção agora.
                   </p>
-                  <p className="text-[11.5px] text-[#666] mt-1">Contas atrasadas e sem origem mapeada.</p>
+                  <p className="text-[11.5px] text-[#6c757d] mt-1">Contas atrasadas e sem origem mapeada.</p>
                   <Link href="/alertas" onClick={() => setSinoAberto(false)}
                     className="block text-center mt-3 bg-amarelo text-[#1a1a1a] text-[12.5px] font-semibold rounded-md py-2 hover:brightness-95">
                     Ver alertas
                   </Link>
                 </>
               ) : (
-                <p className="text-[13px] text-[#666]">Nenhum alerta no momento.</p>
+                <p className="text-[13px] text-[#6c757d]">Nenhum alerta no momento.</p>
               )}
             </div>
           )}
@@ -81,7 +81,7 @@ export default function TopNav({ nome, notificacoes = 0 }: { nome: string; notif
         <div className="relative">
           <button onClick={() => setMenuAberto((v) => !v)} className="flex items-center gap-2">
             <span className="text-white/80 text-sm hidden sm:inline">Olá, {nome.split(" ")[0]}</span>
-            <div className="w-8 h-8 rounded-full bg-[#e0e0e0] text-[#1a1a1a] grid place-items-center font-disp font-semibold text-[12px]">{iniciais}</div>
+            <div className="w-8 h-8 rounded-full bg-[#e9ecef] text-[#1a1a1a] grid place-items-center font-disp font-semibold text-[12px]">{iniciais}</div>
           </button>
           {menuAberto && (
             <div className="absolute right-0 top-11 bg-white border border-linha rounded-md shadow-media w-40 py-1.5 z-40">

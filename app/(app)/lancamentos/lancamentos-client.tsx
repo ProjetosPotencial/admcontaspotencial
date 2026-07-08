@@ -33,7 +33,7 @@ export default function LancamentosClient({ itens, ano }: { itens: Item[]; ano: 
     <>
       <div className="flex flex-wrap items-center gap-2.5 mb-4">
         <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar loja ou fornecedor..."
-          className="h-10 bg-[#f9f9f9] border border-linha rounded-md px-3 text-[13px] min-w-[200px] flex-1 focus:outline-none focus:border-amarelo focus:ring-[3px] focus:ring-amarelo/10" />
+          className="h-10 bg-[#f8f9fa] border border-linha rounded-md px-3 text-[13px] min-w-[200px] flex-1 focus:outline-none focus:border-amarelo focus:ring-[3px] focus:ring-amarelo/10" />
         <select value={fMes} onChange={(e) => setFMes(e.target.value)} className="h-10 bg-white border border-linha rounded-md px-3 text-[13px]">
           <option value="todos">Todos os meses</option>
           {MES.map((m, i) => <option key={i} value={i + 1}>{m}/{ano}</option>)}
@@ -48,12 +48,12 @@ export default function LancamentosClient({ itens, ano }: { itens: Item[]; ano: 
         </select>
       </div>
 
-      <div className="text-[12px] text-[#999] mb-3">{filtrados.length} lançamentos · total {money(totalValor)}</div>
+      <div className="text-[12px] text-[#adb5bd] mb-3">{filtrados.length} lançamentos · total {money(totalValor)}</div>
 
       <div className="card overflow-hidden">
         <table className="w-full border-collapse">
           <thead>
-            <tr className="bg-[#f5f5f5] h-12">
+            <tr className="bg-[#f1f3f5] h-12">
               {["Mês", "Loja", "Tipo", "Fornecedor", "Valor", "Situação"].map((h) => (
                 <th key={h} className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">{h}</th>
               ))}
@@ -62,22 +62,22 @@ export default function LancamentosClient({ itens, ano }: { itens: Item[]; ano: 
           <tbody>
             {filtrados.map((l) => {
               const T = TIPOS[l.contas.tipo];
-              const s = SITUACAO[l.situacao] ?? { label: l.situacao, cls: "bg-[#f5f5f5] text-[#999]" };
+              const s = SITUACAO[l.situacao] ?? { label: l.situacao, cls: "bg-[#f1f3f5] text-[#adb5bd]" };
               return (
-                <tr key={l.id} className="h-12 border-b border-[#f0f0f0] last:border-0 hover:bg-[#f9f9f9]">
-                  <td className="px-4 text-[13px] font-mono text-[#666]">{MES[l.mes - 1]}</td>
+                <tr key={l.id} className="h-12 border-b border-[#f1f3f5] last:border-0 hover:bg-[#f8f9fa]">
+                  <td className="px-4 text-[13px] font-mono text-[#6c757d]">{MES[l.mes - 1]}</td>
                   <td className="px-4 text-[13px] font-medium">{l.contas.lojas?.codigo}</td>
                   <td className="px-4 text-[13px]">
                     <span className="inline-flex items-center gap-1.5"><TipoIcon tipo={l.contas.tipo} size={14} color={T?.c} />{T?.n}</span>
                   </td>
-                  <td className="px-4 text-[13px] text-[#666]">{l.contas.fornecedor_nome ?? "—"}</td>
+                  <td className="px-4 text-[13px] text-[#6c757d]">{l.contas.fornecedor_nome ?? "—"}</td>
                   <td className="px-4 text-[13px] font-mono font-semibold">{money(l.valor)}</td>
                   <td className="px-4"><span className={`badge ${s.cls}`}>{s.label}</span></td>
                 </tr>
               );
             })}
             {filtrados.length === 0 && (
-              <tr><td colSpan={6} className="text-center py-12 text-[#999]">Nenhum lançamento com esses filtros.</td></tr>
+              <tr><td colSpan={6} className="text-center py-12 text-[#adb5bd]">Nenhum lançamento com esses filtros.</td></tr>
             )}
           </tbody>
         </table>

@@ -23,7 +23,7 @@ export default async function CategoriasPage() {
     <>
       <div className="px-8 py-8">
         <h1 className="text-[32px] font-bold text-[#1a1a1a] leading-none">Categorias</h1>
-        <p className="text-[14px] text-[#666] mt-2.5">Os 7 tipos de conta usados no controle de consumo</p>
+        <p className="text-[14px] text-[#6c757d] mt-2.5">Os 7 tipos de conta usados no controle de consumo</p>
       </div>
       <div className="px-8 pb-8 max-w-[900px] grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {Object.entries(TIPOS).map(([k, T]) => {
@@ -37,7 +37,7 @@ export default async function CategoriasPage() {
                 <div className="font-semibold text-[15px] text-[#1a1a1a]">{T.n}</div>
               </div>
               <div className="text-[28px] font-bold text-[#1a1a1a] leading-none">{c.total}</div>
-              <div className="text-[12px] text-[#666] mt-1">{c.ativas} ativas de {c.total} cadastradas</div>
+              <div className="text-[12px] text-[#6c757d] mt-1">{c.ativas} ativas de {c.total} cadastradas</div>
             </div>
           );
         })}

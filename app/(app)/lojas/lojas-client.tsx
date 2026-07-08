@@ -158,7 +158,7 @@ function NovaLojaDrawer({ onClose, onCriada }: { onClose: () => void; onCriada: 
         <div onClick={() => onCriada(criada)} className="fixed inset-0 bg-ebano/40 z-40" />
         <aside className="fixed top-0 right-0 h-screen w-[460px] max-w-[94vw] bg-off border-l border-linha z-50 overflow-y-auto">
           <div className="bg-ebano text-white px-6 pt-5 pb-5">
-            <button onClick={() => onCriada(criada)} className="float-right bg-[#242424] text-[#bbb] w-[30px] h-[30px] rounded-lg text-base">×</button>
+            <button onClick={() => onCriada(criada)} className="float-right bg-ebano-3 text-[#bbb] w-[30px] h-[30px] rounded-lg text-base">×</button>
             <div className="text-[10px] tracking-[2px] uppercase text-amarelo font-semibold">Loja criada</div>
             <h3 className="font-disp text-[19px] font-semibold mt-1.5">{criada.codigo}</h3>
           </div>
@@ -182,7 +182,7 @@ function NovaLojaDrawer({ onClose, onCriada }: { onClose: () => void; onCriada: 
       <div onClick={onClose} className="fixed inset-0 bg-ebano/40 z-40" />
       <aside className="fixed top-0 right-0 h-screen w-[460px] max-w-[94vw] bg-off border-l border-linha z-50 overflow-y-auto">
         <div className="bg-ebano text-white px-6 pt-5 pb-5">
-          <button onClick={onClose} className="float-right bg-[#242424] text-[#bbb] w-[30px] h-[30px] rounded-lg text-base">×</button>
+          <button onClick={onClose} className="float-right bg-ebano-3 text-[#bbb] w-[30px] h-[30px] rounded-lg text-base">×</button>
           <div className="text-[10px] tracking-[2px] uppercase text-amarelo font-semibold">Nova loja</div>
           <h3 className="font-disp text-[19px] font-semibold mt-1.5">Cadastrar loja</h3>
         </div>
@@ -289,7 +289,7 @@ function LojaDrawer({ loja, onClose, onSalvar }: { loja: Loja; onClose: () => vo
       <div onClick={onClose} className="fixed inset-0 bg-ebano/40 z-40" />
       <aside className="fixed top-0 right-0 h-screen w-[460px] max-w-[94vw] bg-off border-l border-linha z-50 overflow-y-auto">
         <div className="bg-ebano text-white px-6 pt-5 pb-5">
-          <button onClick={onClose} className="float-right bg-[#242424] text-[#bbb] w-[30px] h-[30px] rounded-lg text-base">×</button>
+          <button onClick={onClose} className="float-right bg-ebano-3 text-[#bbb] w-[30px] h-[30px] rounded-lg text-base">×</button>
           <div className="text-[10px] tracking-[2px] uppercase text-amarelo font-semibold">{loja.coban}{loja.tipo_pdv ? ` · ${loja.tipo_pdv}` : ""}</div>
           <h3 className="font-disp text-[19px] font-semibold mt-1.5">{loja.codigo}</h3>
         </div>

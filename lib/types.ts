@@ -5,7 +5,7 @@ export const TIPOS: Record<string, { n: string; c: string; bg: string }> = {
   iptu: { n: "IPTU", c: "#43a047", bg: "#e8f5e9" },
   condominio: { n: "Condomínio", c: "#fb8c00", bg: "#ffe0b2" },
   aluguel: { n: "Aluguel", c: "#00897b", bg: "#e0f2f1" },
-  custo_geral: { n: "Custos gerais", c: "#757575", bg: "#f5f5f5" },
+  custo_geral: { n: "Custos gerais", c: "#757575", bg: "#f1f3f5" },
 };
 
 export const ORIGENS: Record<string, string> = {

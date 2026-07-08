@@ -67,7 +67,7 @@ export default function Sidebar() {
   const atual = pathname + (search.toString() ? "?" + search.toString() : "");
 
   return (
-    <aside className="bg-[#2a2a2a] w-[232px] shrink-0 h-[calc(100vh-64px)] sticky top-16 overflow-y-auto py-6">
+    <aside className="bg-ebano-2 w-[232px] shrink-0 h-[calc(100vh-64px)] sticky top-16 overflow-y-auto py-6">
       <nav className="flex flex-col">
         {GRUPOS.map((g) => (
           <div key={g.titulo} className="mb-1">
@@ -79,7 +79,7 @@ export default function Sidebar() {
               return (
                 <Link key={item.label} href={item.href}
                   className={`relative flex items-center gap-2.5 px-6 py-2.5 text-[13px] font-medium transition ${
-                    on ? "text-amarelo bg-[#333]" : "text-white/85 hover:bg-[#3a3a3a] hover:text-white"
+                    on ? "text-amarelo bg-ebano-3" : "text-white/85 hover:bg-ebano-3 hover:text-white"
                   }`}>
                   {on && <span className="absolute left-0 top-0 bottom-0 w-1 bg-amarelo" />}
                   {item.label}

@@ -26,50 +26,50 @@ export default async function PagamentosPage() {
     <>
       <div className="px-8 py-8">
         <h1 className="text-[32px] font-bold text-[#1a1a1a] leading-none">Pagamentos</h1>
-        <p className="text-[14px] text-[#666] mt-2.5">Lançamentos já aprovados, prontos para pagar ou já pagos</p>
+        <p className="text-[14px] text-[#6c757d] mt-2.5">Lançamentos já aprovados, prontos para pagar ou já pagos</p>
       </div>
       <div className="px-8 pb-8 max-w-[1000px] space-y-8">
         <section>
           <div className="flex items-baseline gap-2 mb-3">
             <h2 className="text-[16px] font-semibold text-[#1a1a1a]">Prontos para pagamento</h2>
-            <span className="text-[13px] text-[#999]">{prontosPagar.length} · {money(totalPronto)}</span>
+            <span className="text-[13px] text-[#adb5bd]">{prontosPagar.length} · {money(totalPronto)}</span>
           </div>
-          <div className="card divide-y divide-[#f0f0f0]">
+          <div className="card divide-y divide-[#f1f3f5]">
             {prontosPagar.map((i) => {
               const T = TIPOS[i.contas.tipo];
               return (
                 <div key={i.id} className="flex items-center gap-3 px-5 py-3 text-[13px]">
                   <TipoIcon tipo={i.contas.tipo} size={16} color={T?.c} />
                   <b className="font-semibold">{i.contas.lojas?.codigo}</b>
-                  <span className="text-[#666]">{i.contas.fornecedor_nome ?? "—"}</span>
+                  <span className="text-[#6c757d]">{i.contas.fornecedor_nome ?? "—"}</span>
                   <span className="ml-auto font-mono font-semibold">{money(i.valor)}</span>
                   <span className="badge bg-info-bg text-info">Aprovado</span>
                 </div>
               );
             })}
-            {prontosPagar.length === 0 && <div className="text-center py-10 text-[#999] text-[13px]">Nada aprovado aguardando pagamento agora.</div>}
+            {prontosPagar.length === 0 && <div className="text-center py-10 text-[#adb5bd] text-[13px]">Nada aprovado aguardando pagamento agora.</div>}
           </div>
         </section>
 
         <section>
           <div className="flex items-baseline gap-2 mb-3">
             <h2 className="text-[16px] font-semibold text-[#1a1a1a]">Pagos</h2>
-            <span className="text-[13px] text-[#999]">{pagos.length}</span>
+            <span className="text-[13px] text-[#adb5bd]">{pagos.length}</span>
           </div>
-          <div className="card divide-y divide-[#f0f0f0]">
+          <div className="card divide-y divide-[#f1f3f5]">
             {pagos.map((i) => {
               const T = TIPOS[i.contas.tipo];
               return (
                 <div key={i.id} className="flex items-center gap-3 px-5 py-3 text-[13px]">
                   <TipoIcon tipo={i.contas.tipo} size={16} color={T?.c} />
                   <b className="font-semibold">{i.contas.lojas?.codigo}</b>
-                  <span className="text-[#666]">{i.contas.fornecedor_nome ?? "—"}</span>
+                  <span className="text-[#6c757d]">{i.contas.fornecedor_nome ?? "—"}</span>
                   <span className="ml-auto font-mono font-semibold">{money(i.valor)}</span>
                   <span className="badge bg-ok-bg text-ok">Pago</span>
                 </div>
               );
             })}
-            {pagos.length === 0 && <div className="text-center py-10 text-[#999] text-[13px]">Nenhum pagamento registrado ainda em {ano}.</div>}
+            {pagos.length === 0 && <div className="text-center py-10 text-[#adb5bd] text-[13px]">Nenhum pagamento registrado ainda em {ano}.</div>}
           </div>
         </section>
       </div>

@@ -41,7 +41,7 @@ export default function AprovacoesClient({ itens }: { itens: Item[] }) {
     <>
       <div className="px-8 py-8 border-b border-linha bg-white">
         <h1 className="text-[32px] font-bold text-[#1a1a1a] leading-none">Aprovações</h1>
-        <p className="text-[14px] text-[#666] font-medium mt-2.5 flex items-center gap-2">
+        <p className="text-[14px] text-[#6c757d] font-medium mt-2.5 flex items-center gap-2">
           Aguardando sua decisão
           <span className="bg-amarelo text-[#1a1a1a] text-[12px] font-semibold rounded px-1.5 leading-5">{fila.length}</span>
           lançados no SIP, prontos para pagamento
@@ -51,7 +51,7 @@ export default function AprovacoesClient({ itens }: { itens: Item[] }) {
       <div className="px-8 py-6 max-w-[1100px]">
         {fila.length === 0 ? (
           <div className="card">
-            <div className="text-center py-16 text-[#999]">
+            <div className="text-center py-16 text-[#adb5bd]">
               <div className="w-14 h-14 rounded-full bg-ok-bg text-ok grid place-items-center mx-auto mb-4">
                 <svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 10.5l3.5 3.5L16 5.5" /></svg>
               </div>
@@ -64,7 +64,7 @@ export default function AprovacoesClient({ itens }: { itens: Item[] }) {
             {fila.map((item) => {
               const T = TIPOS[item.contas.tipo];
               return (
-                <div key={item.id} className="relative bg-white border border-linha rounded-lg shadow-leve hover:shadow-media transition p-5 flex items-center gap-5">
+                <div key={item.id} className="relative bg-white border border-linha rounded-xl shadow-leve hover:shadow-media transition p-5 flex items-center gap-5">
                   <span className="absolute left-0 top-0 bottom-0 w-1 bg-amarelo rounded-l-lg" />
 
                   <div className="w-14 h-14 rounded-full grid place-items-center shrink-0 relative" style={{ background: T?.bg }}>
@@ -76,22 +76,22 @@ export default function AprovacoesClient({ itens }: { itens: Item[] }) {
 
                   <div className="w-[140px] shrink-0">
                     <div className="text-[12px] font-bold text-[#1a1a1a] uppercase tracking-wide">{T?.n}</div>
-                    <div className="text-[13px] text-[#666] font-medium mt-0.5">{item.contas.eh_rateio ? "Conta com rateio" : "Conta de Consumo"}</div>
+                    <div className="text-[13px] text-[#6c757d] font-medium mt-0.5">{item.contas.eh_rateio ? "Conta com rateio" : "Conta de Consumo"}</div>
                   </div>
 
                   <div className="w-[170px] shrink-0">
                     <div className="flex items-center gap-1.5 text-[13px] font-semibold text-[#1a1a1a]">
-                      <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="#999" strokeWidth="1.6" className="shrink-0"><path d="M10 18.5s6-5.4 6-9.9A6 6 0 004 8.6c0 4.5 6 9.9 6 9.9z" /><circle cx="10" cy="8.5" r="2.2" /></svg>
+                      <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="#adb5bd" strokeWidth="1.6" className="shrink-0"><path d="M10 18.5s6-5.4 6-9.9A6 6 0 004 8.6c0 4.5 6 9.9 6 9.9z" /><circle cx="10" cy="8.5" r="2.2" /></svg>
                       <span className="truncate">{item.contas.lojas?.codigo}</span>
                     </div>
                     {item.contas.lojas?.cidade && (
-                      <div className="text-[12px] text-[#999] mt-0.5 ml-[19px]">{item.contas.lojas.cidade}{item.contas.lojas.uf ? ` - ${item.contas.lojas.uf}` : ""}</div>
+                      <div className="text-[12px] text-[#adb5bd] mt-0.5 ml-[19px]">{item.contas.lojas.cidade}{item.contas.lojas.uf ? ` - ${item.contas.lojas.uf}` : ""}</div>
                     )}
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 text-[13px] font-semibold text-[#1a1a1a]">
-                      <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="#999" strokeWidth="1.6" className="shrink-0"><rect x="3" y="4" width="14" height="13" rx="1.5" /><path d="M3 8h14" /></svg>
+                      <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="#adb5bd" strokeWidth="1.6" className="shrink-0"><rect x="3" y="4" width="14" height="13" rx="1.5" /><path d="M3 8h14" /></svg>
                       <span className="truncate">{item.contas.fornecedor_nome ?? "—"}</span>
                     </div>
                     {item.comprovante_url && (
@@ -104,7 +104,7 @@ export default function AprovacoesClient({ itens }: { itens: Item[] }) {
                   </div>
 
                   <div className="w-[130px] shrink-0 text-right">
-                    <div className="text-[11px] font-medium text-[#999]">Valor</div>
+                    <div className="text-[11px] font-medium text-[#adb5bd]">Valor</div>
                     <div className="text-[22px] font-bold text-amarelo">{money(item.valor)}</div>
                   </div>
 
@@ -127,14 +127,14 @@ export default function AprovacoesClient({ itens }: { itens: Item[] }) {
         )}
 
         {total > 0 && (
-          <div className="text-center text-[12px] text-[#999] font-medium mt-6">
+          <div className="text-center text-[12px] text-[#adb5bd] font-medium mt-6">
             Exibindo {fila.length} de {total} aprovações pendentes
           </div>
         )}
       </div>
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#1a1a1a] text-white px-5 py-3 rounded-lg text-[13px] flex items-center gap-2.5 shadow-forte z-50">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-ebano text-white px-5 py-3 rounded-lg text-[13px] flex items-center gap-2.5 shadow-forte z-50">
           <span className="w-2 h-2 rounded-full bg-amarelo" />{toast}
         </div>
       )}

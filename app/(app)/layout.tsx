@@ -31,7 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen flex flex-col bg-papel">
       <TopNav nome={nome} notificacoes={alertas.total} />
       <div className="flex flex-1 min-h-0">
-        <Suspense fallback={<div className="bg-[#2a2a2a] w-[232px] shrink-0" />}>
+        <Suspense fallback={<div className="bg-ebano-2 w-[232px] shrink-0" />}>
           <Sidebar />
         </Suspense>
         <main className="flex-1 min-w-0">{children}</main>
