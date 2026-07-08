@@ -112,7 +112,7 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
     supabase.from("lancamentos").select("ano, mes, valor, situacao")
       .eq("conta_id", conta.id).eq("ano", 2026)
       .then(({ data }) => setLancs((data ?? []) as Lancamento[]));
-    supabase.from("credenciais").select("login").eq("conta_id", conta.id).maybeSingle()
+    supabase.from("credenciais_login").select("login").eq("conta_id", conta.id).maybeSingle()
       .then(({ data }) => setLogin((data as any)?.login ?? "não cadastrado"));
   }, [conta.id]);
 
