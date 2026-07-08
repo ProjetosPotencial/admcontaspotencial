@@ -231,6 +231,7 @@ function LojaDrawer({ loja, onClose, onSalvar }: { loja: Loja; onClose: () => vo
   const [codigo, setCodigo] = useState(loja.codigo);
   const [coban, setCoban] = useState(loja.coban);
   const [tipoPdv, setTipoPdv] = useState(loja.tipo_pdv ?? "PE");
+  const [status, setStatus] = useState<"ativo" | "inativo">(loja.status === "inativo" ? "inativo" : "ativo");
   const [form, setForm] = useState<FormInst>({
     setor: loja.setor ?? "", empresa: loja.empresa ?? "", cnpj: loja.cnpj ?? "",
     contrato: loja.contrato ?? "", endereco: loja.endereco ?? "", cidade: loja.cidade ?? "",
@@ -241,6 +242,7 @@ function LojaDrawer({ loja, onClose, onSalvar }: { loja: Loja; onClose: () => vo
   const [erro, setErro] = useState<string | null>(null);
   const [encerrando, setEncerrando] = useState(false);
   const [motivo, setMotivo] = useState("");
+  const [reativando, setReativando] = useState(false);
 
   function set<K extends keyof FormInst>(k: K, v: string) { setForm((f) => ({ ...f, [k]: v })); }
 
@@ -249,7 +251,8 @@ function LojaDrawer({ loja, onClose, onSalvar }: { loja: Loja; onClose: () => vo
     setSalvando(true);
     setErro(null);
     const institucional = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v.trim() === "" ? null : v.trim()]));
-    const payload = { codigo: codigo.trim(), coban, tipo_pdv: tipoPdv, ...institucional };
+    const payload: any = { codigo: codigo.trim(), coban, tipo_pdv: tipoPdv, ...institucional };
+    if (loja.status !== "encerrada") payload.status = status;
     const { error } = await supabase.from("lojas").update(payload).eq("id", loja.id);
     setSalvando(false);
     if (error) { setErro(error.message.includes("duplicate") ? "Já existe uma loja com esse código." : "Sem permissão para salvar."); return; }
@@ -270,6 +273,17 @@ function LojaDrawer({ loja, onClose, onSalvar }: { loja: Loja; onClose: () => vo
     setEncerrando(false);
   }
 
+  async function reativar() {
+    setReativando(true);
+    const { error } = await supabase.from("lojas")
+      .update({ status: "ativo", motivo_encerramento: null })
+      .eq("id", loja.id);
+    setReativando(false);
+    if (error) { setAviso("Sem permissão para reativar esta loja."); return; }
+    setStatus("ativo");
+    onSalvar({ ...loja, status: "ativo", motivo_encerramento: null });
+  }
+
   return (
     <>
       <div onClick={onClose} className="fixed inset-0 bg-ebano/40 z-40" />
@@ -285,6 +299,10 @@ function LojaDrawer({ loja, onClose, onSalvar }: { loja: Loja; onClose: () => vo
             <div className="mb-4 text-[12px] text-alerr bg-alerr-bg rounded-lg px-3 py-2.5 leading-snug">
               <b className="block font-semibold mb-0.5">Loja encerrada</b>
               {loja.motivo_encerramento ?? "Sem motivo registrado."}
+              <button onClick={reativar} disabled={reativando}
+                className="block mt-2.5 text-[12px] font-semibold text-alerr underline hover:no-underline disabled:opacity-50">
+                {reativando ? "Reativando..." : "Reativar loja"}
+              </button>
             </div>
           )}
 
@@ -306,6 +324,16 @@ function LojaDrawer({ loja, onClose, onSalvar }: { loja: Loja; onClose: () => vo
                   {TIPO_PDVS.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
               </label>
+              {loja.status !== "encerrada" && (
+                <label>
+                  <div className="text-[10.5px] tracking-wide uppercase text-txt-3 font-semibold mb-1">Status</div>
+                  <select value={status} onChange={(e) => setStatus(e.target.value as "ativo" | "inativo")}
+                    className="w-full border border-linha rounded-[8px] px-2.5 py-2 text-[13px]">
+                    <option value="ativo">Ativa</option>
+                    <option value="inativo">Inativa</option>
+                  </select>
+                </label>
+              )}
             </div>
           </div>
 

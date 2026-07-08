@@ -11,7 +11,7 @@ type Item = {
   valor: number | null;
   situacao: string;
   comprovante_url?: string | null;
-  contas: { tipo: string; fornecedor_nome: string | null; eh_rateio: boolean; lojas: { codigo: string; coban: string } | null };
+  contas: { tipo: string; fornecedor_nome: string | null; eh_rateio: boolean; lojas: { codigo: string; coban: string; cidade: string | null; uf: string | null } | null };
 };
 
 export default function AprovacoesClient({ itens }: { itens: Item[] }) {
@@ -67,36 +67,45 @@ export default function AprovacoesClient({ itens }: { itens: Item[] }) {
                 <div key={item.id} className="relative bg-white border border-linha rounded-lg shadow-leve hover:shadow-media transition p-5 flex items-center gap-5">
                   <span className="absolute left-0 top-0 bottom-0 w-1 bg-amarelo rounded-l-lg" />
 
-                  <div className="w-14 h-14 rounded-lg grid place-items-center shrink-0 relative" style={{ background: T?.bg }}>
+                  <div className="w-14 h-14 rounded-full grid place-items-center shrink-0 relative" style={{ background: T?.bg }}>
                     <TipoIcon tipo={item.contas.tipo} size={26} color={T?.c} />
                     {item.contas.eh_rateio && (
                       <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-white border border-linha grid place-items-center text-[11px] font-bold" style={{ color: T?.c }}>÷</span>
                     )}
                   </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[12px] font-semibold text-[#999] uppercase tracking-wide">{T?.n}</div>
-                    <div className="text-[14px] font-semibold text-[#1a1a1a] mt-0.5">{item.contas.eh_rateio ? "Conta com rateio" : "Conta de Consumo"}</div>
-                    <div className="flex items-center gap-1.5 text-[12px] text-[#666] font-medium mt-1.5">
-                      <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="#666" strokeWidth="1.6"><path d="M10 18.5s6-5.4 6-9.9A6 6 0 004 8.6c0 4.5 6 9.9 6 9.9z" /><circle cx="10" cy="8.5" r="2.2" /></svg>
-                      {item.contas.lojas?.codigo}
+                  <div className="w-[140px] shrink-0">
+                    <div className="text-[12px] font-bold text-[#1a1a1a] uppercase tracking-wide">{T?.n}</div>
+                    <div className="text-[13px] text-[#666] font-medium mt-0.5">{item.contas.eh_rateio ? "Conta com rateio" : "Conta de Consumo"}</div>
+                  </div>
+
+                  <div className="w-[170px] shrink-0">
+                    <div className="flex items-center gap-1.5 text-[13px] font-semibold text-[#1a1a1a]">
+                      <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="#999" strokeWidth="1.6" className="shrink-0"><path d="M10 18.5s6-5.4 6-9.9A6 6 0 004 8.6c0 4.5 6 9.9 6 9.9z" /><circle cx="10" cy="8.5" r="2.2" /></svg>
+                      <span className="truncate">{item.contas.lojas?.codigo}</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-[12px] text-[#666] font-medium mt-1">
-                      <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="#666" strokeWidth="1.6"><rect x="3" y="4" width="14" height="13" rx="1.5" /><path d="M3 8h14" /></svg>
-                      {item.contas.fornecedor_nome ?? "—"}
+                    {item.contas.lojas?.cidade && (
+                      <div className="text-[12px] text-[#999] mt-0.5 ml-[19px]">{item.contas.lojas.cidade}{item.contas.lojas.uf ? ` - ${item.contas.lojas.uf}` : ""}</div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 text-[13px] font-semibold text-[#1a1a1a]">
+                      <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="#999" strokeWidth="1.6" className="shrink-0"><rect x="3" y="4" width="14" height="13" rx="1.5" /><path d="M3 8h14" /></svg>
+                      <span className="truncate">{item.contas.fornecedor_nome ?? "—"}</span>
                     </div>
                     {item.comprovante_url && (
                       <button onClick={() => verBoleto(item.comprovante_url!)}
-                        className="flex items-center gap-1.5 text-[12px] text-info font-semibold mt-1.5 hover:underline">
+                        className="flex items-center gap-1.5 text-[12px] text-info font-semibold mt-1 ml-[19px] hover:underline">
                         <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M6 3.5h6l4 4V19a1 1 0 01-1 1H6a1 1 0 01-1-1V4.5a1 1 0 011-1z" /><path d="M12 3.5V8h4" /></svg>
                         Ver boleto anexado
                       </button>
                     )}
                   </div>
 
-                  <div className="w-[150px] shrink-0 text-right">
+                  <div className="w-[130px] shrink-0 text-right">
                     <div className="text-[11px] font-medium text-[#999]">Valor</div>
-                    <div className="text-[24px] font-bold text-amarelo">{money(item.valor)}</div>
+                    <div className="text-[22px] font-bold text-amarelo">{money(item.valor)}</div>
                   </div>
 
                   <div className="w-[200px] shrink-0 flex gap-2 justify-end">
