@@ -2,16 +2,18 @@ import { createClient } from "@/lib/supabase/server";
 import { TIPOS } from "@/lib/types";
 import TipoIcon from "@/components/tipo-icon";
 import { money } from "@/lib/format";
+import { obterPeriodoAtual } from "@/lib/date-utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function PagamentosPage() {
   const supabase = createClient();
+  const { ano } = obterPeriodoAtual();
   const { data } = await supabase
     .from("lancamentos")
     .select("id, ano, mes, valor, situacao, aprovado_em, contas!inner ( tipo, fornecedor_nome, lojas ( codigo, coban ) )")
     .in("situacao", ["aprovado", "pago"])
-    .eq("ano", 2026)
+    .eq("ano", ano)
     .order("aprovado_em", { ascending: false })
     .limit(200);
 
@@ -67,7 +69,7 @@ export default async function PagamentosPage() {
                 </div>
               );
             })}
-            {pagos.length === 0 && <div className="text-center py-10 text-[#999] text-[13px]">Nenhum pagamento registrado ainda em 2026.</div>}
+            {pagos.length === 0 && <div className="text-center py-10 text-[#999] text-[13px]">Nenhum pagamento registrado ainda em {ano}.</div>}
           </div>
         </section>
       </div>

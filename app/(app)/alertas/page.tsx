@@ -2,18 +2,19 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { TIPOS } from "@/lib/types";
 import TipoIcon from "@/components/tipo-icon";
+import { obterPeriodoAtual, estaAtrasada } from "@/lib/date-utils";
 
 export const dynamic = "force-dynamic";
-const ANO = 2026, MES_ATUAL = 7;
 
 export default async function AlertasPage() {
   const supabase = createClient();
+  const { ano, mes } = obterPeriodoAtual();
 
-  const [{ data: lancJul }, { data: mapear }] = await Promise.all([
+  const [{ data: lancMes }, { data: mapear }] = await Promise.all([
     supabase
       .from("lancamentos")
       .select("id, situacao, contas!inner ( tipo, dia_vencimento, fornecedor_nome, lojas ( codigo ) )")
-      .eq("ano", ANO).eq("mes", MES_ATUAL)
+      .eq("ano", ano).eq("mes", mes)
       .in("situacao", ["pendente", "lancado"]),
     supabase
       .from("contas")
@@ -21,14 +22,9 @@ export default async function AlertasPage() {
       .eq("situacao_cadastro", "aprovada").eq("status", "ativo").eq("origem", "a_definir"),
   ]);
 
-  const hoje = new Date();
-  const diaAtual = hoje.getDate();
-  const mesJaPassou = hoje.getFullYear() > ANO || (hoje.getFullYear() === ANO && hoje.getMonth() + 1 > MES_ATUAL);
-  const atrasadas = (lancJul ?? []).filter((l: any) => {
-    const dv = l.contas?.dia_vencimento;
-    if (mesJaPassou) return true;
-    return dv && dv < diaAtual;
-  });
+  const atrasadas = (lancMes ?? []).filter((l: any) =>
+    estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano)
+  );
 
   return (
     <>

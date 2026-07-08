@@ -251,7 +251,7 @@ function LojaDrawer({ loja, onClose, onSalvar }: { loja: Loja; onClose: () => vo
     setSalvando(true);
     setErro(null);
     const institucional = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v.trim() === "" ? null : v.trim()]));
-    const payload: any = { codigo: codigo.trim(), coban, tipo_pdv: tipoPdv, ...institucional };
+    const payload: Partial<Loja> = { codigo: codigo.trim(), coban, tipo_pdv: tipoPdv, ...institucional };
     if (loja.status !== "encerrada") payload.status = status;
     const { error } = await supabase.from("lojas").update(payload).eq("id", loja.id);
     setSalvando(false);

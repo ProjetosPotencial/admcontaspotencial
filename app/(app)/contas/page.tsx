@@ -2,11 +2,13 @@ import { createClient } from "@/lib/supabase/server";
 import Topbar from "@/components/topbar";
 import ContasClient from "./contas-client";
 import type { Conta } from "@/lib/types";
+import { obterPeriodoAtual } from "@/lib/date-utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function ContasPage() {
   const supabase = createClient();
+  const { ano, mes } = obterPeriodoAtual();
   const [{ data }, { data: lancAtual }, { data: lojas }] = await Promise.all([
     supabase
       .from("contas")
@@ -16,8 +18,8 @@ export default async function ContasPage() {
     supabase
       .from("lancamentos")
       .select("conta_id, situacao")
-      .eq("ano", 2026)
-      .eq("mes", 7),
+      .eq("ano", ano)
+      .eq("mes", mes),
     supabase
       .from("lojas")
       .select("id, codigo")

@@ -10,7 +10,7 @@ type Item = {
   contas: { tipo: string; fornecedor_nome: string | null; lojas: { codigo: string; coban: string } | null };
 };
 
-export default function LancamentosClient({ itens }: { itens: Item[] }) {
+export default function LancamentosClient({ itens, ano }: { itens: Item[]; ano: number }) {
   const [fMes, setFMes] = useState("todos");
   const [fTipo, setFTipo] = useState("todos");
   const [fSituacao, setFSituacao] = useState("todos");
@@ -36,7 +36,7 @@ export default function LancamentosClient({ itens }: { itens: Item[] }) {
           className="h-10 bg-[#f9f9f9] border border-linha rounded-md px-3 text-[13px] min-w-[200px] flex-1 focus:outline-none focus:border-amarelo focus:ring-[3px] focus:ring-amarelo/10" />
         <select value={fMes} onChange={(e) => setFMes(e.target.value)} className="h-10 bg-white border border-linha rounded-md px-3 text-[13px]">
           <option value="todos">Todos os meses</option>
-          {MES.map((m, i) => <option key={i} value={i + 1}>{m}/2026</option>)}
+          {MES.map((m, i) => <option key={i} value={i + 1}>{m}/{ano}</option>)}
         </select>
         <select value={fTipo} onChange={(e) => setFTipo(e.target.value)} className="h-10 bg-white border border-linha rounded-md px-3 text-[13px]">
           <option value="todos">Todos os tipos</option>

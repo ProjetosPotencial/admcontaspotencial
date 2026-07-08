@@ -2,28 +2,21 @@ import { createClient } from "@/lib/supabase/server";
 import Topbar from "@/components/topbar";
 import TipoIcon from "@/components/tipo-icon";
 import { TIPOS } from "@/lib/types";
+import { obterPeriodoAtual, formatarPeriodo, estaAtrasada, variacaoPct } from "@/lib/date-utils";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
-const ANO: number = 2026;
-const MES_ATUAL: number = 7;
-// mês anterior, cruzando o ano quando for janeiro
-const MES_ANT = MES_ATUAL === 1 ? 12 : MES_ATUAL - 1;
-const ANO_ANT = MES_ATUAL === 1 ? ANO - 1 : ANO;
-
-function variacaoPct(atual: number, anterior: number | null): number | null {
-  if (anterior === null) return null; // sem foto do mes anterior = nao mostra nada, nao inventa
-  if (anterior === 0) return atual === 0 ? 0 : 100;
-  return Math.round(((atual - anterior) / anterior) * 1000) / 10;
-}
-
 export default async function PainelPage() {
   const supabase = createClient();
 
+  // Obtém o período atual dinamicamente
+  const { ano, mes, mesAnterior, anoAnterior } = obterPeriodoAtual();
+  const periodoFormatado = formatarPeriodo(mes, ano);
+
   const [
     { data: contas },
-    { data: lancJul },
+    { data: lancamentos },
     { data: lojasEncerradas },
     { count: totalLojasEncerradas },
     { data: metricaAnterior },
@@ -35,8 +28,8 @@ export default async function PainelPage() {
     supabase
       .from("lancamentos")
       .select("conta_id, situacao, contas!inner(tipo, dia_vencimento)")
-      .eq("ano", ANO)
-      .eq("mes", MES_ATUAL),
+      .eq("ano", ano)
+      .eq("mes", mes),
     supabase
       .from("lojas")
       .select("codigo, coban, empresa, cidade, uf, encerrada_em")
@@ -50,31 +43,29 @@ export default async function PainelPage() {
     supabase
       .from("metricas_mensais")
       .select("contas_ativas, a_lancar, aguardando_pagamento, origem_a_mapear")
-      .eq("ano", ANO_ANT).eq("mes", MES_ANT)
+      .eq("ano", anoAnterior)
+      .eq("mes", mesAnterior)
       .maybeSingle(),
   ]);
 
-  const hoje = new Date();
-  const diaAtual = hoje.getDate();
-  const mesJaPassou = hoje.getFullYear() > ANO || (hoje.getFullYear() === ANO && hoje.getMonth() + 1 > MES_ATUAL);
-  function estaAtrasada(situacao: string, diaVenc: number | null) {
-    if (situacao !== "pendente" && situacao !== "lancado") return false;
-    if (mesJaPassou) return true;
-    if (!diaVenc) return false;
-    return diaVenc < diaAtual;
-  }
-
+  // Calcula métricas por tipo de conta
   const tipos = Object.keys(TIPOS);
   const porTipo = tipos.map((t) => {
     const doTipo = (contas ?? []).filter((c) => c.tipo === t && c.status === "ativo");
     const ativas = doTipo.length;
     const mapear = doTipo.filter((c) => c.origem === "a_definir").length;
-    const lanc = (lancJul ?? []).filter((l: any) => l.contas?.tipo === t);
-    const atrasadas = lanc.filter((l: any) => estaAtrasada(l.situacao, l.contas?.dia_vencimento)).length;
+    const lanc = (lancamentos ?? []).filter((l: any) => l.contas?.tipo === t);
+    const atrasadas = lanc.filter((l: any) =>
+      estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano)
+    ).length;
     const abertoTotal = lanc.filter((l) => l.situacao === "pendente").length;
     const lancadoTotal = lanc.filter((l) => l.situacao === "lancado").length;
-    const aberto = abertoTotal - lanc.filter((l: any) => l.situacao === "pendente" && estaAtrasada(l.situacao, l.contas?.dia_vencimento)).length;
-    const lancado = lancadoTotal - lanc.filter((l: any) => l.situacao === "lancado" && estaAtrasada(l.situacao, l.contas?.dia_vencimento)).length;
+    const aberto = abertoTotal - lanc.filter((l: any) =>
+      l.situacao === "pendente" && estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano)
+    ).length;
+    const lancado = lancadoTotal - lanc.filter((l: any) =>
+      l.situacao === "lancado" && estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano)
+    ).length;
     return { t, ativas, mapear, aberto: Math.max(aberto, 0), lancado: Math.max(lancado, 0), atrasadas };
   });
 
@@ -90,7 +81,7 @@ export default async function PainelPage() {
         {/* KPIs - grid 4 colunas */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
           <KpiCard icon="doc" value={totAtivas} label="Contas ativas" variacao={variacaoPct(totAtivas, metricaAnterior?.contas_ativas ?? null)} />
-          <KpiCard icon="calendar" value={totAberto} label="A lançar em julho" variacao={variacaoPct(totAberto, metricaAnterior?.a_lancar ?? null)} />
+          <KpiCard icon="calendar" value={totAberto} label={`A lançar em ${formatarPeriodo(mes, ano).split("/")[0].toLowerCase()}`} variacao={variacaoPct(totAberto, metricaAnterior?.a_lancar ?? null)} />
           <KpiCard icon="hourglass" value={totLancado} label="Aguardando pagamento" variacao={variacaoPct(totLancado, metricaAnterior?.aguardando_pagamento ?? null)} />
           <KpiCard icon="pin" value={totMapear} label="Origem a mapear" variacao={variacaoPct(totMapear, metricaAnterior?.origem_a_mapear ?? null)} />
         </div>
@@ -100,7 +91,7 @@ export default async function PainelPage() {
           <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#999" strokeWidth="1.6"><circle cx="10" cy="10" r="7.5" /><path d="M10 9v4.5M10 6.7v.1" /></svg>
           <span className="ml-auto text-[13px] text-[#666] flex items-center gap-1.5 border border-linha rounded-md px-3 py-1.5 bg-white">
             <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#666" strokeWidth="1.6"><rect x="3.5" y="5" width="13" height="12" rx="1.5" /><path d="M3.5 8.5h13" /></svg>
-            Este mês (Julho/2026)
+            Este mês ({periodoFormatado})
           </span>
         </div>
 

@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TIPOS, ORIGENS, SITUACAO, type Conta, type Lancamento } from "@/lib/types";
 import { CAMPOS_TIPO } from "@/lib/campos-tipo";
+import { useContaForm } from "@/lib/hooks/useContaForm";
+import { obterPeriodoAtual, formatarPeriodo } from "@/lib/date-utils";
 import TipoIcon from "@/components/tipo-icon";
 import { money, MES } from "@/lib/format";
 
@@ -165,11 +167,11 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
   const [salvandoLancamento, setSalvandoLancamento] = useState(false);
   const [erroLancamento, setErroLancamento] = useState<string | null>(null);
 
-  const ANO_ATUAL = 2026, MES_ATUAL = 7;
+  const { ano: ANO_ATUAL, mes: MES_ATUAL } = obterPeriodoAtual();
 
   function carregarLancamentos() {
     supabase.from("lancamentos").select("id, ano, mes, valor, situacao, comprovante_url")
-      .eq("conta_id", conta.id).eq("ano", 2026)
+      .eq("conta_id", conta.id).eq("ano", ANO_ATUAL)
       .then(({ data }) => setLancs((data ?? []) as Lancamento[]));
   }
 
@@ -328,7 +330,7 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
           </div>
 
           <div className="pt-5 mt-5 border-t border-linha">
-            <div className="text-[14px] font-semibold text-[#1a1a1a] mb-3.5">Fatura de julho/2026</div>
+            <div className="text-[14px] font-semibold text-[#1a1a1a] mb-3.5">Fatura de {formatarPeriodo(MES_ATUAL, ANO_ATUAL)}</div>
 
             {lancamentoAtual && lancamentoAtual.situacao !== "pendente" ? (
               <div className="card p-4">
@@ -349,7 +351,7 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
             ) : !lancando ? (
               <button onClick={() => setLancando(true)}
                 className="w-full text-[12.5px] font-semibold text-amb border border-amarelo/40 bg-amb-bg rounded-md py-2.5 hover:bg-amarelo/10 transition">
-                {lancamentoAtual ? "Lançar fatura de julho" : "Lançar fatura de julho (sem lançamento pendente ainda)"}
+                {lancamentoAtual ? `Lançar fatura de ${formatarPeriodo(MES_ATUAL, ANO_ATUAL).toLowerCase()}` : `Lançar fatura de ${formatarPeriodo(MES_ATUAL, ANO_ATUAL).toLowerCase()} (sem lançamento pendente ainda)`}
               </button>
             ) : (
               <div className="card p-4">
@@ -425,35 +427,16 @@ function Campo({ label, valor, mono }: { label: string; valor: string; mono?: bo
 }
 
 function NovaContaDrawer({ lojas, onClose }: { lojas: { id: string; codigo: string }[]; onClose: () => void }) {
-  const supabase = createClient();
-  const [lojaId, setLojaId] = useState(lojas[0]?.id ?? "");
-  const [tipo, setTipo] = useState("agua");
-  const [fornecedor, setFornecedor] = useState("");
-  const [identificador, setIdentificador] = useState("");
-  const [venc, setVenc] = useState("");
-  const [origem, setOrigem] = useState("a_definir");
-  const [login, setLogin] = useState("");
-  const [senha, setSenha] = useState("");
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
+  const router = useRouter();
+  const { state, updateField, isLoading, error, salvar } = useContaForm(lojas[0]?.id ?? "");
 
-  async function salvar() {
-    if (!lojaId) { setErro("Selecione a loja."); return; }
-    setSalvando(true);
-    setErro(null);
-    const { data, error } = await supabase.from("contas").insert({
-      loja_id: lojaId, tipo, fornecedor_nome: fornecedor.trim() || null,
-      identificador: identificador.trim() || null,
-      dia_vencimento: venc ? Number(venc) : null,
-      origem, situacao_cadastro: "aprovada", status: "ativo",
-    }).select().single();
-
-    if (error) { setSalvando(false); setErro("Não foi possível salvar a conta."); return; }
-    if (login.trim() || senha.trim()) {
-      await supabase.rpc("credencial_salvar", { p_conta_id: data.id, p_login: login.trim() || null, p_senha: senha.trim() || null });
+  async function handleSalvar() {
+    const resultado = await salvar();
+    if (resultado) {
+      // atualiza os dados da página sem recarregar o navegador inteiro
+      router.refresh();
+      onClose();
     }
-    setSalvando(false);
-    window.location.reload();
   }
 
   return (
@@ -470,50 +453,58 @@ function NovaContaDrawer({ lojas, onClose }: { lojas: { id: string; codigo: stri
         <div className="p-5 space-y-3.5">
           <label>
             <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Loja</div>
-            <select value={lojaId} onChange={(e) => setLojaId(e.target.value)} className="input-padrao w-full">
+            <select value={state.lojaId} onChange={(e) => updateField("lojaId", e.target.value)} className="input-padrao w-full">
               {lojas.map((l) => <option key={l.id} value={l.id}>{l.codigo}</option>)}
             </select>
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label>
               <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Tipo</div>
-              <select value={tipo} onChange={(e) => setTipo(e.target.value)} className="input-padrao w-full">
+              <select value={state.tipo} onChange={(e) => updateField("tipo", e.target.value)} className="input-padrao w-full">
                 {Object.entries(TIPOS).map(([k, v]) => <option key={k} value={k}>{v.n}</option>)}
               </select>
             </label>
             <label>
               <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Origem</div>
-              <select value={origem} onChange={(e) => setOrigem(e.target.value)} className="input-padrao w-full">
+              <select value={state.origem} onChange={(e) => updateField("origem", e.target.value)} className="input-padrao w-full">
                 {Object.entries(ORIGENS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </label>
           </div>
           <label>
             <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Fornecedor</div>
-            <input value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} placeholder={CAMPOS_TIPO[tipo]?.placeholderFornecedor} className="input-padrao w-full" />
+            <input value={state.fornecedor} onChange={(e) => updateField("fornecedor", e.target.value)} placeholder={CAMPOS_TIPO[state.tipo]?.placeholderFornecedor} className="input-padrao w-full" />
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label>
-              <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">{CAMPOS_TIPO[tipo]?.labelIdentificador ?? "Identificador"}</div>
-              <input value={identificador} onChange={(e) => setIdentificador(e.target.value)} placeholder={CAMPOS_TIPO[tipo]?.placeholderIdentificador} className="input-padrao w-full font-mono" />
+              <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">{CAMPOS_TIPO[state.tipo]?.labelIdentificador ?? "Identificador"}</div>
+              <input value={state.identificador} onChange={(e) => updateField("identificador", e.target.value)} placeholder={CAMPOS_TIPO[state.tipo]?.placeholderIdentificador} className="input-padrao w-full font-mono" />
             </label>
             <label>
               <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Vencimento</div>
-              <input value={venc} onChange={(e) => setVenc(e.target.value)} placeholder="1-31" className="input-padrao w-full" />
+              <input value={state.vencimento} onChange={(e) => updateField("vencimento", e.target.value)} placeholder="1-31" className="input-padrao w-full" />
             </label>
           </div>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={state.ehRateio} onChange={(e) => updateField("ehRateio", e.target.checked)} className="w-4 h-4" />
+            <span className="text-[12.5px] text-txt-2">É rateio</span>
+            {state.ehRateio && (
+              <input value={state.rateioDivisor} onChange={(e) => updateField("rateioDivisor", e.target.value)} placeholder="/2"
+                className="w-16 border border-linha rounded-md px-2 py-1.5 text-[12.5px] ml-1" />
+            )}
+          </label>
           <label>
             <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Login do portal</div>
-            <input value={login} onChange={(e) => setLogin(e.target.value)} className="input-padrao w-full font-mono" />
+            <input value={state.login} onChange={(e) => updateField("login", e.target.value)} className="input-padrao w-full font-mono" />
           </label>
           <label>
             <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Senha do portal</div>
-            <input value={senha} onChange={(e) => setSenha(e.target.value)} className="input-padrao w-full font-mono" />
+            <input value={state.senha} onChange={(e) => updateField("senha", e.target.value)} className="input-padrao w-full font-mono" />
           </label>
           <div className="text-[10.5px] text-[#999] leading-snug">A senha vai direto para o cofre criptografado.</div>
-          {erro && <div className="text-[12px] text-alerr bg-alerr-bg rounded-md px-3 py-2">{erro}</div>}
-          <button onClick={salvar} disabled={salvando} className="btn-primario w-full">
-            {salvando ? "Salvando..." : "Criar conta"}
+          {error && <div className="text-[12px] text-alerr bg-alerr-bg rounded-md px-3 py-2">{error}</div>}
+          <button onClick={handleSalvar} disabled={isLoading} className="btn-primario w-full">
+            {isLoading ? "Salvando..." : "Criar conta"}
           </button>
         </div>
       </aside>

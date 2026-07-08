@@ -1,16 +1,18 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { money } from "@/lib/format";
+import { obterPeriodoAtual } from "@/lib/date-utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function CentrosDeCustoPage() {
   const supabase = createClient();
+  const { ano } = obterPeriodoAtual();
 
   const { data } = await supabase
     .from("lancamentos")
     .select("valor, contas!inner ( loja_id, lojas ( codigo, coban ) )")
-    .eq("ano", 2026)
+    .eq("ano", ano)
     .not("valor", "is", null);
 
   const porLoja: Record<string, { codigo: string; coban: string; total: number; qtd: number }> = {};
@@ -30,7 +32,7 @@ export default async function CentrosDeCustoPage() {
     <>
       <div className="px-8 py-8">
         <h1 className="text-[32px] font-bold text-[#1a1a1a] leading-none">Centros de custo</h1>
-        <p className="text-[14px] text-[#666] mt-2.5">Gasto acumulado de 2026 por loja, com base nos lançamentos reais</p>
+        <p className="text-[14px] text-[#666] mt-2.5">Gasto acumulado de {ano} por loja, com base nos lançamentos reais</p>
       </div>
       <div className="px-8 pb-8 max-w-[900px]">
         <div className="card overflow-hidden">
@@ -39,7 +41,7 @@ export default async function CentrosDeCustoPage() {
               <tr className="bg-[#f5f5f5] h-12">
                 <th className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">Loja</th>
                 <th className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">Lançamentos</th>
-                <th className="text-right text-[12px] font-semibold text-[#1a1a1a] px-4">Total 2026</th>
+                <th className="text-right text-[12px] font-semibold text-[#1a1a1a] px-4">Total {ano}</th>
                 <th className="text-right text-[12px] font-semibold text-[#1a1a1a] px-4">% do total</th>
               </tr>
             </thead>
@@ -56,7 +58,7 @@ export default async function CentrosDeCustoPage() {
                 </tr>
               ))}
               {ranking.length === 0 && (
-                <tr><td colSpan={4} className="text-center py-12 text-[#999]">Sem lançamentos com valor em 2026.</td></tr>
+                <tr><td colSpan={4} className="text-center py-12 text-[#999]">Sem lançamentos com valor em {ano}.</td></tr>
               )}
             </tbody>
           </table>

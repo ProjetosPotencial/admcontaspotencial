@@ -1,13 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { estaAtrasada } from "./date-utils";
 
-// Conta rápida usada pelo sino de notificação no topo. Mesma lógica de
-// "atrasada" usada no Painel e na tela de Alertas: lançamento pendente ou
-// lançado cujo vencimento já passou dentro do mês corrente.
+// Conta rápida usada pelo sino de notificação no topo. Mesma função de
+// "atrasada" usada no Painel e na tela de Alertas (lib/date-utils.ts),
+// pra não ter uma terceira cópia dessa regra espalhada pelo projeto.
 export async function contarAlertas(supabase: SupabaseClient, ano: number, mes: number) {
-  const hoje = new Date();
-  const diaAtual = hoje.getDate();
-  const mesJaPassou = hoje.getFullYear() > ano || (hoje.getFullYear() === ano && hoje.getMonth() + 1 > mes);
-
   const [{ data: lanc }, { count: mapear }] = await Promise.all([
     supabase
       .from("lancamentos")
@@ -23,11 +20,9 @@ export async function contarAlertas(supabase: SupabaseClient, ano: number, mes: 
       .eq("origem", "a_definir"),
   ]);
 
-  const atrasadas = (lanc ?? []).filter((l: any) => {
-    const dv = l.contas?.dia_vencimento;
-    if (mesJaPassou) return true;
-    return dv != null && dv < diaAtual;
-  }).length;
+  const atrasadas = (lanc ?? []).filter((l: any) =>
+    estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano)
+  ).length;
 
   const totalMapear = mapear ?? 0;
   return { atrasadas, mapear: totalMapear, total: atrasadas + totalMapear };

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { contarAlertas } from "@/lib/alertas";
+import { obterPeriodoAtual } from "@/lib/date-utils";
 import Sidebar from "@/components/sidebar";
 import TopNav from "@/components/topnav";
 
@@ -18,9 +19,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   // perfil (nome) e a contagem do sino saem em paralelo, não uma depois da
   // outra, pra não pesar a navegação entre páginas.
+  const { ano, mes } = obterPeriodoAtual();
   const [{ data: perfil }, alertas] = await Promise.all([
     supabase.from("perfis").select("nome, papel").eq("id", user.id).single(),
-    contarAlertas(supabase, 2026, 7),
+    contarAlertas(supabase, ano, mes),
   ]);
 
   const nome = perfil?.nome ?? user.email ?? "Usuário";
