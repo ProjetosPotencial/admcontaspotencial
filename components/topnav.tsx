@@ -1,91 +1,51 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import Link from "next/link";
+import { formatarPeriodo, obterPeriodoAtual } from "@/lib/date-utils";
 
-const ABAS = [
-  { href: "/painel", label: "PAINEL" },
-  { href: "/contas", label: "CONTAS" },
-  { href: "/aprovacoes", label: "APROVAÇÕES" },
-  { href: "/cofre", label: "COFRE" },
-];
-
-export default function TopNav({ nome, notificacoes = 0 }: { nome: string; notificacoes?: number }) {
-  const pathname = usePathname();
-  const router = useRouter();
-  const supabase = createClient();
-  const [menuAberto, setMenuAberto] = useState(false);
+export default function TopNav({ notificacoes = 0 }: { notificacoes?: number }) {
   const [sinoAberto, setSinoAberto] = useState(false);
-  const iniciais = nome.split(" ").map((s) => s[0]).slice(0, 2).join("").toUpperCase();
-
-  async function sair() {
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
-  }
+  const { ano, mes } = obterPeriodoAtual();
+  const periodo = formatarPeriodo(mes, ano);
 
   return (
-    <header className="h-16 bg-ebano px-6 flex items-center justify-between shrink-0 sticky top-0 z-30">
-      <div className="flex items-center gap-10">
-        <Link href="/painel" className="flex items-center gap-2.5 shrink-0">
-          <svg width="26" height="26" viewBox="0 0 72 72" fill="none">
-            <path d="M18 8h20c11 0 18 7 18 17s-7 17-18 17H30v22H18V8z" fill="#FFC107" />
-            <path d="M30 20h7c4.5 0 7 2.2 7 5.5S41.5 31 37 31h-7V20z" fill="#1a1a1a" />
-          </svg>
-          <span className="text-white font-disp font-bold text-[15px] tracking-tight leading-none">POTENCIAL <span className="text-amarelo">CONTAS</span></span>
-        </Link>
+    <header className="h-16 bg-white border-b border-linha px-6 flex items-center justify-between shrink-0 sticky top-0 z-30">
+      <button className="text-txt-2 hover:text-txt md:hidden" aria-label="Abrir menu">
+        <svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M3 6h14M3 10h14M3 14h14" /></svg>
+      </button>
 
-        <nav className="hidden md:flex items-center gap-8">
-          {ABAS.map((a) => {
-            const on = pathname.startsWith(a.href);
-            return (
-              <Link key={a.href} href={a.href}
-                className={`relative text-sm font-medium py-5 transition ${on ? "text-white" : "text-white/70 hover:text-amarelo/80"}`}>
-                {a.label}
-                {on && <span className="absolute left-0 right-0 -bottom-px h-[3px] bg-amarelo rounded-t" />}
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
+      <div className="flex-1" />
 
-      <div className="flex items-center gap-5">
+      <div className="flex items-center gap-3">
+        <div className="hidden sm:flex items-center gap-2 border border-linha rounded-lg px-3.5 py-2 text-[13px] font-medium text-txt bg-white">
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="#6c757d" strokeWidth="1.6"><rect x="3.5" y="5" width="13" height="12" rx="1.5" /><path d="M3.5 8.5h13M7 3v3.5M13 3v3.5" /></svg>
+          {periodo}
+        </div>
+
         <div className="relative">
-          <button onClick={() => setSinoAberto((v) => !v)} className="relative text-white/80 hover:text-white">
+          <button onClick={() => setSinoAberto((v) => !v)} className="relative text-txt-2 hover:text-txt w-9 h-9 grid place-items-center rounded-lg hover:bg-off transition">
             <svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M5 8a5 5 0 0110 0c0 4 1.5 5 1.5 5h-13S5 12 5 8z" /><path d="M8 16a2 2 0 004 0" /></svg>
             {notificacoes > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 bg-amarelo text-[#1a1a1a] text-[10px] font-bold w-4 h-4 rounded-full grid place-items-center">{notificacoes}</span>
+              <span className="absolute top-1 right-1 bg-alerr text-white text-[10px] font-bold w-4 h-4 rounded-full grid place-items-center">{notificacoes}</span>
             )}
           </button>
           {sinoAberto && (
-            <div className="absolute right-0 top-11 bg-white border border-linha rounded-md shadow-media w-64 py-3 px-4 z-40">
+            <div className="absolute right-0 top-11 bg-white border border-linha rounded-lg shadow-media w-64 py-3 px-4 z-40">
               {notificacoes > 0 ? (
                 <>
-                  <p className="text-[13px] text-[#1a1a1a] font-medium leading-snug">
+                  <p className="text-[13px] text-txt font-medium leading-snug">
                     <b className="text-alerr">{notificacoes}</b> {notificacoes === 1 ? "item precisa" : "itens precisam"} de atenção agora.
                   </p>
-                  <p className="text-[11.5px] text-[#6c757d] mt-1">Contas atrasadas e sem origem mapeada.</p>
+                  <p className="text-[11.5px] text-txt-2 mt-1">Contas atrasadas e sem origem mapeada.</p>
                   <Link href="/alertas" onClick={() => setSinoAberto(false)}
-                    className="block text-center mt-3 bg-amarelo text-[#1a1a1a] text-[12.5px] font-semibold rounded-md py-2 hover:brightness-95">
+                    className="block text-center mt-3 bg-amarelo text-ebano text-[12.5px] font-semibold rounded-md py-2 hover:brightness-95">
                     Ver alertas
                   </Link>
                 </>
               ) : (
-                <p className="text-[13px] text-[#6c757d]">Nenhum alerta no momento.</p>
+                <p className="text-[13px] text-txt-2">Nenhum alerta no momento.</p>
               )}
-            </div>
-          )}
-        </div>
-        <div className="relative">
-          <button onClick={() => setMenuAberto((v) => !v)} className="flex items-center gap-2">
-            <span className="text-white/80 text-sm hidden sm:inline">Olá, {nome.split(" ")[0]}</span>
-            <div className="w-8 h-8 rounded-full bg-[#e9ecef] text-[#1a1a1a] grid place-items-center font-disp font-semibold text-[12px]">{iniciais}</div>
-          </button>
-          {menuAberto && (
-            <div className="absolute right-0 top-11 bg-white border border-linha rounded-md shadow-media w-40 py-1.5 z-40">
-              <button onClick={sair} className="w-full text-left px-4 py-2 text-[13px] text-txt hover:bg-off">Sair</button>
             </div>
           )}
         </div>

@@ -12,7 +12,6 @@ export default async function PainelPage() {
 
   // Obtém o período atual dinamicamente
   const { ano, mes, mesAnterior, anoAnterior } = obterPeriodoAtual();
-  const periodoFormatado = formatarPeriodo(mes, ano);
 
   const [
     { data: contas },
@@ -58,6 +57,9 @@ export default async function PainelPage() {
     const atrasadas = lanc.filter((l: any) =>
       estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano)
     ).length;
+    const pagas = lanc.filter((l) => l.situacao === "pago").length;
+    const aguardando = lanc.filter((l) => l.situacao === "lancado" || l.situacao === "aprovado").length;
+    const aLancar = lanc.filter((l) => l.situacao === "pendente").length;
     const abertoTotal = lanc.filter((l) => l.situacao === "pendente").length;
     const lancadoTotal = lanc.filter((l) => l.situacao === "lancado").length;
     const aberto = abertoTotal - lanc.filter((l: any) =>
@@ -66,7 +68,7 @@ export default async function PainelPage() {
     const lancado = lancadoTotal - lanc.filter((l: any) =>
       l.situacao === "lancado" && estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano)
     ).length;
-    return { t, ativas, mapear, aberto: Math.max(aberto, 0), lancado: Math.max(lancado, 0), atrasadas };
+    return { t, ativas, mapear, aberto: Math.max(aberto, 0), lancado: Math.max(lancado, 0), atrasadas, pagas, aguardando, aLancar };
   });
 
   const totAtivas = porTipo.reduce((s, x) => s + x.ativas, 0);
@@ -86,41 +88,60 @@ export default async function PainelPage() {
           <KpiCard icon="pin" value={totMapear} label="Origem a mapear" variacao={variacaoPct(totMapear, metricaAnterior?.origem_a_mapear ?? null)} />
         </div>
 
-        <div className="flex items-center gap-2 mb-5">
-          <h2 className="text-[20px] font-semibold text-[#1a1a1a]">Situação por tipo de conta</h2>
-          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#adb5bd" strokeWidth="1.6"><circle cx="10" cy="10" r="7.5" /><path d="M10 9v4.5M10 6.7v.1" /></svg>
-          <span className="ml-auto text-[13px] text-[#6c757d] flex items-center gap-1.5 border border-linha rounded-md px-3 py-1.5 bg-white">
-            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#6c757d" strokeWidth="1.6"><rect x="3.5" y="5" width="13" height="12" rx="1.5" /><path d="M3.5 8.5h13" /></svg>
-            Este mês ({periodoFormatado})
-          </span>
+        <div className="flex items-end justify-between mb-5">
+          <div>
+            <h2 className="text-[20px] font-semibold text-[#1a1a1a]">Situação por tipo de conta</h2>
+            <p className="text-[13px] text-[#6c757d] mt-0.5">Visão geral do status das contas por categoria</p>
+          </div>
+          <div className="flex items-center gap-1.5 text-[13px] font-medium text-txt border border-linha rounded-lg px-3.5 py-2 bg-white">
+            Exibir todas
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#6c757d" strokeWidth="1.6"><path d="M6 8l4 4 4-4" /></svg>
+          </div>
         </div>
 
-        {/* grid 2 linhas x 3 colunas (7 tipos, o ultimo quebra pra proxima linha) */}
+        {/* grid de cards de tipo */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
-          {porTipo.map(({ t, ativas, mapear, aberto, lancado, atrasadas }) => {
+          {porTipo.map(({ t, ativas, mapear, pagas, aguardando, aLancar, atrasadas }) => {
             const T = TIPOS[t];
             const base = ativas || 1;
+            const pctPagas = Math.round((pagas / base) * 100);
             return (
-              <Link href={`/contas?tipo=${t}`} key={t}
-                className="bg-white border border-linha rounded-xl p-6 shadow-leve hover:shadow-media transition block">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-14 h-14 rounded-lg grid place-items-center shrink-0" style={{ background: T.bg }}>
-                    <TipoIcon tipo={t} size={26} color={T.c} />
+              <div key={t} className="bg-white border border-linha rounded-xl p-6 shadow-leve hover:shadow-media transition flex flex-col">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-full grid place-items-center shrink-0" style={{ background: T.bg }}>
+                    <TipoIcon tipo={t} size={22} color={T.c} />
                   </div>
                   <div>
-                    <div className="text-[18px] font-semibold text-[#1a1a1a] leading-tight">{T.n}</div>
-                    <div className="text-[28px] font-bold text-[#1a1a1a] leading-tight">{ativas}</div>
+                    <div className="text-[15px] font-semibold text-[#1a1a1a] leading-tight">{T.n}</div>
+                    <div className="text-[12px] text-[#6c757d]">Total de contas</div>
                   </div>
                 </div>
-                <div className="space-y-2 mt-4">
-                  <LinhaProgresso cor="#FFC107" label="A lançar" valor={aberto} base={base} />
-                  <LinhaProgresso cor="#4caf50" label="Aguardando pagamento" valor={lancado} base={base} />
-                  <LinhaProgresso cor="#f44336" label="Atrasadas" valor={atrasadas} base={base} />
+
+                <div className="text-[26px] font-bold text-[#1a1a1a] leading-none mb-3">{ativas}</div>
+
+                <div className="flex items-center gap-2.5 mb-4">
+                  <div className="flex-1 h-1.5 rounded-full bg-[#f1f3f5] overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${Math.min(pctPagas, 100)}%`, background: T.c }} />
+                  </div>
+                  <span className="text-[12px] font-semibold text-[#1a1a1a] shrink-0">{pctPagas}%</span>
                 </div>
+
+                <div className="space-y-2 flex-1">
+                  <LinhaLegenda cor="#2196f3" label="Pagas" valor={pagas} base={base} />
+                  <LinhaLegenda cor="#FFC107" label="Aguardando" valor={aguardando} base={base} />
+                  <LinhaLegenda cor="#f44336" label="A Lançar" valor={aLancar} base={base} extra={atrasadas > 0 ? `${atrasadas} atrasada${atrasadas > 1 ? "s" : ""}` : undefined} />
+                </div>
+
                 {mapear > 0 && (
-                  <div className="mt-3 pt-3 border-t border-linha2 text-[11px] text-alerr font-medium">{mapear} sem origem mapeada</div>
+                  <div className="mt-3 text-[11px] text-alerr font-medium">{mapear} sem origem mapeada</div>
                 )}
-              </Link>
+
+                <Link href={`/contas?tipo=${t}`}
+                  className="mt-4 pt-4 border-t border-linha2 flex items-center justify-between text-[13px] font-semibold text-txt hover:text-amarelo-dark transition">
+                  Ver detalhes
+                  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M7.5 4.5l6 5.5-6 5.5" /></svg>
+                </Link>
+              </div>
             );
           })}
         </div>
@@ -158,19 +179,15 @@ export default async function PainelPage() {
   );
 }
 
-function LinhaProgresso({ cor, label, valor, base }: { cor: string; label: string; valor: number; base: number }) {
+function LinhaLegenda({ cor, label, valor, base, extra }: { cor: string; label: string; valor: number; base: number; extra?: string }) {
   const pct = Math.round((valor / base) * 100);
   return (
-    <div>
-      <div className="flex items-center gap-1.5 mb-1">
-        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: cor }} />
-        <span className="text-[12px] text-[#6c757d] font-medium">{label}</span>
-        <span className="ml-auto text-[12px] font-semibold text-[#1a1a1a]">{valor}</span>
-        <span className="text-[12px] text-[#adb5bd]">({pct}%)</span>
-      </div>
-      <div className="h-1.5 rounded-full bg-[#f1f3f5] overflow-hidden">
-        <div className="h-full rounded-full" style={{ width: `${Math.min(pct, 100)}%`, background: cor }} />
-      </div>
+    <div className="flex items-center gap-2 text-[12.5px]">
+      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: cor }} />
+      <span className="text-[#6c757d] font-medium">{label}</span>
+      {extra && <span className="text-[10.5px] text-alerr font-semibold">({extra})</span>}
+      <span className="ml-auto text-[#1a1a1a] font-semibold">{valor}</span>
+      <span className="text-[#adb5bd] w-9 text-right">({pct}%)</span>
     </div>
   );
 }
@@ -185,18 +202,29 @@ const KPI_ICONS: Record<string, React.ReactNode> = {
 function KpiCard({ icon, value, label, variacao }: { icon: string; value: number; label: string; variacao: number | null }) {
   return (
     <div className="relative bg-white border border-linha rounded-xl p-6 shadow-leve overflow-hidden">
-      <span className="absolute left-0 top-0 bottom-0 w-1 bg-amarelo" />
-      <div className="w-12 h-12 rounded-lg grid place-items-center mb-4" style={{ background: "#fff3cd" }}>
-        <svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="#adb5bd" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{KPI_ICONS[icon]}</svg>
+      <div className="flex items-start justify-between mb-4">
+        <div className="w-14 h-14 rounded-full grid place-items-center" style={{ background: "#fdf3e3" }}>
+          <svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="#c9922a" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{KPI_ICONS[icon]}</svg>
+        </div>
+        <svg width="46" height="20" viewBox="0 0 46 20" fill="none" className="mt-2 opacity-80">
+          <path d="M1 14c4-2 6 4 10 2s5-9 9-7 6 8 10 5 5-10 9-8" stroke="#FFC107" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+        </svg>
       </div>
-      <div className="text-3xl font-bold text-gray-900 leading-none">{value}</div>
-      <div className="text-sm text-gray-500 font-medium mt-2">{label}</div>
+      <div className="text-sm text-gray-500 font-medium">{label}</div>
+      <div className="text-3xl font-bold text-gray-900 leading-none mt-1.5">{value}</div>
       {variacao !== null ? (
-        <div className={`text-[12px] font-medium mt-1.5 flex items-center gap-1 ${variacao > 0 ? "text-ok" : variacao < 0 ? "text-alerr" : "text-[#adb5bd]"}`}>
-          {variacao > 0 ? "↑" : variacao < 0 ? "↓" : "—"} {Math.abs(variacao)}% <span className="text-[#adb5bd] font-normal">vs. mês anterior</span>
+        <div className={`text-[12.5px] font-medium mt-3 flex items-center gap-1.5 ${variacao > 0 ? "text-ok" : variacao < 0 ? "text-alerr" : "text-[#adb5bd]"}`}>
+          {variacao > 0 ? (
+            <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 14l6-6 4 4 6-7M14 5h6v6" /></svg>
+          ) : variacao < 0 ? (
+            <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6l6 6 4-4 6 7M14 15h6V9" /></svg>
+          ) : (
+            <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 10h12" /></svg>
+          )}
+          {Math.abs(variacao)}% {variacao >= 0 ? "acima" : "abaixo"} do mês anterior
         </div>
       ) : (
-        <div className="text-[11px] text-[#bbb] font-normal mt-1.5">sem dado do mês anterior ainda</div>
+        <div className="text-[11px] text-[#bbb] font-normal mt-3">sem dado do mês anterior ainda</div>
       )}
     </div>
   );
