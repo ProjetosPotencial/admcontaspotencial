@@ -19,8 +19,10 @@ const GRUPOS: Grupo[] = [
     titulo: "CONTAS",
     itens: [
       { label: "Todas as contas", href: "/contas" },
+      { label: "Lançamentos", href: "/lancamentos" },
       { label: "A lançar", href: "/contas?situacao=pendente" },
       { label: "Aguardando pagamento", href: "/contas?situacao=lancado" },
+      { label: "Pagamentos", href: "/pagamentos" },
       { label: "Pagas", href: "/contas?situacao=pago" },
       { label: "Canceladas", href: "/contas?status=encerrado" },
     ],
@@ -31,7 +33,7 @@ const GRUPOS: Grupo[] = [
       { label: "Fornecedores", href: "/fornecedores" },
       { label: "Categorias", href: "/categorias" },
       { label: "Centros de custo", href: "/centros-de-custo" },
-      { label: "Unidades", href: "/lojas" },
+      { label: "Locais / Lojas", href: "/lojas" },
     ],
   },
   {

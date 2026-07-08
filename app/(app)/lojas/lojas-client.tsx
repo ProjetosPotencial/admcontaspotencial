@@ -228,6 +228,9 @@ function NovaLojaDrawer({ onClose, onCriada }: { onClose: () => void; onCriada: 
 /* ---------------- ficha de loja existente ---------------- */
 function LojaDrawer({ loja, onClose, onSalvar }: { loja: Loja; onClose: () => void; onSalvar: (l: Loja) => void }) {
   const supabase = createClient();
+  const [codigo, setCodigo] = useState(loja.codigo);
+  const [coban, setCoban] = useState(loja.coban);
+  const [tipoPdv, setTipoPdv] = useState(loja.tipo_pdv ?? "PE");
   const [form, setForm] = useState<FormInst>({
     setor: loja.setor ?? "", empresa: loja.empresa ?? "", cnpj: loja.cnpj ?? "",
     contrato: loja.contrato ?? "", endereco: loja.endereco ?? "", cidade: loja.cidade ?? "",
@@ -235,17 +238,21 @@ function LojaDrawer({ loja, onClose, onSalvar }: { loja: Loja; onClose: () => vo
   });
   const [salvando, setSalvando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
   const [encerrando, setEncerrando] = useState(false);
   const [motivo, setMotivo] = useState("");
 
   function set<K extends keyof FormInst>(k: K, v: string) { setForm((f) => ({ ...f, [k]: v })); }
 
   async function salvar() {
+    if (!codigo.trim()) { setErro("O código da loja não pode ficar em branco."); return; }
     setSalvando(true);
-    const payload = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v.trim() === "" ? null : v.trim()]));
+    setErro(null);
+    const institucional = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v.trim() === "" ? null : v.trim()]));
+    const payload = { codigo: codigo.trim(), coban, tipo_pdv: tipoPdv, ...institucional };
     const { error } = await supabase.from("lojas").update(payload).eq("id", loja.id);
     setSalvando(false);
-    if (error) { setAviso("Sem permissão para salvar."); return; }
+    if (error) { setErro(error.message.includes("duplicate") ? "Já existe uma loja com esse código." : "Sem permissão para salvar."); return; }
     onSalvar({ ...loja, ...payload } as Loja);
     setAviso("Dados salvos.");
     setTimeout(() => setAviso(null), 2000);
@@ -282,11 +289,33 @@ function LojaDrawer({ loja, onClose, onSalvar }: { loja: Loja; onClose: () => vo
           )}
 
           <div className="card p-4 mb-4">
+            <div className="font-disp text-[13px] font-semibold mb-3.5">Identificação</div>
+            <div className="grid grid-cols-2 gap-3">
+              <LabeledInput label="Código da loja" value={codigo} onChange={setCodigo} full />
+              <label>
+                <div className="text-[10.5px] tracking-wide uppercase text-txt-3 font-semibold mb-1">Praça</div>
+                <select value={coban} onChange={(e) => setCoban(e.target.value)}
+                  className="w-full border border-linha rounded-[8px] px-2.5 py-2 text-[13px]">
+                  {COBANS.map((c) => <option key={c} value={c}>{c === "CORP" ? "Corporativo" : c}</option>)}
+                </select>
+              </label>
+              <label>
+                <div className="text-[10.5px] tracking-wide uppercase text-txt-3 font-semibold mb-1">Tipo</div>
+                <select value={tipoPdv} onChange={(e) => setTipoPdv(e.target.value)}
+                  className="w-full border border-linha rounded-[8px] px-2.5 py-2 text-[13px]">
+                  {TIPO_PDVS.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div className="card p-4 mb-4">
             <div className="font-disp text-[13px] font-semibold mb-3.5">Dados institucionais</div>
             <CamposInstitucionais form={form} set={set} />
+            {erro && <div className="mt-3 text-[12px] text-alerr bg-alerr-bg rounded-lg px-3 py-2">{erro}</div>}
             <button onClick={salvar} disabled={salvando}
               className="w-full mt-4 bg-amarelo text-ebano rounded-[9px] py-2.5 text-[12.5px] font-semibold disabled:opacity-50">
-              {salvando ? "Salvando..." : "Salvar dados"}
+              {salvando ? "Salvando..." : "Salvar alterações"}
             </button>
             {aviso && <div className="mt-2.5 text-[11.5px] text-txt-2">{aviso}</div>}
           </div>
