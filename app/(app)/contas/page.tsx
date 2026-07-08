@@ -7,23 +7,23 @@ export const dynamic = "force-dynamic";
 
 export default async function ContasPage() {
   const supabase = createClient();
-  const { data } = await supabase
-    .from("contas")
-    .select("id, tipo, fornecedor_nome, identificador, dia_vencimento, origem, cnpj_cpf, insc_cod_mat, portal_link, eh_rateio, rateio_divisor, observacoes, status, loja_id, lojas ( codigo, coban )")
-    .eq("situacao_cadastro", "aprovada")
-    .order("tipo");
-
-  const { data: lancAtual } = await supabase
-    .from("lancamentos")
-    .select("conta_id, situacao")
-    .eq("ano", 2026)
-    .eq("mes", 7);
-
-  const { data: lojas } = await supabase
-    .from("lojas")
-    .select("id, codigo")
-    .eq("status", "ativo")
-    .order("codigo");
+  const [{ data }, { data: lancAtual }, { data: lojas }] = await Promise.all([
+    supabase
+      .from("contas")
+      .select("id, tipo, fornecedor_nome, identificador, dia_vencimento, origem, cnpj_cpf, insc_cod_mat, portal_link, eh_rateio, rateio_divisor, observacoes, status, loja_id, lojas ( codigo, coban )")
+      .eq("situacao_cadastro", "aprovada")
+      .order("tipo"),
+    supabase
+      .from("lancamentos")
+      .select("conta_id, situacao")
+      .eq("ano", 2026)
+      .eq("mes", 7),
+    supabase
+      .from("lojas")
+      .select("id, codigo")
+      .eq("status", "ativo")
+      .order("codigo"),
+  ]);
 
   const contas = (data ?? []) as unknown as Conta[];
   const situacaoPorConta: Record<string, string> = {};

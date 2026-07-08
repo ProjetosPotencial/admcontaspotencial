@@ -37,7 +37,7 @@ export default function LoginPage() {
               <path d="M18 8h20c11 0 18 7 18 17s-7 17-18 17H30v22H18V8z" fill="#FFC107" />
               <path d="M30 20h7c4.5 0 7 2.2 7 5.5S41.5 31 37 31h-7V20z" fill="#1a1a1a" />
             </svg>
-            <div className="text-white font-disp font-extrabold text-[26px] tracking-tight mt-3 leading-none">POTENCIAL</div>
+            <div className="text-white font-disp font-bold text-[26px] tracking-tight mt-3 leading-none">POTENCIAL</div>
             <div className="flex items-center gap-2 mt-2.5">
               <span className="h-px w-6 bg-amarelo" />
               <span className="text-amarelo font-disp font-bold text-[13px] tracking-[4px]">CONTAS</span>

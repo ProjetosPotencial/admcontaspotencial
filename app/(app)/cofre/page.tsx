@@ -5,16 +5,17 @@ export const dynamic = "force-dynamic";
 export default async function CofrePage() {
   const supabase = createClient();
 
-  const { data: creds } = await supabase
-    .from("credenciais")
-    .select("conta_id, login, senha_secret, contas!inner ( fornecedor_nome, lojas ( codigo, coban ) )")
-    .limit(50);
-
-  const { data: acessos } = await supabase
-    .from("cofre_acessos")
-    .select("motivo, acessado_em, perfis ( nome ), credenciais ( contas ( lojas ( codigo ) ) )")
-    .order("acessado_em", { ascending: false })
-    .limit(15);
+  const [{ data: creds }, { data: acessos }] = await Promise.all([
+    supabase
+      .from("credenciais")
+      .select("conta_id, login, senha_secret, contas!inner ( fornecedor_nome, lojas ( codigo, coban ) )")
+      .limit(50),
+    supabase
+      .from("cofre_acessos")
+      .select("motivo, acessado_em, perfis ( nome ), credenciais ( contas ( lojas ( codigo ) ) )")
+      .order("acessado_em", { ascending: false })
+      .limit(15),
+  ]);
 
   return (
     <>

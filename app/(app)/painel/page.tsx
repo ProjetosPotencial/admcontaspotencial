@@ -11,28 +11,32 @@ const MES_ATUAL = 7;
 export default async function PainelPage() {
   const supabase = createClient();
 
-  const { data: contas } = await supabase
-    .from("contas")
-    .select("id, tipo, status, origem, dia_vencimento")
-    .eq("situacao_cadastro", "aprovada");
-
-  const { data: lancJul } = await supabase
-    .from("lancamentos")
-    .select("conta_id, situacao, contas!inner(tipo, dia_vencimento)")
-    .eq("ano", ANO)
-    .eq("mes", MES_ATUAL);
-
-  const { data: lojasEncerradas } = await supabase
-    .from("lojas")
-    .select("codigo, coban, empresa, cidade, uf, encerrada_em")
-    .eq("status", "encerrada")
-    .order("encerrada_em", { ascending: false })
-    .limit(6);
-
-  const { count: totalLojasEncerradas } = await supabase
-    .from("lojas")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "encerrada");
+  const [
+    { data: contas },
+    { data: lancJul },
+    { data: lojasEncerradas },
+    { count: totalLojasEncerradas },
+  ] = await Promise.all([
+    supabase
+      .from("contas")
+      .select("id, tipo, status, origem, dia_vencimento")
+      .eq("situacao_cadastro", "aprovada"),
+    supabase
+      .from("lancamentos")
+      .select("conta_id, situacao, contas!inner(tipo, dia_vencimento)")
+      .eq("ano", ANO)
+      .eq("mes", MES_ATUAL),
+    supabase
+      .from("lojas")
+      .select("codigo, coban, empresa, cidade, uf, encerrada_em")
+      .eq("status", "encerrada")
+      .order("encerrada_em", { ascending: false })
+      .limit(6),
+    supabase
+      .from("lojas")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "encerrada"),
+  ]);
 
   const hoje = new Date();
   const diaAtual = hoje.getDate();

@@ -8,16 +8,17 @@ const ANO = 2026, MES_ATUAL = 7;
 export default async function AlertasPage() {
   const supabase = createClient();
 
-  const { data: lancJul } = await supabase
-    .from("lancamentos")
-    .select("id, situacao, contas!inner ( tipo, dia_vencimento, fornecedor_nome, lojas ( codigo ) )")
-    .eq("ano", ANO).eq("mes", MES_ATUAL)
-    .in("situacao", ["pendente", "lancado"]);
-
-  const { data: mapear } = await supabase
-    .from("contas")
-    .select("id, tipo, fornecedor_nome, lojas ( codigo )")
-    .eq("situacao_cadastro", "aprovada").eq("status", "ativo").eq("origem", "a_definir");
+  const [{ data: lancJul }, { data: mapear }] = await Promise.all([
+    supabase
+      .from("lancamentos")
+      .select("id, situacao, contas!inner ( tipo, dia_vencimento, fornecedor_nome, lojas ( codigo ) )")
+      .eq("ano", ANO).eq("mes", MES_ATUAL)
+      .in("situacao", ["pendente", "lancado"]),
+    supabase
+      .from("contas")
+      .select("id, tipo, fornecedor_nome, lojas ( codigo )")
+      .eq("situacao_cadastro", "aprovada").eq("status", "ativo").eq("origem", "a_definir"),
+  ]);
 
   const hoje = new Date();
   const diaAtual = hoje.getDate();

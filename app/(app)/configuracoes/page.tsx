@@ -4,7 +4,8 @@ export const dynamic = "force-dynamic";
 
 export default async function ConfiguracoesPage() {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { session } } = await supabase.auth.getSession();
+  const user = session?.user;
   const { data: perfil } = await supabase.from("perfis").select("nome, email, papel, ativo, created_at").eq("id", user?.id).single();
 
   return (

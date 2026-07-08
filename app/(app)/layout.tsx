@@ -6,8 +6,12 @@ import TopNav from "@/components/topnav";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  // O middleware já validou a sessão contra o servidor e redireciona quem não
+  // está logado antes de chegar aqui. getSession() só lê o cookie, sem bater
+  // de novo no Supabase Auth — evita duplicar a chamada de rede a cada página.
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) redirect("/login");
+  const user = session.user;
 
   const { data: perfil } = await supabase
     .from("perfis")
