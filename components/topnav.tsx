@@ -17,6 +17,7 @@ export default function TopNav({ nome, notificacoes = 0 }: { nome: string; notif
   const router = useRouter();
   const supabase = createClient();
   const [menuAberto, setMenuAberto] = useState(false);
+  const [sinoAberto, setSinoAberto] = useState(false);
   const iniciais = nome.split(" ").map((s) => s[0]).slice(0, 2).join("").toUpperCase();
 
   async function sair() {
@@ -51,12 +52,32 @@ export default function TopNav({ nome, notificacoes = 0 }: { nome: string; notif
       </div>
 
       <div className="flex items-center gap-5">
-        <button className="relative text-white/80 hover:text-white">
-          <svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M5 8a5 5 0 0110 0c0 4 1.5 5 1.5 5h-13S5 12 5 8z" /><path d="M8 16a2 2 0 004 0" /></svg>
-          {notificacoes > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 bg-amarelo text-[#1a1a1a] text-[10px] font-bold w-4 h-4 rounded-full grid place-items-center">{notificacoes}</span>
+        <div className="relative">
+          <button onClick={() => setSinoAberto((v) => !v)} className="relative text-white/80 hover:text-white">
+            <svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M5 8a5 5 0 0110 0c0 4 1.5 5 1.5 5h-13S5 12 5 8z" /><path d="M8 16a2 2 0 004 0" /></svg>
+            {notificacoes > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 bg-amarelo text-[#1a1a1a] text-[10px] font-bold w-4 h-4 rounded-full grid place-items-center">{notificacoes}</span>
+            )}
+          </button>
+          {sinoAberto && (
+            <div className="absolute right-0 top-11 bg-white border border-linha rounded-md shadow-media w-64 py-3 px-4 z-40">
+              {notificacoes > 0 ? (
+                <>
+                  <p className="text-[13px] text-[#1a1a1a] font-medium leading-snug">
+                    <b className="text-alerr">{notificacoes}</b> {notificacoes === 1 ? "item precisa" : "itens precisam"} de atenção agora.
+                  </p>
+                  <p className="text-[11.5px] text-[#666] mt-1">Contas atrasadas e sem origem mapeada.</p>
+                  <Link href="/alertas" onClick={() => setSinoAberto(false)}
+                    className="block text-center mt-3 bg-amarelo text-[#1a1a1a] text-[12.5px] font-semibold rounded-md py-2 hover:brightness-95">
+                    Ver alertas
+                  </Link>
+                </>
+              ) : (
+                <p className="text-[13px] text-[#666]">Nenhum alerta no momento.</p>
+              )}
+            </div>
           )}
-        </button>
+        </div>
         <div className="relative">
           <button onClick={() => setMenuAberto((v) => !v)} className="flex items-center gap-2">
             <span className="text-white/80 text-sm hidden sm:inline">Olá, {nome.split(" ")[0]}</span>

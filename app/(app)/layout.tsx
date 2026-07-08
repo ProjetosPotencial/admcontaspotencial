@@ -1,8 +1,11 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { contarAlertas } from "@/lib/alertas";
 import Sidebar from "@/components/sidebar";
 import TopNav from "@/components/topnav";
+
+export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
@@ -13,17 +16,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!session) redirect("/login");
   const user = session.user;
 
-  const { data: perfil } = await supabase
-    .from("perfis")
-    .select("nome, papel")
-    .eq("id", user.id)
-    .single();
+  // perfil (nome) e a contagem do sino saem em paralelo, não uma depois da
+  // outra, pra não pesar a navegação entre páginas.
+  const [{ data: perfil }, alertas] = await Promise.all([
+    supabase.from("perfis").select("nome, papel").eq("id", user.id).single(),
+    contarAlertas(supabase, 2026, 7),
+  ]);
 
   const nome = perfil?.nome ?? user.email ?? "Usuário";
 
   return (
     <div className="min-h-screen flex flex-col bg-papel">
-      <TopNav nome={nome} />
+      <TopNav nome={nome} notificacoes={alertas.total} />
       <div className="flex flex-1 min-h-0">
         <Suspense fallback={<div className="bg-[#2a2a2a] w-[232px] shrink-0" />}>
           <Sidebar />
