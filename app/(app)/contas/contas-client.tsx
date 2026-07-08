@@ -52,8 +52,9 @@ export default function ContasClient({ contas }: { contas: Conta[] }) {
           </select>
           <select value={fStatus} onChange={(e) => setFStatus(e.target.value)}
             className="border border-linha bg-white px-3 py-2 rounded-[9px] text-[12.5px] text-txt-2">
-            <option value="todos">Ativas e inativas</option>
+            <option value="todos">Todos os status</option>
             <option value="ativo">Só ativas</option><option value="inativo">Só inativas</option>
+            <option value="encerrado">Só encerradas</option>
           </select>
         </div>
       </div>
@@ -107,6 +108,10 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
   const [senha, setSenha] = useState<string | null>(null);
   const [revelando, setRevelando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [status, setStatus] = useState(conta.status);
+  const [encerrando, setEncerrando] = useState(false);
+  const [motivo, setMotivo] = useState("");
+  const [salvandoEncerrar, setSalvandoEncerrar] = useState(false);
 
   useEffect(() => {
     supabase.from("lancamentos").select("ano, mes, valor, situacao")
@@ -129,6 +134,19 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
     setAviso("Acesso registrado no log de auditoria.");
   }
 
+  async function confirmarEncerramento() {
+    if (!motivo.trim()) return;
+    setSalvandoEncerrar(true);
+    const { error } = await supabase
+      .from("contas")
+      .update({ status: "encerrado", motivo_encerramento: motivo.trim() })
+      .eq("id", conta.id);
+    setSalvandoEncerrar(false);
+    if (error) { setAviso("Sem permissão para encerrar esta conta."); return; }
+    setStatus("encerrado");
+    setEncerrando(false);
+  }
+
   const valores = lancs.filter((l) => l.valor != null).map((l) => Number(l.valor));
   const maxv = Math.max(...valores, 1);
 
@@ -144,6 +162,15 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
         </div>
 
         <div className="px-6 py-5">
+          {status === "encerrado" && (
+            <div className="mb-4 text-[12px] text-alerr bg-alerr-bg rounded-lg px-3 py-2.5 leading-snug">
+              <b className="block font-semibold mb-0.5">Conta encerrada</b>
+              {conta.observacoes && conta.observacoes.startsWith("[Histórico migrado]")
+                ? "Migrada do histórico de contas encerradas/canceladas."
+                : "Esta conta foi marcada como encerrada."}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-x-4 gap-y-3.5 mb-5">
             <Field label="Vencimento" value={conta.dia_vencimento ? `Todo dia ${conta.dia_vencimento}` : "não definido"} />
             <Field label="Origem" value={ORIGENS[conta.origem]} />
@@ -200,6 +227,34 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
               })}
             </div>
           </div>
+
+          {status !== "encerrado" && (
+            <div className="card p-4">
+              {!encerrando ? (
+                <button onClick={() => setEncerrando(true)}
+                  className="w-full text-[12.5px] font-semibold text-alerr border border-alerr/30 bg-alerr-bg rounded-[9px] py-2.5 hover:bg-alerr/10 transition">
+                  Encerrar conta
+                </button>
+              ) : (
+                <div>
+                  <div className="font-disp text-[13px] font-semibold mb-2">Motivo do encerramento</div>
+                  <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)}
+                    placeholder="Ex.: loja fechou, fornecedor trocado, contrato cancelado..."
+                    className="w-full border border-linha rounded-[9px] px-3 py-2 text-[13px] mb-3 focus:outline-none focus:ring-2 focus:ring-amarelo" rows={3} />
+                  <div className="flex gap-2">
+                    <button onClick={confirmarEncerramento} disabled={!motivo.trim() || salvandoEncerrar}
+                      className="flex-1 bg-alerr text-white rounded-[9px] py-2.5 text-[12.5px] font-semibold disabled:opacity-50">
+                      {salvandoEncerrar ? "Encerrando..." : "Confirmar encerramento"}
+                    </button>
+                    <button onClick={() => { setEncerrando(false); setMotivo(""); }}
+                      className="bg-white border border-linha text-txt-2 rounded-[9px] px-4 py-2.5 text-[12.5px] font-semibold">
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </aside>
     </>
