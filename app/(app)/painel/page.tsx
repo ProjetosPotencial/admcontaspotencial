@@ -22,6 +22,18 @@ export default async function PainelPage() {
     .eq("ano", ANO)
     .eq("mes", MES_ATUAL);
 
+  const { data: lojasEncerradas } = await supabase
+    .from("lojas")
+    .select("codigo, coban, empresa, cidade, uf, encerrada_em, motivo_encerramento")
+    .eq("status", "encerrada")
+    .order("encerrada_em", { ascending: false })
+    .limit(6);
+
+  const { count: totalLojasEncerradas } = await supabase
+    .from("lojas")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "encerrada");
+
   const tipos = Object.keys(TIPOS);
   const porTipo = tipos.map((t) => {
     const doTipo = (contas ?? []).filter((c) => c.tipo === t && c.status === "ativo");
@@ -44,11 +56,14 @@ export default async function PainelPage() {
       <Topbar eyebrow="Operação" title="Painel" />
       <div className="px-8 py-7 max-w-[1180px] w-full">
         {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5 mb-6">
           <Kpi label="Contas ativas" value={totAtivas} sub="em todas as lojas e quiosques" />
           <Kpi label="A lançar em julho" value={totAberto} sub="faturas ainda não lançadas" hl />
           <Kpi label="Aguardando pagamento" value={totLancado} sub="lançadas no SIP" tag="fila" tagCls="bg-amb-bg text-amb" />
           <Kpi label="Origem a mapear" value={totMapear} sub="sem caminho de recebimento" tag="atenção" tagCls="bg-alerr-bg text-alerr" />
+          <Link href="/lojas?status=encerrada">
+            <Kpi label="Lojas encerradas" value={totalLojasEncerradas ?? 0} sub="clique para ver a lista" tag="fechadas" tagCls="bg-alerr-bg text-alerr" />
+          </Link>
         </div>
 
         <div className="flex items-baseline gap-3 mb-3.5 mt-6">
@@ -88,6 +103,35 @@ export default async function PainelPage() {
             );
           })}
         </div>
+
+        {(lojasEncerradas ?? []).length > 0 && (
+          <>
+            <div className="flex items-baseline gap-3 mb-3.5 mt-6">
+              <h2 className="font-disp text-[15px] font-semibold">Lojas encerradas recentemente</h2>
+              <Link href="/lojas?status=encerrada" className="text-xs text-petroleo hover:underline">ver todas</Link>
+            </div>
+            <div className="card overflow-hidden">
+              <ul>
+                {(lojasEncerradas ?? []).map((l: any, i: number) => (
+                  <li key={i} className="flex items-center gap-3.5 px-[18px] py-3 border-b border-linha2 last:border-0 text-[13px]">
+                    <div className="w-7 h-7 rounded-lg bg-alerr-bg text-alerr grid place-items-center text-[11px] font-semibold font-disp shrink-0">
+                      {l.coban?.slice(0, 2) ?? "—"}
+                    </div>
+                    <div className="min-w-0">
+                      <b className="font-semibold">{l.codigo}</b>
+                      <small className="block text-txt-3 text-[11px] mt-0.5 truncate">
+                        {[l.empresa, l.cidade && l.uf ? `${l.cidade}/${l.uf}` : null].filter(Boolean).join(" · ") || "sem dados adicionais"}
+                      </small>
+                    </div>
+                    <span className="ml-auto text-[11px] text-txt-3 font-mono shrink-0">
+                      {l.encerrada_em ? new Date(l.encerrada_em).toLocaleDateString("pt-br") : "—"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </>
+        )}
       </div>
     </>
   );

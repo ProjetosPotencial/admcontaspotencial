@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 
 const NAV = [
   { href: "/painel", label: "Painel", group: "Operação" },
+  { href: "/lojas", label: "Lojas", group: "Operação" },
   { href: "/contas", label: "Contas", group: "Operação" },
   { href: "/aprovacoes", label: "Aprovações", group: "Operação" },
   { href: "/cofre", label: "Cofre", group: "Segurança" },
@@ -14,6 +15,7 @@ const NAV = [
 function Icon({ name }: { name: string }) {
   const p: Record<string, React.ReactNode> = {
     "/painel": (<><rect x="2.5" y="2.5" width="6" height="6" rx="1.5" /><rect x="11.5" y="2.5" width="6" height="6" rx="1.5" /><rect x="2.5" y="11.5" width="6" height="6" rx="1.5" /><rect x="11.5" y="11.5" width="6" height="6" rx="1.5" /></>),
+    "/lojas": (<><path d="M3 8.5L10 3l7 5.5" /><path d="M4.5 8v8h11V8" /><path d="M8 16v-4.5h4V16" /></>),
     "/contas": (<><rect x="2.5" y="3.5" width="15" height="13" rx="2" /><path d="M2.5 8h15M7 8v8.5" /></>),
     "/aprovacoes": <path d="M4 10.5l3.5 3.5L16 5.5" />,
     "/cofre": (<><rect x="3.5" y="8.5" width="13" height="9" rx="2" /><path d="M6.5 8.5V6a3.5 3.5 0 017 0v2.5" /></>),
