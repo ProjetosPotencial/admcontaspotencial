@@ -44,12 +44,12 @@ export default function Sidebar({ nome, papel }: { nome: string; papel: string }
   return (
     <aside className="bg-ebano text-[#cfcdc7] flex flex-col sticky top-0 h-screen w-[236px] shrink-0">
       <div className="px-[22px] py-5 flex items-center gap-3 border-b border-[#242424]">
-        <div className="w-[30px] h-[30px] rounded-lg bg-amarelo relative shrink-0">
+        <div className="w-[30px] h-[30px] rounded-lg bg-amarelo relative shrink-0 rotate-[-3deg]">
           <span className="absolute inset-[9px] rounded-[2px] bg-ebano block" />
         </div>
         <div>
-          <b className="font-disp text-white font-bold text-[15px] leading-none block">Potencial</b>
-          <span className="text-amarelo text-[10px] tracking-[2px] uppercase font-semibold">Contas</span>
+          <b className="font-disp text-white font-extrabold text-[15px] leading-none block tracking-tight">POTENCIAL</b>
+          <span className="text-amarelo text-[10px] tracking-[3px] uppercase font-bold">Contas</span>
         </div>
       </div>
 
@@ -61,10 +61,9 @@ export default function Sidebar({ nome, papel }: { nome: string; papel: string }
               const on = pathname.startsWith(n.href);
               return (
                 <Link key={n.href} href={n.href}
-                  className={`relative flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-[13.5px] font-medium transition ${
-                    on ? "bg-ebano-3 text-white" : "text-[#c9c7c1] hover:bg-ebano-3 hover:text-white"
+                  className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-semibold transition ${
+                    on ? "bg-amarelo text-ebano" : "text-[#c9c7c1] hover:bg-ebano-3 hover:text-white"
                   }`}>
-                  {on && <span className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-r bg-amarelo" />}
                   <Icon name={n.href} />
                   {n.label}
                 </Link>
