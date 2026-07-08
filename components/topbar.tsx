@@ -1,10 +1,8 @@
-export default function Topbar({ eyebrow, title }: { eyebrow: string; title: string }) {
+export default function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <header className="bg-papel border-b border-linha px-8 py-4 flex items-center gap-4 sticky top-0 z-20">
-      <div>
-        <div className="kicker">{eyebrow}</div>
-        <h1 className="font-disp text-2xl font-extrabold -mt-0.5 tracking-tight">{title}</h1>
-      </div>
-    </header>
+    <div className="px-8 pt-8 pb-2">
+      <h1 className="font-disp text-[32px] font-bold text-[#1a1a1a] leading-none">{title}</h1>
+      {subtitle && <p className="text-[#666] text-sm mt-2">{subtitle}</p>}
+    </div>
   );
 }

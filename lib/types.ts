@@ -1,11 +1,11 @@
-export const TIPOS: Record<string, { n: string; c: string }> = {
-  agua: { n: "Água", c: "#1B6E7E" },
-  energia: { n: "Energia", c: "#E0A200" },
-  telefone: { n: "Telefone", c: "#3B6EA5" },
-  iptu: { n: "IPTU", c: "#6B5B95" },
-  condominio: { n: "Condomínio", c: "#4E8D6E" },
-  aluguel: { n: "Aluguel", c: "#C06B4E" },
-  custo_geral: { n: "Custos gerais", c: "#7A7873" },
+export const TIPOS: Record<string, { n: string; c: string; bg: string }> = {
+  agua: { n: "Água", c: "#1976d2", bg: "#e3f2fd" },
+  energia: { n: "Energia", c: "#f9a825", bg: "#fff3cd" },
+  telefone: { n: "Telefone", c: "#8e24aa", bg: "#f3e5f5" },
+  iptu: { n: "IPTU", c: "#43a047", bg: "#e8f5e9" },
+  condominio: { n: "Condomínio", c: "#fb8c00", bg: "#ffe0b2" },
+  aluguel: { n: "Aluguel", c: "#00897b", bg: "#e0f2f1" },
+  custo_geral: { n: "Custos gerais", c: "#757575", bg: "#f5f5f5" },
 };
 
 export const ORIGENS: Record<string, string> = {
@@ -19,8 +19,8 @@ export const ORIGENS: Record<string, string> = {
 
 export const SITUACAO: Record<string, { label: string; cls: string }> = {
   pendente: { label: "Em aberto", cls: "bg-alerr-bg text-alerr" },
-  lancado: { label: "Lançado", cls: "bg-amb-bg text-amb" },
-  aprovado: { label: "Aprovado", cls: "bg-petroleo/10 text-petroleo" },
+  lancado: { label: "Lançado", cls: "bg-amb-bg text-[#B5860A]" },
+  aprovado: { label: "Aprovado", cls: "bg-info-bg text-info" },
   pago: { label: "Pago", cls: "bg-ok-bg text-ok" },
   contestado: { label: "Contestado", cls: "bg-alerr-bg text-alerr" },
 };

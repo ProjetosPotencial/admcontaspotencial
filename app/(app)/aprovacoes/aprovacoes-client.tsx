@@ -16,6 +16,7 @@ export default function AprovacoesClient({ itens }: { itens: Item[] }) {
   const supabase = createClient();
   const [fila, setFila] = useState<Item[]>(itens);
   const [toast, setToast] = useState<string | null>(null);
+  const total = itens.length;
 
   async function decidir(item: Item, aprovar: boolean) {
     const { error } = await supabase
@@ -28,77 +29,87 @@ export default function AprovacoesClient({ itens }: { itens: Item[] }) {
     setTimeout(() => setToast(null), 2600);
   }
 
-  if (fila.length === 0) {
-    return (
-      <div className="card">
-        <div className="text-center py-16 text-txt-3">
-          <div className="w-14 h-14 rounded-full bg-ok-bg text-ok grid place-items-center mx-auto mb-4">
-            <svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 10.5l3.5 3.5L16 5.5" /></svg>
-          </div>
-          <b className="block font-disp text-txt text-base mb-1">Tudo em dia por aqui.</b>
-          Nenhum lançamento aguardando aprovação.
-        </div>
-      </div>
-    );
-  }
-
   return (
     <>
-      <p className="text-txt-2 text-sm mb-5">
-        Aguardando sua decisão · <span className="inline-flex items-center justify-center bg-amarelo text-ebano font-bold text-xs w-5 h-5 rounded-full align-middle">{fila.length}</span> lançados no SIP, prontos para pagamento
-      </p>
-      <div className="grid gap-4">
-        {fila.map((item) => {
-          const T = TIPOS[item.contas.tipo];
-          return (
-            <div key={item.id} className="bg-white border border-linha rounded-2xl p-5 flex items-center gap-5 border-l-4" style={{ borderLeftColor: "#FFB600" }}>
-              <div className="w-14 h-14 rounded-full grid place-items-center shrink-0" style={{ background: `${T?.c}20` }}>
-                <span className="font-disp font-extrabold text-lg" style={{ color: T?.c }}>
-                  {item.contas.eh_rateio ? "÷" : T?.n.slice(0, 2)}
-                </span>
-              </div>
+      <div className="px-8 py-8 border-b border-linha bg-white">
+        <h1 className="text-[32px] font-bold text-[#1a1a1a] leading-none">Aprovações</h1>
+        <p className="text-[14px] text-[#666] font-medium mt-2.5 flex items-center gap-2">
+          Aguardando sua decisão
+          <span className="bg-amarelo text-[#1a1a1a] text-[12px] font-semibold rounded px-1.5 leading-5">{fila.length}</span>
+          lançados no SIP, prontos para pagamento
+        </p>
+      </div>
 
-              <div className="min-w-0 flex-1 grid grid-cols-[1fr_1fr] gap-4 items-center">
-                <div>
-                  <div className="font-disp font-extrabold text-[13px] uppercase tracking-wide">{T?.n}</div>
-                  <div className="text-[12.5px] text-txt-2 mt-0.5">{item.contas.eh_rateio ? "Conta com rateio" : "Conta de consumo"}</div>
-                  <div className="flex items-center gap-1.5 text-[13px] font-semibold mt-1.5">
-                    <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="#8a8880" strokeWidth="1.6"><path d="M10 18.5s6-5.4 6-9.9A6 6 0 004 8.6c0 4.5 6 9.9 6 9.9z" /><circle cx="10" cy="8.5" r="2.2" /></svg>
-                    {item.contas.lojas?.codigo}
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5 text-[13px] font-semibold">
-                    <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="#8a8880" strokeWidth="1.6"><rect x="3" y="4" width="14" height="13" rx="1.5" /><path d="M3 8h14" /></svg>
-                    {item.contas.fornecedor_nome ?? "—"}
-                  </div>
-                </div>
+      <div className="px-8 py-6 max-w-[1100px]">
+        {fila.length === 0 ? (
+          <div className="card">
+            <div className="text-center py-16 text-[#999]">
+              <div className="w-14 h-14 rounded-full bg-ok-bg text-ok grid place-items-center mx-auto mb-4">
+                <svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 10.5l3.5 3.5L16 5.5" /></svg>
               </div>
-
-              <div className="text-right shrink-0">
-                <div className="text-[10.5px] text-txt-3 uppercase tracking-wide font-medium">Valor</div>
-                <div className="font-disp text-xl font-extrabold" style={{ color: "#B5860A" }}>{money(item.valor)}</div>
-              </div>
-
-              <div className="flex gap-2 shrink-0">
-                <button onClick={() => decidir(item, true)}
-                  className="flex items-center gap-1.5 bg-ok text-white rounded-xl px-4 py-2.5 text-[12.5px] font-bold hover:brightness-95">
-                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 10.5l3.5 3.5L16 5.5" /></svg>
-                  Aprovar
-                </button>
-                <button onClick={() => decidir(item, false)}
-                  className="flex items-center gap-1.5 bg-alerr text-white rounded-xl px-4 py-2.5 text-[12.5px] font-bold hover:brightness-95">
-                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 5l10 10M15 5L5 15" /></svg>
-                  Recusar
-                </button>
-              </div>
+              <b className="block text-[#1a1a1a] text-base mb-1">Tudo em dia por aqui.</b>
+              Nenhum lançamento aguardando aprovação.
             </div>
-          );
-        })}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {fila.map((item) => {
+              const T = TIPOS[item.contas.tipo];
+              return (
+                <div key={item.id} className="relative bg-white border border-linha rounded-lg shadow-leve hover:shadow-media transition p-5 flex items-center gap-5">
+                  <span className="absolute left-0 top-0 bottom-0 w-1 bg-amarelo rounded-l-lg" />
+
+                  <div className="w-14 h-14 rounded-lg grid place-items-center shrink-0" style={{ background: T?.bg }}>
+                    <span className="text-[28px] font-bold" style={{ color: T?.c }}>
+                      {item.contas.eh_rateio ? "÷" : T?.n[0]}
+                    </span>
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12px] font-semibold text-[#999] uppercase tracking-wide">{T?.n}</div>
+                    <div className="text-[14px] font-semibold text-[#1a1a1a] mt-0.5">{item.contas.eh_rateio ? "Conta com rateio" : "Conta de Consumo"}</div>
+                    <div className="flex items-center gap-1.5 text-[12px] text-[#666] font-medium mt-1.5">
+                      <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="#666" strokeWidth="1.6"><path d="M10 18.5s6-5.4 6-9.9A6 6 0 004 8.6c0 4.5 6 9.9 6 9.9z" /><circle cx="10" cy="8.5" r="2.2" /></svg>
+                      {item.contas.lojas?.codigo}
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[12px] text-[#666] font-medium mt-1">
+                      <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="#666" strokeWidth="1.6"><rect x="3" y="4" width="14" height="13" rx="1.5" /><path d="M3 8h14" /></svg>
+                      {item.contas.fornecedor_nome ?? "—"}
+                    </div>
+                  </div>
+
+                  <div className="w-[150px] shrink-0 text-right">
+                    <div className="text-[11px] font-medium text-[#999]">Valor</div>
+                    <div className="text-[24px] font-bold text-amarelo">{money(item.valor)}</div>
+                  </div>
+
+                  <div className="w-[200px] shrink-0 flex gap-2 justify-end">
+                    <button onClick={() => decidir(item, true)}
+                      className="flex items-center gap-1.5 bg-ok hover:bg-ok-dark text-white rounded-md px-4 py-2.5 text-[13px] font-semibold transition-colors">
+                      <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 10.5l3.5 3.5L16 5.5" /></svg>
+                      Aprovar
+                    </button>
+                    <button onClick={() => decidir(item, false)}
+                      className="flex items-center gap-1.5 bg-alerr hover:bg-alerr-dark text-white rounded-md px-4 py-2.5 text-[13px] font-semibold transition-colors">
+                      <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 5l10 10M15 5L5 15" /></svg>
+                      Recusar
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {total > 0 && (
+          <div className="text-center text-[12px] text-[#999] font-medium mt-6">
+            Exibindo {fila.length} de {total} aprovações pendentes
+          </div>
+        )}
       </div>
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-ebano text-white px-5 py-3 rounded-xl text-[13px] flex items-center gap-2.5 shadow-lg z-50">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#1a1a1a] text-white px-5 py-3 rounded-lg text-[13px] flex items-center gap-2.5 shadow-forte z-50">
           <span className="w-2 h-2 rounded-full bg-amarelo" />{toast}
         </div>
       )}

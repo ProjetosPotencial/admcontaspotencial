@@ -14,7 +14,7 @@ export default async function LojasPage({ searchParams }: { searchParams: { stat
 
   return (
     <>
-      <Topbar eyebrow="Operação" title="Lojas" />
+      <Topbar title="Lojas" />
       <div className="px-8 py-7 max-w-[1180px] w-full">
         <LojasClient lojas={(data ?? []) as Loja[]} statusInicial={searchParams.status} />
       </div>

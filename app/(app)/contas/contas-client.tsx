@@ -3,99 +3,142 @@
 import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { TIPOS, ORIGENS, type Conta, type Lancamento } from "@/lib/types";
+import { TIPOS, ORIGENS, SITUACAO, type Conta, type Lancamento } from "@/lib/types";
 import { money, MES } from "@/lib/format";
-import { StatusBadge } from "@/components/badges";
 
-export default function ContasClient({ contas }: { contas: Conta[] }) {
+function StatusBadge({ status }: { status: string }) {
+  if (status === "encerrado") return <span className="badge bg-alerr-bg text-alerr">Encerrada</span>;
+  if (status === "inativo") return <span className="badge bg-[#f5f5f5] text-[#999]">Inativa</span>;
+  return <span className="badge bg-ok-bg text-ok">Ativa</span>;
+}
+
+export default function ContasClient({ contas, situacaoPorConta, lojas }: {
+  contas: Conta[]; situacaoPorConta: Record<string, string>; lojas: { id: string; codigo: string }[];
+}) {
   const params = useSearchParams();
   const [fTipo, setFTipo] = useState<string>(params.get("tipo") ?? "todos");
   const [fCoban, setFCoban] = useState("todos");
-  const [fStatus, setFStatus] = useState("todos");
+  const [fStatus, setFStatus] = useState(params.get("status") ?? "todos");
+  const [fSituacao, setFSituacao] = useState(params.get("situacao") ?? "todos");
   const [busca, setBusca] = useState("");
   const [aberta, setAberta] = useState<Conta | null>(null);
+  const [criando, setCriando] = useState(false);
 
   const filtradas = useMemo(() => {
     return contas.filter((c) => {
       const t = fTipo === "todos" || c.tipo === fTipo;
       const cb = fCoban === "todos" || c.lojas?.coban === fCoban;
       const st = fStatus === "todos" || c.status === fStatus;
+      const si = fSituacao === "todos" || (situacaoPorConta[c.id] ?? "pendente") === fSituacao;
       const q =
         busca === "" ||
         (c.lojas?.codigo ?? "").toLowerCase().includes(busca.toLowerCase()) ||
         (c.fornecedor_nome ?? "").toLowerCase().includes(busca.toLowerCase());
-      return t && cb && st && q;
+      return t && cb && st && si && q;
     });
-  }, [contas, fTipo, fCoban, fStatus, busca]);
+  }, [contas, fTipo, fCoban, fStatus, fSituacao, busca, situacaoPorConta]);
 
+  const limparFiltros = () => { setFTipo("todos"); setFCoban("todos"); setFStatus("todos"); setFSituacao("todos"); setBusca(""); };
+  const temFiltro = fTipo !== "todos" || fCoban !== "todos" || fStatus !== "todos" || fSituacao !== "todos" || busca !== "";
   const chips = ["todos", ...Object.keys(TIPOS)];
 
   return (
     <>
-      <div className="flex items-center gap-2 flex-wrap mb-4">
-        {chips.map((t) => (
-          <button key={t} onClick={() => setFTipo(t)}
-            className={`px-3 py-[7px] rounded-full text-[12.5px] font-medium border transition ${
-              fTipo === t ? "bg-ebano text-white border-ebano" : "bg-white text-txt-2 border-linha hover:border-txt-3"
-            }`}>
-            {t === "todos" ? "Todos os tipos" : TIPOS[t].n}
+      {/* Seção de filtros */}
+      <div className="bg-white border border-linha rounded-lg p-6 mb-6 shadow-leve">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-[20px] font-semibold text-[#1a1a1a]">Filtrar contas</h2>
+          <button onClick={() => setCriando(true)}
+            className="flex items-center gap-1.5 bg-amarelo hover:bg-amarelo-dark text-[#1a1a1a] font-semibold text-[13px] px-4 py-2.5 rounded-md transition-colors">
+            <span className="text-base leading-none">+</span> Nova conta
           </button>
-        ))}
-        <div className="ml-auto flex gap-2">
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar loja ou fornecedor"
-            className="border border-linha bg-white px-3 py-2 rounded-[9px] text-[12.5px] w-52 focus:outline-none focus:ring-2 focus:ring-amarelo" />
+        </div>
+
+        <div className="flex flex-wrap gap-2.5 mb-4">
+          {chips.map((t) => (
+            <button key={t} onClick={() => setFTipo(t)}
+              className={`px-4 py-2 rounded-full text-[13px] border transition ${
+                fTipo === t ? "bg-amarelo text-[#1a1a1a] border-amarelo font-semibold" : "bg-[#f5f5f5] text-[#1a1a1a] border-linha font-medium hover:bg-white"
+              }`}>
+              {t === "todos" ? "Todos os tipos" : TIPOS[t].n}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="relative flex-1 min-w-[220px]">
+            <svg className="absolute left-3.5 top-1/2 -translate-y-1/2" width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="#999" strokeWidth="1.6"><circle cx="8.5" cy="8.5" r="5.5" /><path d="M13 13l4 4" /></svg>
+            <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por fornecedor, loja ou código..."
+              className="w-full h-10 bg-[#f9f9f9] border border-linha rounded-md pl-10 pr-3 text-[13px] focus:outline-none focus:border-amarelo focus:ring-[3px] focus:ring-amarelo/10" />
+          </div>
           <select value={fCoban} onChange={(e) => setFCoban(e.target.value)}
-            className="border border-linha bg-white px-3 py-2 rounded-[9px] text-[12.5px] text-txt-2">
-            <option value="todos">Todas as praças</option>
+            className="h-10 bg-white border border-linha rounded-md px-3 text-[13px] text-[#1a1a1a] min-w-[150px]">
+            <option value="todos">Todas as lojas</option>
             <option>MG</option><option>MS</option><option>SP</option>
             <option value="QUIOSQUE">Quiosque</option><option value="CORP">Corporativo</option>
           </select>
           <select value={fStatus} onChange={(e) => setFStatus(e.target.value)}
-            className="border border-linha bg-white px-3 py-2 rounded-[9px] text-[12.5px] text-txt-2">
+            className="h-10 bg-white border border-linha rounded-md px-3 text-[13px] text-[#1a1a1a] min-w-[150px]">
             <option value="todos">Todos os status</option>
-            <option value="ativo">Só ativas</option><option value="inativo">Só inativas</option>
-            <option value="encerrado">Só encerradas</option>
+            <option value="ativo">Ativa</option><option value="inativo">Inativa</option><option value="encerrado">Encerrada</option>
           </select>
+          <select value={fSituacao} onChange={(e) => setFSituacao(e.target.value)}
+            className="h-10 bg-white border border-linha rounded-md px-3 text-[13px] text-[#1a1a1a] min-w-[170px]">
+            <option value="todos">Qualquer situação</option>
+            <option value="pendente">Em aberto</option><option value="lancado">Aguardando pagamento</option><option value="pago">Pagas</option>
+          </select>
+          {temFiltro && (
+            <button onClick={limparFiltros} className="flex items-center gap-1.5 text-[13px] text-[#666] hover:text-alerr font-medium">
+              <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 5l10 10M15 5L5 15" /></svg>
+              Limpar filtros
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="card overflow-hidden">
+      {/* Tabela */}
+      <div className="bg-white border border-linha rounded-lg overflow-hidden shadow-leve">
         <table className="w-full border-collapse">
           <thead>
-            <tr>
-              {["Loja", "Tipo", "Fornecedor", "Venc.", "Origem", "Status"].map((h) => (
-                <th key={h} className="text-left text-[10.5px] tracking-wide uppercase text-txt-3 font-semibold px-4 py-3 border-b border-linha bg-off">{h}</th>
+            <tr className="bg-[#f5f5f5] h-12">
+              {["Loja", "Tipo", "Fornecedor", "Venc.", "Origem", "Status", ""].map((h) => (
+                <th key={h} className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {filtradas.map((c) => (
-              <tr key={c.id} onClick={() => setAberta(c)} className="cursor-pointer hover:bg-[#FBFAF7] transition">
-                <td className="px-4 py-3 border-b border-linha2 text-[13px]">
-                  <b className="font-semibold">{c.lojas?.codigo ?? "—"}</b>
-                  <small className="block text-txt-3 text-[11px] font-mono mt-0.5">{c.lojas?.coban}</small>
+              <tr key={c.id} onClick={() => setAberta(c)} className="h-14 cursor-pointer border-b border-[#f0f0f0] last:border-0 hover:bg-[#f9f9f9] transition group relative">
+                <td className="px-4 text-[13px] font-medium relative">
+                  <span className="absolute left-0 top-0 bottom-0 w-1 bg-amarelo opacity-0 group-hover:opacity-100 transition" />
+                  {c.lojas?.codigo ?? "—"}
+                  <small className="block text-[#999] text-[11px] font-mono">{c.lojas?.coban}</small>
                 </td>
-                <td className="px-4 py-3 border-b border-linha2 text-[13px]">
-                  <span className="inline-block w-[7px] h-[7px] rounded-full mr-1.5 align-[1px]" style={{ background: TIPOS[c.tipo]?.c }} />
+                <td className="px-4 text-[13px] font-medium">
+                  <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ background: TIPOS[c.tipo]?.c }} />
                   {TIPOS[c.tipo]?.n}
                 </td>
-                <td className="px-4 py-3 border-b border-linha2 text-[13px]">
+                <td className="px-4 text-[13px] font-medium">
                   {c.fornecedor_nome ?? "—"}
-                  {c.eh_rateio && <span className="text-[10px] font-mono text-amb border border-amb rounded px-1 ml-1.5">RATEIO</span>}
+                  {c.eh_rateio && <span className="text-[10px] font-mono text-amb border border-amarelo rounded px-1 ml-1.5">RATEIO</span>}
                 </td>
-                <td className="px-4 py-3 border-b border-linha2 text-[13px] font-mono">{c.dia_vencimento ? `dia ${c.dia_vencimento}` : "—"}</td>
-                <td className="px-4 py-3 border-b border-linha2 text-[13px]"><span className="badge bg-[#EAF0F1] text-petroleo !font-medium">{ORIGENS[c.origem]}</span></td>
-                <td className="px-4 py-3 border-b border-linha2 text-[13px]"><StatusBadge status={c.status} /></td>
+                <td className="px-4 text-[13px] font-medium font-mono">{c.dia_vencimento ? `dia ${c.dia_vencimento}` : "—"}</td>
+                <td className="px-4 text-[13px]"><span className="badge bg-info-bg text-info">{ORIGENS[c.origem]}</span></td>
+                <td className="px-4 text-[13px]"><StatusBadge status={c.status} /></td>
+                <td className="px-4 text-right">
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#999" strokeWidth="1.6" className="inline group-hover:stroke-amarelo"><path d="M7.5 4.5l6 5.5-6 5.5" /></svg>
+                </td>
               </tr>
             ))}
             {filtradas.length === 0 && (
-              <tr><td colSpan={6} className="text-center py-12 text-txt-3">Nenhuma conta com esses filtros.</td></tr>
+              <tr><td colSpan={7} className="text-center py-14 text-[#999]">Nenhuma conta com esses filtros.</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
       {aberta && <ContaDrawer conta={aberta} onClose={() => setAberta(null)} />}
+      {criando && <NovaContaDrawer lojas={lojas} onClose={() => setCriando(false)} />}
     </>
   );
 }
@@ -108,24 +151,22 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
   const [senha, setSenha] = useState<string | null>(null);
   const [revelando, setRevelando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
-  const [status, setStatus] = useState(conta.status);
-  const [encerrando, setEncerrando] = useState(false);
-  const [motivo, setMotivo] = useState("");
-  const [salvandoEncerrar, setSalvandoEncerrar] = useState(false);
+  const [editandoCred, setEditandoCred] = useState(false);
+  const [novoLogin, setNovoLogin] = useState("");
+  const [novaSenha, setNovaSenha] = useState("");
+  const [salvandoCred, setSalvandoCred] = useState(false);
 
   useEffect(() => {
     supabase.from("lancamentos").select("ano, mes, valor, situacao")
       .eq("conta_id", conta.id).eq("ano", 2026)
       .then(({ data }) => setLancs((data ?? []) as Lancamento[]));
     supabase.from("credenciais_login").select("login").eq("conta_id", conta.id).maybeSingle()
-      .then(({ data }) => setLogin((data as any)?.login ?? "não cadastrado"));
+      .then(({ data }) => setLogin((data as any)?.login ?? null));
   }, [conta.id]);
 
   async function revelar() {
     setRevelando(true);
-    const { data, error } = await supabase.rpc("credencial_ler", {
-      p_conta_id: conta.id, p_motivo: "consulta de fatura",
-    });
+    const { data, error } = await supabase.rpc("credencial_ler", { p_conta_id: conta.id, p_motivo: "consulta de fatura" });
     setRevelando(false);
     if (error) { setAviso("Sem permissão ou credencial não encontrada."); return; }
     const row = Array.isArray(data) ? data[0] : data;
@@ -134,17 +175,27 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
     setAviso("Acesso registrado no log de auditoria.");
   }
 
-  async function confirmarEncerramento() {
-    if (!motivo.trim()) return;
-    setSalvandoEncerrar(true);
-    const { error } = await supabase
-      .from("contas")
-      .update({ status: "encerrado", motivo_encerramento: motivo.trim() })
-      .eq("id", conta.id);
-    setSalvandoEncerrar(false);
-    if (error) { setAviso("Sem permissão para encerrar esta conta."); return; }
-    setStatus("encerrado");
-    setEncerrando(false);
+  async function salvarCredencial() {
+    setSalvandoCred(true);
+    const { error } = await supabase.rpc("credencial_salvar", {
+      p_conta_id: conta.id, p_login: novoLogin.trim() || null, p_senha: novaSenha.trim() || null,
+    });
+    setSalvandoCred(false);
+    if (error) { setAviso("Sem permissão para editar credencial."); return; }
+    setLogin(novoLogin.trim() || login);
+    setSenha(null);
+    setEditandoCred(false);
+    setAviso("Credencial atualizada.");
+  }
+
+  function baixarExtrato() {
+    const linhas = ["mes,valor,situacao"];
+    lancs.forEach((l) => linhas.push(`${MES[l.mes - 1]},${l.valor ?? ""},${SITUACAO[l.situacao]?.label ?? l.situacao}`));
+    const blob = new Blob([linhas.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `extrato_${conta.lojas?.codigo ?? "conta"}_${conta.tipo}.csv`;
+    a.click(); URL.revokeObjectURL(url);
   }
 
   const valores = lancs.filter((l) => l.valor != null).map((l) => Number(l.valor));
@@ -152,120 +203,211 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
 
   return (
     <>
-      <div onClick={onClose} className="fixed inset-0 bg-ebano/40 z-40" />
-      <aside className="fixed top-0 right-0 h-screen w-[440px] max-w-[94vw] bg-off border-l border-linha z-50 overflow-y-auto">
-        <div className="bg-ebano text-white px-6 pt-5 pb-5">
-          <button onClick={onClose} className="float-right bg-[#242424] text-[#bbb] w-[30px] h-[30px] rounded-lg text-base">×</button>
-          <div className="text-[10px] tracking-[2px] uppercase text-amarelo font-semibold">{T?.n}{conta.eh_rateio ? " · rateio" : ""}</div>
-          <h3 className="font-disp text-[19px] font-semibold mt-1.5">{conta.lojas?.codigo}</h3>
-          <div className="text-[#9d9b95] text-[12.5px] font-mono">{conta.lojas?.coban} · {conta.fornecedor_nome}</div>
+      <div onClick={onClose} className="fixed inset-0 bg-black/40 z-40" />
+      <aside className="fixed top-0 right-0 h-screen w-[380px] max-w-[94vw] bg-white border-l border-linha z-50 overflow-y-auto">
+        <div className="relative px-5 py-5 border-b border-linha">
+          <span className="absolute left-0 right-0 top-0 h-1 bg-amarelo" />
+          <button onClick={onClose} className="absolute right-5 top-5 text-[#999] hover:text-[#1a1a1a]">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 5l10 10M15 5L5 15" /></svg>
+          </button>
+          <h3 className="text-[20px] font-bold text-[#1a1a1a]">Conta de {T?.n}</h3>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-[13px] text-[#666]">{conta.lojas?.codigo}</span>
+            <StatusBadgeDrawer status={conta.status} />
+          </div>
         </div>
 
-        <div className="px-6 py-5">
-          {status === "encerrado" && (
-            <div className="mb-4 text-[12px] text-alerr bg-alerr-bg rounded-lg px-3 py-2.5 leading-snug">
-              <b className="block font-semibold mb-0.5">Conta encerrada</b>
-              {conta.observacoes && conta.observacoes.startsWith("[Histórico migrado]")
-                ? "Migrada do histórico de contas encerradas/canceladas."
-                : "Esta conta foi marcada como encerrada."}
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3.5 mb-5">
-            <Field label="Vencimento" value={conta.dia_vencimento ? `Todo dia ${conta.dia_vencimento}` : "não definido"} />
-            <Field label="Origem" value={ORIGENS[conta.origem]} />
-            <Field label="Identificador" value={conta.identificador ?? "—"} mono />
-            <Field label="Rateio" value={conta.eh_rateio ? "Dividir antes de lançar" : "Conta integral"} />
+        <div className="p-5">
+          <div className="text-[14px] font-semibold text-[#1a1a1a] mb-4">Detalhes da conta</div>
+          <div className="grid grid-cols-2 gap-y-3.5 mb-6">
+            <Campo label="Fornecedor" valor={conta.fornecedor_nome ?? "—"} />
+            <Campo label="Vencimento" valor={conta.dia_vencimento ? `dia ${conta.dia_vencimento}` : "—"} />
+            <Campo label="Código da conta" valor={conta.identificador ?? "—"} mono />
+            <Campo label="Origem" valor={ORIGENS[conta.origem]} />
           </div>
 
-          {/* cofre */}
-          <div className="card p-4 mb-4">
-            <div className="flex items-center gap-2 font-disp text-[13px] font-semibold mb-3.5">
-              Cofre de acesso
-              <span className="ml-auto text-[10px] font-mono text-petroleo bg-[#EAF0F1] px-2 py-0.5 rounded-full">portal do fornecedor</span>
+          <div className="pt-5 border-t border-linha">
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-[14px] font-semibold text-[#1a1a1a]">Credenciais</div>
+              <button onClick={() => { setEditandoCred((v) => !v); setNovoLogin(login ?? ""); setNovaSenha(""); }}
+                className="text-amarelo text-[12px] font-semibold hover:underline">
+                {editandoCred ? "Cancelar" : "Editar"}
+              </button>
             </div>
-            <div className="flex items-center gap-2.5 py-2 border-b border-linha2">
-              <span className="text-[11px] text-txt-3 w-14">Login</span>
-              <span className="font-mono text-[13px]">{login ?? "..."}</span>
-            </div>
-            <div className="flex items-center gap-2.5 py-2">
-              <span className="text-[11px] text-txt-3 w-14">Senha</span>
-              <span className="font-mono text-[13px]" style={{ color: senha ? "#1B6E7E" : undefined }}>{senha ?? "•••••••••"}</span>
-              {!senha && (
-                <button onClick={revelar} disabled={revelando}
-                  className="ml-auto bg-ebano text-white text-[11.5px] px-3 py-1.5 rounded-lg font-medium hover:bg-ebano-2 flex items-center gap-1.5">
-                  {revelando ? "..." : "Revelar"}
+
+            {!editandoCred ? (
+              <div className="space-y-3">
+                <Campo label="Usuário" valor={login ?? "não cadastrado"} mono />
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-[12px] text-[#999] font-medium mb-0.5">Senha</div>
+                    <div className="text-[13px] font-semibold text-[#1a1a1a] font-mono">{senha ?? "•••••••••"}</div>
+                  </div>
+                  {!senha && (
+                    <button onClick={revelar} disabled={revelando} className="text-[#999] hover:text-amarelo">
+                      <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M2 10s3-5.5 8-5.5S18 10 18 10s-3 5.5-8 5.5S2 10 2 10z" /><circle cx="10" cy="10" r="2.3" /></svg>
+                    </button>
+                  )}
+                </div>
+                {aviso && <div className="text-[11px] text-amb bg-amb-bg rounded-md px-3 py-2 leading-snug">{aviso}</div>}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <label>
+                  <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Usuário</div>
+                  <input value={novoLogin} onChange={(e) => setNovoLogin(e.target.value)} className="input-padrao w-full font-mono" />
+                </label>
+                <label>
+                  <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Nova senha</div>
+                  <input value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} placeholder="deixe em branco para manter" className="input-padrao w-full font-mono" />
+                </label>
+                <button onClick={salvarCredencial} disabled={salvandoCred} className="btn-primario w-full">
+                  {salvandoCred ? "Salvando..." : "Salvar credencial"}
                 </button>
-              )}
-            </div>
-            {aviso && (
-              <div className="mt-3 text-[11px] text-amb bg-amb-bg rounded-lg px-3 py-2 leading-snug">{aviso}</div>
+              </div>
             )}
           </div>
 
-          {/* histórico */}
-          <div className="card p-4 mb-4">
-            <div className="flex items-center gap-2 font-disp text-[13px] font-semibold mb-3.5">
-              Lançamentos 2026
-              <span className="ml-auto text-[10px] font-mono text-petroleo bg-[#EAF0F1] px-2 py-0.5 rounded-full">{valores.length} meses</span>
+          <div className="pt-5 mt-5 border-t border-linha">
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-[14px] font-semibold text-[#1a1a1a]">Histórico mensal (R$)</div>
+              <span className="text-[12px] text-[#666]">Últimos 12 meses</span>
             </div>
-            <div className="flex items-stretch gap-1 h-[86px]">
+            <div className="flex items-stretch gap-1 h-[140px]">
               {Array.from({ length: 12 }).map((_, mi) => {
                 const l = lancs.find((x) => x.mes === mi + 1);
                 const v = l?.valor != null ? Number(l.valor) : null;
-                const h = v != null ? Math.max((v / maxv) * 100, 4) : 4;
-                const now = mi === 6;
-                const bg = v == null ? "#E7E5DF" : now ? "#FFB600" : "#1B6E7E";
+                const h = v != null ? Math.max((v / maxv) * 100, 3) : 3;
                 return (
                   <div key={mi} className="flex-1 flex flex-col" title={`${MES[mi]}: ${money(v)}`}>
                     <div className="flex-1 flex items-end">
-                      <i className="w-full rounded-t-[3px]" style={{ height: `${h}%`, minHeight: 3, background: bg, display: "block" }} />
+                      <div className="w-full rounded-t-sm" style={{ height: `${h}%`, background: v == null ? "#f0f0f0" : "#FFC107" }} />
                     </div>
-                    <span className="text-[9px] text-txt-3 font-mono text-center mt-1.5">{MES[mi][0]}</span>
+                    <span className="text-[9px] text-[#999] font-mono text-center mt-1.5">{MES[mi][0]}</span>
                   </div>
                 );
               })}
             </div>
           </div>
 
-          {status !== "encerrado" && (
-            <div className="card p-4">
-              {!encerrando ? (
-                <button onClick={() => setEncerrando(true)}
-                  className="w-full text-[12.5px] font-semibold text-alerr border border-alerr/30 bg-alerr-bg rounded-[9px] py-2.5 hover:bg-alerr/10 transition">
-                  Encerrar conta
-                </button>
-              ) : (
-                <div>
-                  <div className="font-disp text-[13px] font-semibold mb-2">Motivo do encerramento</div>
-                  <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)}
-                    placeholder="Ex.: loja fechou, fornecedor trocado, contrato cancelado..."
-                    className="w-full border border-linha rounded-[9px] px-3 py-2 text-[13px] mb-3 focus:outline-none focus:ring-2 focus:ring-amarelo" rows={3} />
-                  <div className="flex gap-2">
-                    <button onClick={confirmarEncerramento} disabled={!motivo.trim() || salvandoEncerrar}
-                      className="flex-1 bg-alerr text-white rounded-[9px] py-2.5 text-[12.5px] font-semibold disabled:opacity-50">
-                      {salvandoEncerrar ? "Encerrando..." : "Confirmar encerramento"}
-                    </button>
-                    <button onClick={() => { setEncerrando(false); setMotivo(""); }}
-                      className="bg-white border border-linha text-txt-2 rounded-[9px] px-4 py-2.5 text-[12.5px] font-semibold">
-                      Cancelar
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          <button onClick={baixarExtrato} className="btn-secundario w-full mt-6 flex items-center justify-center gap-2">
+            <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M10 3v10m0 0l-4-4m4 4l4-4" /><path d="M3.5 15v2a1.5 1.5 0 001.5 1.5h10a1.5 1.5 0 001.5-1.5v-2" /></svg>
+            Baixar extrato da conta
+          </button>
         </div>
       </aside>
     </>
   );
 }
 
-function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function StatusBadgeDrawer({ status }: { status: string }) {
+  if (status === "encerrado") return <span className="badge bg-alerr-bg text-alerr">Encerrada</span>;
+  if (status === "inativo") return <span className="badge bg-[#f5f5f5] text-[#999]">Inativa</span>;
+  return <span className="badge bg-ok-bg text-ok">Ativa</span>;
+}
+
+function Campo({ label, valor, mono }: { label: string; valor: string; mono?: boolean }) {
   return (
     <div>
-      <div className="text-[10.5px] tracking-wide uppercase text-txt-3 font-semibold mb-0.5">{label}</div>
-      <div className={`text-[13.5px] font-medium ${mono ? "font-mono !font-normal" : ""}`}>{value}</div>
+      <div className="text-[12px] text-[#999] font-medium mb-0.5">{label}</div>
+      <div className={`text-[13px] font-semibold text-[#1a1a1a] ${mono ? "font-mono !font-normal" : ""}`}>{valor}</div>
     </div>
+  );
+}
+
+function NovaContaDrawer({ lojas, onClose }: { lojas: { id: string; codigo: string }[]; onClose: () => void }) {
+  const supabase = createClient();
+  const [lojaId, setLojaId] = useState(lojas[0]?.id ?? "");
+  const [tipo, setTipo] = useState("agua");
+  const [fornecedor, setFornecedor] = useState("");
+  const [identificador, setIdentificador] = useState("");
+  const [venc, setVenc] = useState("");
+  const [origem, setOrigem] = useState("a_definir");
+  const [login, setLogin] = useState("");
+  const [senha, setSenha] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  async function salvar() {
+    if (!lojaId) { setErro("Selecione a loja."); return; }
+    setSalvando(true);
+    setErro(null);
+    const { data, error } = await supabase.from("contas").insert({
+      loja_id: lojaId, tipo, fornecedor_nome: fornecedor.trim() || null,
+      identificador: identificador.trim() || null,
+      dia_vencimento: venc ? Number(venc) : null,
+      origem, situacao_cadastro: "aprovada", status: "ativo",
+    }).select().single();
+
+    if (error) { setSalvando(false); setErro("Não foi possível salvar a conta."); return; }
+    if (login.trim() || senha.trim()) {
+      await supabase.rpc("credencial_salvar", { p_conta_id: data.id, p_login: login.trim() || null, p_senha: senha.trim() || null });
+    }
+    setSalvando(false);
+    window.location.reload();
+  }
+
+  return (
+    <>
+      <div onClick={onClose} className="fixed inset-0 bg-black/40 z-40" />
+      <aside className="fixed top-0 right-0 h-screen w-[380px] max-w-[94vw] bg-white border-l border-linha z-50 overflow-y-auto">
+        <div className="relative px-5 py-5 border-b border-linha">
+          <span className="absolute left-0 right-0 top-0 h-1 bg-amarelo" />
+          <button onClick={onClose} className="absolute right-5 top-5 text-[#999] hover:text-[#1a1a1a]">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 5l10 10M15 5L5 15" /></svg>
+          </button>
+          <h3 className="text-[20px] font-bold text-[#1a1a1a]">Nova conta</h3>
+        </div>
+        <div className="p-5 space-y-3.5">
+          <label>
+            <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Loja</div>
+            <select value={lojaId} onChange={(e) => setLojaId(e.target.value)} className="input-padrao w-full">
+              {lojas.map((l) => <option key={l.id} value={l.id}>{l.codigo}</option>)}
+            </select>
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label>
+              <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Tipo</div>
+              <select value={tipo} onChange={(e) => setTipo(e.target.value)} className="input-padrao w-full">
+                {Object.entries(TIPOS).map(([k, v]) => <option key={k} value={k}>{v.n}</option>)}
+              </select>
+            </label>
+            <label>
+              <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Origem</div>
+              <select value={origem} onChange={(e) => setOrigem(e.target.value)} className="input-padrao w-full">
+                {Object.entries(ORIGENS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </label>
+          </div>
+          <label>
+            <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Fornecedor</div>
+            <input value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} placeholder="SABESP, CEMIG..." className="input-padrao w-full" />
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label>
+              <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Identificador</div>
+              <input value={identificador} onChange={(e) => setIdentificador(e.target.value)} className="input-padrao w-full font-mono" />
+            </label>
+            <label>
+              <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Vencimento</div>
+              <input value={venc} onChange={(e) => setVenc(e.target.value)} placeholder="1-31" className="input-padrao w-full" />
+            </label>
+          </div>
+          <label>
+            <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Login do portal</div>
+            <input value={login} onChange={(e) => setLogin(e.target.value)} className="input-padrao w-full font-mono" />
+          </label>
+          <label>
+            <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Senha do portal</div>
+            <input value={senha} onChange={(e) => setSenha(e.target.value)} className="input-padrao w-full font-mono" />
+          </label>
+          <div className="text-[10.5px] text-[#999] leading-snug">A senha vai direto para o cofre criptografado.</div>
+          {erro && <div className="text-[12px] text-alerr bg-alerr-bg rounded-md px-3 py-2">{erro}</div>}
+          <button onClick={salvar} disabled={salvando} className="btn-primario w-full">
+            {salvando ? "Salvando..." : "Criar conta"}
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }

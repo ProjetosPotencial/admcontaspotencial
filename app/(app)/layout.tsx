@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import Sidebar from "@/components/sidebar";
+import TopNav from "@/components/topnav";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
@@ -14,12 +16,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .single();
 
   const nome = perfil?.nome ?? user.email ?? "Usuário";
-  const papel = perfil?.papel ?? "leitura";
 
   return (
-    <div className="grid grid-cols-[236px_1fr] min-h-screen">
-      <Sidebar nome={nome} papel={papel} />
-      <main className="flex flex-col min-w-0">{children}</main>
+    <div className="min-h-screen flex flex-col bg-papel">
+      <TopNav nome={nome} />
+      <div className="flex flex-1 min-h-0">
+        <Suspense fallback={<div className="bg-[#2a2a2a] w-[232px] shrink-0" />}>
+          <Sidebar />
+        </Suspense>
+        <main className="flex-1 min-w-0">{children}</main>
+      </div>
     </div>
   );
 }

@@ -350,7 +350,7 @@ function ContasVinculadas({ loja }: { loja: Loja }) {
     <div className="card p-4">
       <div className="flex items-center gap-2 font-disp text-[13px] font-semibold mb-3.5">
         Contas vinculadas
-        <span className="ml-auto text-[10px] font-mono text-petroleo bg-[#EAF0F1] px-2 py-0.5 rounded-full">
+        <span className="ml-auto text-[10px] font-mono text-info bg-info-bg px-2 py-0.5 rounded-full">
           {contas ? contas.length : "..."}
         </span>
       </div>
@@ -373,7 +373,7 @@ function ContasVinculadas({ loja }: { loja: Loja }) {
 
       {!addAberto ? (
         <button onClick={() => setAddAberto(true)}
-          className="w-full mt-3 text-[12.5px] font-semibold text-petroleo border border-petroleo/30 bg-[#EAF0F1] rounded-[9px] py-2.5 hover:bg-petroleo/10 transition">
+          className="w-full mt-3 text-[12.5px] font-semibold text-info border border-info/30 bg-info-bg rounded-md py-2.5 hover:bg-info/10 transition">
           + Adicionar conta
         </button>
       ) : (
@@ -452,7 +452,7 @@ function NovaContaForm({ lojaId, onCriada, onCancelar }: { lojaId: string; onCri
       {erro && <div className="mb-2.5 text-[12px] text-alerr bg-alerr-bg rounded-lg px-3 py-2">{erro}</div>}
       <div className="flex gap-2">
         <button onClick={salvar} disabled={salvando}
-          className="flex-1 bg-petroleo text-white rounded-[9px] py-2.5 text-[12.5px] font-semibold disabled:opacity-50">
+          className="flex-1 bg-info text-white rounded-md py-2.5 text-[12.5px] font-semibold disabled:opacity-50">
           {salvando ? "Salvando..." : "Adicionar conta"}
         </button>
         <button onClick={onCancelar} className="bg-white border border-linha text-txt-2 rounded-[9px] px-4 py-2.5 text-[12.5px] font-semibold">
