@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TIPOS, ORIGENS, SITUACAO, type Conta, type Lancamento } from "@/lib/types";
+import TipoIcon from "@/components/tipo-icon";
 import { money, MES } from "@/lib/format";
 
 function StatusBadge({ status }: { status: string }) {
@@ -115,8 +116,10 @@ export default function ContasClient({ contas, situacaoPorConta, lojas }: {
                   <small className="block text-[#999] text-[11px] font-mono">{c.lojas?.coban}</small>
                 </td>
                 <td className="px-4 text-[13px] font-medium">
-                  <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ background: TIPOS[c.tipo]?.c }} />
-                  {TIPOS[c.tipo]?.n}
+                  <span className="inline-flex items-center gap-1.5">
+                    <TipoIcon tipo={c.tipo} size={15} color={TIPOS[c.tipo]?.c} />
+                    {TIPOS[c.tipo]?.n}
+                  </span>
                 </td>
                 <td className="px-4 text-[13px] font-medium">
                   {c.fornecedor_nome ?? "—"}
@@ -210,10 +213,17 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
           <button onClick={onClose} className="absolute right-5 top-5 text-[#999] hover:text-[#1a1a1a]">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 5l10 10M15 5L5 15" /></svg>
           </button>
-          <h3 className="text-[20px] font-bold text-[#1a1a1a]">Conta de {T?.n}</h3>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-[13px] text-[#666]">{conta.lojas?.codigo}</span>
-            <StatusBadgeDrawer status={conta.status} />
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-full grid place-items-center shrink-0" style={{ background: T?.bg }}>
+              <TipoIcon tipo={conta.tipo} size={20} color={T?.c} />
+            </div>
+            <div>
+              <h3 className="text-[20px] font-bold text-[#1a1a1a] leading-tight">Conta de {T?.n}</h3>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[13px] text-[#666]">{conta.lojas?.codigo}</span>
+                <StatusBadgeDrawer status={conta.status} />
+              </div>
+            </div>
           </div>
         </div>
 

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { TIPOS } from "@/lib/types";
+import TipoIcon from "@/components/tipo-icon";
 
 export const dynamic = "force-dynamic";
 const ANO = 2026, MES_ATUAL = 7;
@@ -43,7 +44,7 @@ export default async function AlertasPage() {
           <div className="card divide-y divide-[#f0f0f0]">
             {atrasadas.slice(0, 20).map((l: any) => (
               <Link key={l.id} href={`/contas?tipo=${l.contas.tipo}`} className="flex items-center gap-3 px-5 py-3 text-[13px] hover:bg-[#f9f9f9]">
-                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: TIPOS[l.contas.tipo]?.c }} />
+                <TipoIcon tipo={l.contas.tipo} size={15} color={TIPOS[l.contas.tipo]?.c} />
                 <b className="font-semibold">{l.contas.lojas?.codigo}</b>
                 <span className="text-[#666]">{TIPOS[l.contas.tipo]?.n} · {l.contas.fornecedor_nome ?? "—"}</span>
                 <span className="ml-auto text-[11px] text-[#999] font-mono">dia {l.contas.dia_vencimento ?? "—"}</span>
@@ -60,7 +61,7 @@ export default async function AlertasPage() {
           <div className="card divide-y divide-[#f0f0f0]">
             {(mapear ?? []).slice(0, 20).map((c: any) => (
               <Link key={c.id} href={`/contas?tipo=${c.tipo}`} className="flex items-center gap-3 px-5 py-3 text-[13px] hover:bg-[#f9f9f9]">
-                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: TIPOS[c.tipo]?.c }} />
+                <TipoIcon tipo={c.tipo} size={15} color={TIPOS[c.tipo]?.c} />
                 <b className="font-semibold">{c.lojas?.codigo}</b>
                 <span className="text-[#666]">{TIPOS[c.tipo]?.n} · {c.fornecedor_nome ?? "—"}</span>
               </Link>

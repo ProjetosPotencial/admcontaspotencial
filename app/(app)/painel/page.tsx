@@ -1,12 +1,22 @@
 import { createClient } from "@/lib/supabase/server";
 import Topbar from "@/components/topbar";
+import TipoIcon from "@/components/tipo-icon";
 import { TIPOS } from "@/lib/types";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
-const ANO = 2026;
-const MES_ATUAL = 7;
+const ANO: number = 2026;
+const MES_ATUAL: number = 7;
+// mês anterior, cruzando o ano quando for janeiro
+const MES_ANT = MES_ATUAL === 1 ? 12 : MES_ATUAL - 1;
+const ANO_ANT = MES_ATUAL === 1 ? ANO - 1 : ANO;
+
+function variacaoPct(atual: number, anterior: number | null): number | null {
+  if (anterior === null) return null; // sem foto do mes anterior = nao mostra nada, nao inventa
+  if (anterior === 0) return atual === 0 ? 0 : 100;
+  return Math.round(((atual - anterior) / anterior) * 1000) / 10;
+}
 
 export default async function PainelPage() {
   const supabase = createClient();
@@ -16,6 +26,7 @@ export default async function PainelPage() {
     { data: lancJul },
     { data: lojasEncerradas },
     { count: totalLojasEncerradas },
+    { data: metricaAnterior },
   ] = await Promise.all([
     supabase
       .from("contas")
@@ -36,6 +47,11 @@ export default async function PainelPage() {
       .from("lojas")
       .select("id", { count: "exact", head: true })
       .eq("status", "encerrada"),
+    supabase
+      .from("metricas_mensais")
+      .select("contas_ativas, a_lancar, aguardando_pagamento, origem_a_mapear")
+      .eq("ano", ANO_ANT).eq("mes", MES_ANT)
+      .maybeSingle(),
   ]);
 
   const hoje = new Date();
@@ -73,10 +89,10 @@ export default async function PainelPage() {
       <div className="px-8 py-8 max-w-[1240px] w-full">
         {/* KPIs - grid 4 colunas */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
-          <KpiCard icon="doc" value={totAtivas} label="Contas ativas" variacao={null} />
-          <KpiCard icon="calendar" value={totAberto} label="A lançar em julho" variacao={null} />
-          <KpiCard icon="hourglass" value={totLancado} label="Aguardando pagamento" variacao={null} />
-          <KpiCard icon="pin" value={totMapear} label="Origem a mapear" variacao={null} />
+          <KpiCard icon="doc" value={totAtivas} label="Contas ativas" variacao={variacaoPct(totAtivas, metricaAnterior?.contas_ativas ?? null)} />
+          <KpiCard icon="calendar" value={totAberto} label="A lançar em julho" variacao={variacaoPct(totAberto, metricaAnterior?.a_lancar ?? null)} />
+          <KpiCard icon="hourglass" value={totLancado} label="Aguardando pagamento" variacao={variacaoPct(totLancado, metricaAnterior?.aguardando_pagamento ?? null)} />
+          <KpiCard icon="pin" value={totMapear} label="Origem a mapear" variacao={variacaoPct(totMapear, metricaAnterior?.origem_a_mapear ?? null)} />
         </div>
 
         <div className="flex items-center gap-2 mb-5">
@@ -98,7 +114,7 @@ export default async function PainelPage() {
                 className="bg-white border border-linha rounded-lg p-6 shadow-leve hover:shadow-media transition block">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-14 h-14 rounded-lg grid place-items-center shrink-0" style={{ background: T.bg }}>
-                    <span className="w-3.5 h-3.5 rounded-full" style={{ background: T.c }} />
+                    <TipoIcon tipo={t} size={26} color={T.c} />
                   </div>
                   <div>
                     <div className="text-[18px] font-semibold text-[#1a1a1a] leading-tight">{T.n}</div>
@@ -184,10 +200,12 @@ function KpiCard({ icon, value, label, variacao }: { icon: string; value: number
       </div>
       <div className="text-[40px] font-bold text-[#1a1a1a] leading-none">{value}</div>
       <div className="text-[13px] text-[#666] font-medium mt-2">{label}</div>
-      {variacao !== null && (
+      {variacao !== null ? (
         <div className={`text-[12px] font-medium mt-1.5 flex items-center gap-1 ${variacao > 0 ? "text-ok" : variacao < 0 ? "text-alerr" : "text-[#999]"}`}>
           {variacao > 0 ? "↑" : variacao < 0 ? "↓" : "—"} {Math.abs(variacao)}% <span className="text-[#999] font-normal">vs. mês anterior</span>
         </div>
+      ) : (
+        <div className="text-[11px] text-[#bbb] font-normal mt-1.5">sem dado do mês anterior ainda</div>
       )}
     </div>
   );

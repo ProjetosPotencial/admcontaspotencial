@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { TIPOS } from "@/lib/types";
+import TipoIcon from "@/components/tipo-icon";
 import { money } from "@/lib/format";
 
 type Item = {
@@ -59,10 +60,11 @@ export default function AprovacoesClient({ itens }: { itens: Item[] }) {
                 <div key={item.id} className="relative bg-white border border-linha rounded-lg shadow-leve hover:shadow-media transition p-5 flex items-center gap-5">
                   <span className="absolute left-0 top-0 bottom-0 w-1 bg-amarelo rounded-l-lg" />
 
-                  <div className="w-14 h-14 rounded-lg grid place-items-center shrink-0" style={{ background: T?.bg }}>
-                    <span className="text-[28px] font-bold" style={{ color: T?.c }}>
-                      {item.contas.eh_rateio ? "÷" : T?.n[0]}
-                    </span>
+                  <div className="w-14 h-14 rounded-lg grid place-items-center shrink-0 relative" style={{ background: T?.bg }}>
+                    <TipoIcon tipo={item.contas.tipo} size={26} color={T?.c} />
+                    {item.contas.eh_rateio && (
+                      <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-white border border-linha grid place-items-center text-[11px] font-bold" style={{ color: T?.c }}>÷</span>
+                    )}
                   </div>
 
                   <div className="flex-1 min-w-0">

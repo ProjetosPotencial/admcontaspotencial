@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { TIPOS } from "@/lib/types";
+import TipoIcon from "@/components/tipo-icon";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export default async function CategoriasPage() {
             <div key={k} className="card p-5">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-11 h-11 rounded-lg grid place-items-center shrink-0" style={{ background: T.bg }}>
-                  <span className="w-3 h-3 rounded-full" style={{ background: T.c }} />
+                  <TipoIcon tipo={k} size={20} color={T.c} />
                 </div>
                 <div className="font-semibold text-[15px] text-[#1a1a1a]">{T.n}</div>
               </div>
