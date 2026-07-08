@@ -43,8 +43,10 @@ export type Conta = {
 };
 
 export type Lancamento = {
+  id?: string;
   ano: number;
   mes: number;
   valor: number | null;
   situacao: string;
+  comprovante_url?: string | null;
 };

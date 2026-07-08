@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Loja } from "@/lib/loja-types";
 import { TIPOS, ORIGENS } from "@/lib/types";
+import { CAMPOS_TIPO } from "@/lib/campos-tipo";
 
 const COBANS = ["MG", "MS", "SP", "QUIOSQUE", "CORP"];
 const TIPO_PDVS = ["PE", "OP", "QQ", "AC", "PT"];
@@ -434,8 +435,8 @@ function NovaContaForm({ lojaId, onCriada, onCancelar }: { lojaId: string; onCri
             {Object.entries(ORIGENS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </label>
-        <LabeledInput label="Fornecedor" value={fornecedor} onChange={setFornecedor} placeholder="SABESP, CEMIG..." />
-        <LabeledInput label="Identificador" value={identificador} onChange={setIdentificador} mono />
+        <LabeledInput label="Fornecedor" value={fornecedor} onChange={setFornecedor} placeholder={CAMPOS_TIPO[tipo]?.placeholderFornecedor} />
+        <LabeledInput label={CAMPOS_TIPO[tipo]?.labelIdentificador ?? "Identificador"} value={identificador} onChange={setIdentificador} placeholder={CAMPOS_TIPO[tipo]?.placeholderIdentificador} mono />
         <LabeledInput label="Dia de vencimento" value={venc} onChange={setVenc} placeholder="1-31" />
         <label className="flex items-end gap-2 pb-2">
           <input type="checkbox" checked={rateio} onChange={(e) => setRateio(e.target.checked)} className="w-4 h-4" />

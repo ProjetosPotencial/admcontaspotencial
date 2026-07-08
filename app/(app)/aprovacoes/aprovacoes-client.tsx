@@ -10,6 +10,7 @@ type Item = {
   id: string;
   valor: number | null;
   situacao: string;
+  comprovante_url?: string | null;
   contas: { tipo: string; fornecedor_nome: string | null; eh_rateio: boolean; lojas: { codigo: string; coban: string } | null };
 };
 
@@ -28,6 +29,12 @@ export default function AprovacoesClient({ itens }: { itens: Item[] }) {
     setFila((f) => f.filter((x) => x.id !== item.id));
     setToast(`${aprovar ? "Aprovado" : "Recusado"}: ${item.contas.lojas?.codigo}.`);
     setTimeout(() => setToast(null), 2600);
+  }
+
+  async function verBoleto(caminho: string) {
+    const { data, error } = await supabase.storage.from("boletos").createSignedUrl(caminho, 300);
+    if (error || !data) { setToast("Não foi possível abrir o boleto."); return; }
+    window.open(data.signedUrl, "_blank");
   }
 
   return (
@@ -78,6 +85,13 @@ export default function AprovacoesClient({ itens }: { itens: Item[] }) {
                       <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="#666" strokeWidth="1.6"><rect x="3" y="4" width="14" height="13" rx="1.5" /><path d="M3 8h14" /></svg>
                       {item.contas.fornecedor_nome ?? "—"}
                     </div>
+                    {item.comprovante_url && (
+                      <button onClick={() => verBoleto(item.comprovante_url!)}
+                        className="flex items-center gap-1.5 text-[12px] text-info font-semibold mt-1.5 hover:underline">
+                        <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M6 3.5h6l4 4V19a1 1 0 01-1 1H6a1 1 0 01-1-1V4.5a1 1 0 011-1z" /><path d="M12 3.5V8h4" /></svg>
+                        Ver boleto anexado
+                      </button>
+                    )}
                   </div>
 
                   <div className="w-[150px] shrink-0 text-right">

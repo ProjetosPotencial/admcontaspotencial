@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TIPOS, ORIGENS, SITUACAO, type Conta, type Lancamento } from "@/lib/types";
+import { CAMPOS_TIPO } from "@/lib/campos-tipo";
 import TipoIcon from "@/components/tipo-icon";
 import { money, MES } from "@/lib/format";
 
@@ -158,14 +159,27 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
   const [novoLogin, setNovoLogin] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [salvandoCred, setSalvandoCred] = useState(false);
+  const [lancando, setLancando] = useState(false);
+  const [valorLancar, setValorLancar] = useState("");
+  const [arquivoBoleto, setArquivoBoleto] = useState<File | null>(null);
+  const [salvandoLancamento, setSalvandoLancamento] = useState(false);
+  const [erroLancamento, setErroLancamento] = useState<string | null>(null);
 
-  useEffect(() => {
-    supabase.from("lancamentos").select("ano, mes, valor, situacao")
+  const ANO_ATUAL = 2026, MES_ATUAL = 7;
+
+  function carregarLancamentos() {
+    supabase.from("lancamentos").select("id, ano, mes, valor, situacao, comprovante_url")
       .eq("conta_id", conta.id).eq("ano", 2026)
       .then(({ data }) => setLancs((data ?? []) as Lancamento[]));
+  }
+
+  useEffect(() => {
+    carregarLancamentos();
     supabase.from("credenciais_login").select("login").eq("conta_id", conta.id).maybeSingle()
       .then(({ data }) => setLogin((data as any)?.login ?? null));
   }, [conta.id]);
+
+  const lancamentoAtual = lancs.find((l) => l.mes === MES_ATUAL);
 
   async function revelar() {
     setRevelando(true);
@@ -189,6 +203,41 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
     setSenha(null);
     setEditandoCred(false);
     setAviso("Credencial atualizada.");
+  }
+
+  async function lancarComBoleto() {
+    if (!valorLancar.trim()) { setErroLancamento("Informe o valor da fatura."); return; }
+    setSalvandoLancamento(true);
+    setErroLancamento(null);
+
+    let caminhoBoleto: string | null = lancamentoAtual?.comprovante_url ?? null;
+    if (arquivoBoleto) {
+      const ext = arquivoBoleto.name.split(".").pop();
+      const caminho = `${conta.id}/${ANO_ATUAL}-${String(MES_ATUAL).padStart(2, "0")}.${ext}`;
+      const { error: erroUpload } = await supabase.storage.from("boletos").upload(caminho, arquivoBoleto, { upsert: true });
+      if (erroUpload) { setSalvandoLancamento(false); setErroLancamento("Não foi possível enviar o boleto."); return; }
+      caminhoBoleto = caminho;
+    }
+
+    const payload = {
+      conta_id: conta.id, ano: ANO_ATUAL, mes: MES_ATUAL,
+      valor: Number(valorLancar.replace(",", ".")),
+      situacao: "lancado", comprovante_url: caminhoBoleto,
+      lancado_em: new Date().toISOString(),
+    };
+    const { error } = await supabase.from("lancamentos").upsert(payload, { onConflict: "conta_id,ano,mes" });
+    setSalvandoLancamento(false);
+    if (error) { setErroLancamento("Não foi possível salvar o lançamento."); return; }
+    setLancando(false);
+    setValorLancar("");
+    setArquivoBoleto(null);
+    carregarLancamentos();
+  }
+
+  async function verBoleto(caminho: string) {
+    const { data, error } = await supabase.storage.from("boletos").createSignedUrl(caminho, 300);
+    if (error || !data) { setAviso("Não foi possível abrir o boleto."); return; }
+    window.open(data.signedUrl, "_blank");
   }
 
   function baixarExtrato() {
@@ -232,7 +281,7 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
           <div className="grid grid-cols-2 gap-y-3.5 mb-6">
             <Campo label="Fornecedor" valor={conta.fornecedor_nome ?? "—"} />
             <Campo label="Vencimento" valor={conta.dia_vencimento ? `dia ${conta.dia_vencimento}` : "—"} />
-            <Campo label="Código da conta" valor={conta.identificador ?? "—"} mono />
+            <Campo label={CAMPOS_TIPO[conta.tipo]?.labelIdentificador ?? "Código da conta"} valor={conta.identificador ?? "—"} mono />
             <Campo label="Origem" valor={ORIGENS[conta.origem]} />
           </div>
 
@@ -274,6 +323,56 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
                 <button onClick={salvarCredencial} disabled={salvandoCred} className="btn-primario w-full">
                   {salvandoCred ? "Salvando..." : "Salvar credencial"}
                 </button>
+              </div>
+            )}
+          </div>
+
+          <div className="pt-5 mt-5 border-t border-linha">
+            <div className="text-[14px] font-semibold text-[#1a1a1a] mb-3.5">Fatura de julho/2026</div>
+
+            {lancamentoAtual && lancamentoAtual.situacao !== "pendente" ? (
+              <div className="card p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-[18px] font-bold text-[#1a1a1a]">{money(lancamentoAtual.valor)}</div>
+                    <SituacaoBadgeInline situacao={lancamentoAtual.situacao} />
+                  </div>
+                  {lancamentoAtual.comprovante_url && (
+                    <button onClick={() => verBoleto(lancamentoAtual.comprovante_url!)}
+                      className="flex items-center gap-1.5 text-[12.5px] font-semibold text-info hover:underline">
+                      <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M6 3.5h6l4 4V19a1 1 0 01-1 1H6a1 1 0 01-1-1V4.5a1 1 0 011-1z" /><path d="M12 3.5V8h4" /></svg>
+                      Ver boleto
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : !lancando ? (
+              <button onClick={() => setLancando(true)}
+                className="w-full text-[12.5px] font-semibold text-amb border border-amarelo/40 bg-amb-bg rounded-md py-2.5 hover:bg-amarelo/10 transition">
+                {lancamentoAtual ? "Lançar fatura de julho" : "Lançar fatura de julho (sem lançamento pendente ainda)"}
+              </button>
+            ) : (
+              <div className="card p-4">
+                <label className="block mb-3">
+                  <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Valor da fatura</div>
+                  <input value={valorLancar} onChange={(e) => setValorLancar(e.target.value)} placeholder="0,00"
+                    className="input-padrao w-full font-mono" />
+                </label>
+                <label className="block mb-3">
+                  <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Boleto (PDF ou imagem)</div>
+                  <input type="file" accept=".pdf,image/*" onChange={(e) => setArquivoBoleto(e.target.files?.[0] ?? null)}
+                    className="w-full text-[12.5px] file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-[#f5f5f5] file:text-[12px] file:font-medium" />
+                </label>
+                <div className="text-[10.5px] text-[#999] mb-3 leading-snug">
+                  Baixado do portal do fornecedor. Depois de lançar, a conta entra na fila de Aprovações.
+                </div>
+                {erroLancamento && <div className="text-[12px] text-alerr bg-alerr-bg rounded-md px-3 py-2 mb-3">{erroLancamento}</div>}
+                <div className="flex gap-2">
+                  <button onClick={lancarComBoleto} disabled={salvandoLancamento} className="btn-primario flex-1 disabled:opacity-50">
+                    {salvandoLancamento ? "Enviando..." : "Lançar"}
+                  </button>
+                  <button onClick={() => { setLancando(false); setErroLancamento(null); }} className="btn-secundario">Cancelar</button>
+                </div>
               </div>
             )}
           </div>
@@ -391,12 +490,12 @@ function NovaContaDrawer({ lojas, onClose }: { lojas: { id: string; codigo: stri
           </div>
           <label>
             <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Fornecedor</div>
-            <input value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} placeholder="SABESP, CEMIG..." className="input-padrao w-full" />
+            <input value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} placeholder={CAMPOS_TIPO[tipo]?.placeholderFornecedor} className="input-padrao w-full" />
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label>
-              <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Identificador</div>
-              <input value={identificador} onChange={(e) => setIdentificador(e.target.value)} className="input-padrao w-full font-mono" />
+              <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">{CAMPOS_TIPO[tipo]?.labelIdentificador ?? "Identificador"}</div>
+              <input value={identificador} onChange={(e) => setIdentificador(e.target.value)} placeholder={CAMPOS_TIPO[tipo]?.placeholderIdentificador} className="input-padrao w-full font-mono" />
             </label>
             <label>
               <div className="text-[11px] font-semibold text-[#999] uppercase mb-1">Vencimento</div>
@@ -420,4 +519,9 @@ function NovaContaDrawer({ lojas, onClose }: { lojas: { id: string; codigo: stri
       </aside>
     </>
   );
+}
+
+function SituacaoBadgeInline({ situacao }: { situacao: string }) {
+  const s = SITUACAO[situacao] ?? { label: situacao, cls: "bg-[#f5f5f5] text-[#999]" };
+  return <span className={`badge mt-1 ${s.cls}`}>{s.label}</span>;
 }
