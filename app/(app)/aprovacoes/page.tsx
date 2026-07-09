@@ -9,7 +9,7 @@ export default async function AprovacoesPage() {
   const { ano, mes } = obterPeriodoAtual();
   const { data } = await supabase
     .from("lancamentos")
-    .select("id, valor, situacao, comprovante_url, contas!inner ( tipo, fornecedor_nome, eh_rateio, lojas ( codigo, coban, cidade, uf ) )")
+    .select("id, valor, situacao, comprovante_url, comprovante_drive_url, contas!inner ( tipo, fornecedor_nome, eh_rateio, lojas ( codigo, coban, cidade, uf ) )")
     .eq("ano", ano)
     .eq("mes", mes)
     .eq("situacao", "lancado")

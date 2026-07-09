@@ -49,4 +49,5 @@ export type Lancamento = {
   valor: number | null;
   situacao: string;
   comprovante_url?: string | null;
+  comprovante_drive_url?: string | null;
 };

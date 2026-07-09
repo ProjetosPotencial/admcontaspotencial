@@ -164,13 +164,14 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
   const [lancando, setLancando] = useState(false);
   const [valorLancar, setValorLancar] = useState("");
   const [arquivoBoleto, setArquivoBoleto] = useState<File | null>(null);
+  const [enviarDrive, setEnviarDrive] = useState(false);
   const [salvandoLancamento, setSalvandoLancamento] = useState(false);
   const [erroLancamento, setErroLancamento] = useState<string | null>(null);
 
   const { ano: ANO_ATUAL, mes: MES_ATUAL } = obterPeriodoAtual();
 
   function carregarLancamentos() {
-    supabase.from("lancamentos").select("id, ano, mes, valor, situacao, comprovante_url")
+    supabase.from("lancamentos").select("id, ano, mes, valor, situacao, comprovante_url, comprovante_drive_url")
       .eq("conta_id", conta.id).eq("ano", ANO_ATUAL)
       .then(({ data }) => setLancs((data ?? []) as Lancamento[]));
   }
@@ -213,20 +214,40 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
     setErroLancamento(null);
 
     let caminhoBoleto: string | null = lancamentoAtual?.comprovante_url ?? null;
+    let linkDrive: string | null = (lancamentoAtual as any)?.comprovante_drive_url ?? null;
+
     if (arquivoBoleto) {
       const ext = arquivoBoleto.name.split(".").pop();
       const caminho = `${conta.id}/${ANO_ATUAL}-${String(MES_ATUAL).padStart(2, "0")}.${ext}`;
       const { error: erroUpload } = await supabase.storage.from("boletos").upload(caminho, arquivoBoleto, { upsert: true });
       if (erroUpload) { setSalvandoLancamento(false); setErroLancamento("Não foi possível enviar o boleto."); return; }
       caminhoBoleto = caminho;
+
+      if (enviarDrive) {
+        const form = new FormData();
+        form.append("arquivo", arquivoBoleto);
+        form.append("ano", String(ANO_ATUAL));
+        form.append("mes", MES[MES_ATUAL - 1]);
+        form.append("loja", conta.lojas?.codigo ?? "loja");
+        form.append("tipo", T?.n ?? conta.tipo);
+        try {
+          const resp = await fetch("/api/upload-drive", { method: "POST", body: form });
+          const json = await resp.json();
+          if (resp.ok) linkDrive = json.webViewLink;
+          else setErroLancamento(`Boleto salvo no sistema, mas não foi possível enviar ao Drive: ${json.error}`);
+        } catch {
+          setErroLancamento("Boleto salvo no sistema, mas o envio ao Google Drive falhou.");
+        }
+      }
     }
 
-    const payload = {
+    const payload: any = {
       conta_id: conta.id, ano: ANO_ATUAL, mes: MES_ATUAL,
       valor: Number(valorLancar.replace(",", ".")),
       situacao: "lancado", comprovante_url: caminhoBoleto,
       lancado_em: new Date().toISOString(),
     };
+    if (linkDrive) payload.comprovante_drive_url = linkDrive;
     const { error } = await supabase.from("lancamentos").upsert(payload, { onConflict: "conta_id,ano,mes" });
     setSalvandoLancamento(false);
     if (error) { setErroLancamento("Não foi possível salvar o lançamento."); return; }
@@ -339,13 +360,22 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
                     <div className="text-[18px] font-bold text-[#1a1a1a]">{money(lancamentoAtual.valor)}</div>
                     <SituacaoBadgeInline situacao={lancamentoAtual.situacao} />
                   </div>
-                  {lancamentoAtual.comprovante_url && (
-                    <button onClick={() => verBoleto(lancamentoAtual.comprovante_url!)}
-                      className="flex items-center gap-1.5 text-[12.5px] font-semibold text-info hover:underline">
-                      <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M6 3.5h6l4 4V19a1 1 0 01-1 1H6a1 1 0 01-1-1V4.5a1 1 0 011-1z" /><path d="M12 3.5V8h4" /></svg>
-                      Ver boleto
-                    </button>
-                  )}
+                  <div className="flex flex-col items-end gap-1">
+                    {lancamentoAtual.comprovante_url && (
+                      <button onClick={() => verBoleto(lancamentoAtual.comprovante_url!)}
+                        className="flex items-center gap-1.5 text-[12.5px] font-semibold text-info hover:underline">
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M6 3.5h6l4 4V19a1 1 0 01-1 1H6a1 1 0 01-1-1V4.5a1 1 0 011-1z" /><path d="M12 3.5V8h4" /></svg>
+                        Ver boleto
+                      </button>
+                    )}
+                    {lancamentoAtual.comprovante_drive_url && (
+                      <a href={lancamentoAtual.comprovante_drive_url} target="_blank" rel="noreferrer"
+                        className="flex items-center gap-1.5 text-[12px] font-semibold text-[#6c757d] hover:underline">
+                        <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M6 2l6 10.5H2.5L8 2z" /><path d="M9 12.5l3 5.5h6l-3-5.5" /><path d="M12 2l6 10.5-3 5.5" /></svg>
+                        Ver no Drive
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
             ) : !lancando ? (
@@ -364,6 +394,11 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
                   <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Boleto (PDF ou imagem)</div>
                   <input type="file" accept=".pdf,image/*" onChange={(e) => setArquivoBoleto(e.target.files?.[0] ?? null)}
                     className="w-full text-[12.5px] file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-[#f1f3f5] file:text-[12px] file:font-medium" />
+                </label>
+                <label className="flex items-center gap-2 mb-3">
+                  <input type="checkbox" checked={enviarDrive} onChange={(e) => setEnviarDrive(e.target.checked)}
+                    disabled={!arquivoBoleto} className="w-4 h-4" />
+                  <span className="text-[12.5px] text-[#6c757d]">Enviar cópia também para o Google Drive</span>
                 </label>
                 <div className="text-[10.5px] text-[#adb5bd] mb-3 leading-snug">
                   Baixado do portal do fornecedor. Depois de lançar, a conta entra na fila de Aprovações.

@@ -11,6 +11,7 @@ type Item = {
   valor: number | null;
   situacao: string;
   comprovante_url?: string | null;
+  comprovante_drive_url?: string | null;
   contas: { tipo: string; fornecedor_nome: string | null; eh_rateio: boolean; lojas: { codigo: string; coban: string; cidade: string | null; uf: string | null } | null };
 };
 
@@ -100,6 +101,13 @@ export default function AprovacoesClient({ itens }: { itens: Item[] }) {
                         <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M6 3.5h6l4 4V19a1 1 0 01-1 1H6a1 1 0 01-1-1V4.5a1 1 0 011-1z" /><path d="M12 3.5V8h4" /></svg>
                         Ver boleto anexado
                       </button>
+                    )}
+                    {item.comprovante_drive_url && (
+                      <a href={item.comprovante_drive_url} target="_blank" rel="noreferrer"
+                        className="flex items-center gap-1.5 text-[11.5px] text-[#6c757d] font-medium mt-1 ml-[19px] hover:underline">
+                        <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M6 2l6 10.5H2.5L8 2z" /><path d="M9 12.5l3 5.5h6l-3-5.5" /><path d="M12 2l6 10.5-3 5.5" /></svg>
+                        Ver no Drive
+                      </a>
                     )}
                   </div>
 
