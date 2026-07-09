@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
     const arquivo = form.get("arquivo") as File | null;
     const ano = form.get("ano") as string;
     const mes = form.get("mes") as string;
+    const mesNumero = form.get("mesNumero") as string;
     const loja = form.get("loja") as string;
     const tipo = form.get("tipo") as string;
 
@@ -31,6 +32,7 @@ export async function POST(req: NextRequest) {
       mimeType: arquivo.type || "application/octet-stream",
       ano: Number(ano),
       mes,
+      mesNumero: mesNumero || "00",
       loja,
       tipo,
     });

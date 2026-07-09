@@ -1,4 +1,5 @@
 import { google } from "googleapis";
+import { Readable } from "stream";
 
 // Autentica AGINDO COMO a conta real do Google que já tem a pasta no Drive
 // pessoal (não uma conta de serviço "robô" — essas não têm cota própria de
@@ -51,7 +52,13 @@ async function garantirPasta(nome: string, paiId: string): Promise<string> {
 
 /**
  * Envia um boleto para o Drive, organizado como:
- * PASTA_RAIZ / {ano} / {mês} / {loja} - {tipo}.{extensão}
+ * PASTA_RAIZ / {loja} / {tipo} / {loja} - {tipo} - {mesNumero}-{ano}.{extensão}
+ *
+ * Cada loja vira uma pasta, e dentro dela cada tipo de conta (Água, Energia,
+ * Telefone, IPTU...) vira uma subpasta - assim quem abre a pasta de uma
+ * loja já vê tudo separado por tipo, em vez de misturado por mês.
+ * O nome do arquivo repete loja/tipo/competência mesmo estando nas pastas
+ * certas, pra continuar identificável se alguém mover ou baixar o arquivo.
  * Devolve o link de visualização do arquivo no Drive.
  */
 export async function enviarBoletoParaDrive(params: {
@@ -59,7 +66,8 @@ export async function enviarBoletoParaDrive(params: {
   nomeArquivo: string;
   mimeType: string;
   ano: number;
-  mes: string; // nome do mes, ex "Julho"
+  mes: string; // nome do mes, ex "Julho" (não usado na pasta, mantido pro nome do arquivo se precisar)
+  mesNumero: string; // "07"
   loja: string;
   tipo: string;
 }): Promise<{ fileId: string; webViewLink: string }> {
@@ -69,16 +77,16 @@ export async function enviarBoletoParaDrive(params: {
   }
   const drive = getDrive();
 
-  const pastaAno = await garantirPasta(String(params.ano), raizId);
-  const pastaMes = await garantirPasta(params.mes, pastaAno);
+  const pastaLoja = await garantirPasta(params.loja, raizId);
+  const pastaTipo = await garantirPasta(params.tipo, pastaLoja);
 
-  const { Readable } = await import("stream");
   const stream = Readable.from(params.arquivo);
+  const nomeArquivo = `${params.loja} - ${params.tipo} - ${params.mesNumero}-${params.ano}${extensaoDoNome(params.nomeArquivo)}`;
 
   const resultado = await drive.files.create({
     requestBody: {
-      name: `${params.loja} - ${params.tipo}${extensaoDoNome(params.nomeArquivo)}`,
-      parents: [pastaMes],
+      name: nomeArquivo,
+      parents: [pastaTipo],
     },
     media: { mimeType: params.mimeType, body: stream },
     fields: "id, webViewLink",

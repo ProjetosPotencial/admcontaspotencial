@@ -8,7 +8,7 @@ import { CAMPOS_TIPO } from "@/lib/campos-tipo";
 import { useContaForm } from "@/lib/hooks/useContaForm";
 import { obterPeriodoAtual, formatarPeriodo } from "@/lib/date-utils";
 import TipoIcon from "@/components/tipo-icon";
-import { money, MES } from "@/lib/format";
+import { money, MES, nomeArquivoSeguro } from "@/lib/format";
 
 function StatusBadge({ status }: { status: string }) {
   if (status === "encerrado") return <span className="badge bg-alerr-bg text-alerr">Encerrada</span>;
@@ -218,7 +218,9 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
 
     if (arquivoBoleto) {
       const ext = arquivoBoleto.name.split(".").pop();
-      const caminho = `${conta.id}/${ANO_ATUAL}-${String(MES_ATUAL).padStart(2, "0")}.${ext}`;
+      const lojaSlug = nomeArquivoSeguro(conta.lojas?.codigo ?? "loja");
+      const competencia = `${String(MES_ATUAL).padStart(2, "0")}-${ANO_ATUAL}`;
+      const caminho = `${lojaSlug}/${conta.tipo}/${competencia}_${conta.id.slice(0, 8)}.${ext}`;
       const { error: erroUpload } = await supabase.storage.from("boletos").upload(caminho, arquivoBoleto, { upsert: true });
       if (erroUpload) { setSalvandoLancamento(false); setErroLancamento("Não foi possível enviar o boleto."); return; }
       caminhoBoleto = caminho;
@@ -228,6 +230,7 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
         form.append("arquivo", arquivoBoleto);
         form.append("ano", String(ANO_ATUAL));
         form.append("mes", MES[MES_ATUAL - 1]);
+        form.append("mesNumero", String(MES_ATUAL).padStart(2, "0"));
         form.append("loja", conta.lojas?.codigo ?? "loja");
         form.append("tipo", T?.n ?? conta.tipo);
         try {
