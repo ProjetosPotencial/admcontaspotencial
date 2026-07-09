@@ -13,9 +13,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = session.user;
 
   const { ano, mes } = obterPeriodoAtual();
-  const [{ data: perfil }, alertas] = await Promise.all([
+  const [{ data: perfil }, alertas, { data: menuItens }] = await Promise.all([
     supabase.from("perfis").select("nome, email, papel").eq("id", user.id).single(),
     contarAlertas(supabase, ano, mes),
+    // já vem filtrado pelo papel do usuário logado, calculado no banco (vw_menu_visivel)
+    supabase.from("vw_menu_visivel").select("id, label, href, icone"),
   ]);
 
   const nome = perfil?.nome ?? user.email ?? "Usuário";
@@ -24,7 +26,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen flex bg-papel">
       <Suspense fallback={<div className="bg-ebano w-[248px] shrink-0 h-screen sticky top-0" />}>
-        <Sidebar nome={nome} email={email} />
+        <Sidebar nome={nome} email={email} itens={menuItens ?? []} />
       </Suspense>
       <div className="flex-1 flex flex-col min-w-0">
         <TopNav notificacoes={alertas.total} />

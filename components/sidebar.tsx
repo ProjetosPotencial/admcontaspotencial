@@ -5,19 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-const NAV = [
-  { label: "Painel", href: "/painel", icon: "painel" },
-  { label: "Contas", href: "/contas", icon: "contas" },
-  { label: "Lançamentos", href: "/lancamentos", icon: "lancamentos" },
-  { label: "Aprovações", href: "/aprovacoes", icon: "aprovacoes" },
-  { label: "Pagamentos", href: "/pagamentos", icon: "pagamentos" },
-  { label: "Fornecedores", href: "/fornecedores", icon: "fornecedores" },
-  { label: "Centros de Custo", href: "/centros-de-custo", icon: "centros" },
-  { label: "Relatórios", href: "/relatorios", icon: "relatorios" },
-  { label: "Cadastros", href: "/lojas", icon: "cadastros" },
-  { label: "Cofre", href: "/cofre", icon: "cofre" },
-  { label: "Configurações", href: "/configuracoes", icon: "config" },
-];
+type MenuItem = { id: string; label: string; href: string; icone: string };
 
 const ICONS: Record<string, React.ReactNode> = {
   painel: <><rect x="2.5" y="2.5" width="6" height="6" rx="1.5" /><rect x="11.5" y="2.5" width="6" height="6" rx="1.5" /><rect x="2.5" y="11.5" width="6" height="6" rx="1.5" /><rect x="11.5" y="11.5" width="6" height="6" rx="1.5" /></>,
@@ -31,17 +19,19 @@ const ICONS: Record<string, React.ReactNode> = {
   cadastros: <><path d="M3 8.5L10 3l7 5.5" /><path d="M4.5 8v8h11V8" /><path d="M8 16v-4.5h4V16" /></>,
   cofre: <><rect x="3.5" y="8.5" width="13" height="9" rx="2" /><path d="M6.5 8.5V6a3.5 3.5 0 017 0v2.5" /></>,
   config: <><rect x="3.5" y="8.5" width="13" height="9" rx="2" /><circle cx="10" cy="13" r="1.6" /></>,
+  empresas: <><rect x="3" y="6" width="14" height="11" rx="1.5" /><path d="M3 6l7-3 7 3" /><path d="M8 17v-3.5h4V17" /></>,
+  contratos: <><path d="M6 2.5h6l4 4V19a1 1 0 01-1 1H6a1 1 0 01-1-1V3.5a1 1 0 011-1z" /><path d="M7.5 8h5M7.5 11h5M7.5 14h3" /></>,
 };
 
 function Icon({ name }: { name: string }) {
   return (
     <svg className="w-[17px] h-[17px] shrink-0" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      {ICONS[name]}
+      {ICONS[name] ?? <circle cx="10" cy="10" r="7" />}
     </svg>
   );
 }
 
-export default function Sidebar({ nome, email }: { nome: string; email: string }) {
+export default function Sidebar({ nome, email, itens }: { nome: string; email: string; itens: MenuItem[] }) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -68,15 +58,19 @@ export default function Sidebar({ nome, email }: { nome: string; email: string }
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-        {NAV.map((item) => {
-          const on = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href) && item.href !== "/lojas") || pathname === item.href;
+        {itens.length === 0 && (
+          <div className="px-3.5 py-2.5 text-[12px] text-white/40 leading-snug">
+            Nenhum item de menu liberado para o seu papel.
+          </div>
+        )}
+        {itens.map((item) => {
           const ativo = pathname.startsWith(item.href);
           return (
-            <Link key={item.href} href={item.href}
+            <Link key={item.id} href={item.href}
               className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-[13.5px] font-medium transition ${
                 ativo ? "bg-amarelo text-ebano font-semibold" : "text-white/75 hover:bg-white/10 hover:text-white"
               }`}>
-              <Icon name={item.icon} />
+              <Icon name={item.icone} />
               {item.label}
             </Link>
           );

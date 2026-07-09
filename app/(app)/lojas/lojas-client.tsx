@@ -15,7 +15,7 @@ function StatusBadge({ status }: { status: string }) {
   return <span className="badge bg-ok-bg text-ok">Ativa</span>;
 }
 
-export default function LojasClient({ lojas: lojasIniciais, statusInicial }: { lojas: Loja[]; statusInicial?: string }) {
+export default function LojasClient({ lojas: lojasIniciais, statusInicial, empresas }: { lojas: Loja[]; statusInicial?: string; empresas: { id: string; nome: string }[] }) {
   const [lojas, setLojas] = useState(lojasIniciais);
   const [fCoban, setFCoban] = useState("todos");
   const [fStatus, setFStatus] = useState(statusInicial ?? "todos");
@@ -91,9 +91,10 @@ export default function LojasClient({ lojas: lojasIniciais, statusInicial }: { l
         </table>
       </div>
 
-      {aberta && <LojaDrawer loja={aberta} onClose={() => setAberta(null)} onSalvar={atualizarNaLista} />}
+      {aberta && <LojaDrawer loja={aberta} onClose={() => setAberta(null)} onSalvar={atualizarNaLista} empresas={empresas} />}
       {criando && (
         <NovaLojaDrawer
+          empresas={empresas}
           onClose={() => setCriando(false)}
           onCriada={(loja) => { atualizarNaLista(loja); setCriando(false); setAberta(loja); }}
         />
@@ -109,13 +110,23 @@ type FormInst = {
 };
 const CAMPOS_VAZIOS: FormInst = { setor: "", empresa: "", cnpj: "", contrato: "", endereco: "", cidade: "", uf: "", responsavel: "", contato: "" };
 
-function CamposInstitucionais({ form, set }: { form: FormInst; set: <K extends keyof FormInst>(k: K, v: string) => void }) {
+function CamposInstitucionais({ form, set, empresas, empresaId, setEmpresaId }: {
+  form: FormInst; set: <K extends keyof FormInst>(k: K, v: string) => void;
+  empresas: { id: string; nome: string }[]; empresaId: string; setEmpresaId: (v: string) => void;
+}) {
   return (
     <div className="grid grid-cols-2 gap-3">
       <LabeledInput label="Setor" value={form.setor} onChange={(v) => set("setor", v)} placeholder="Varejo, Administrativo..." />
-      <LabeledInput label="Empresa" value={form.empresa} onChange={(v) => set("empresa", v)} placeholder="Grupo Potencial..." />
+      <label>
+        <div className="text-[10.5px] tracking-wide uppercase text-txt-3 font-semibold mb-1">Empresa</div>
+        <select value={empresaId} onChange={(e) => setEmpresaId(e.target.value)}
+          className="w-full border border-linha rounded-[8px] px-2.5 py-2 text-[13px]">
+          <option value="">— nenhuma —</option>
+          {empresas.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
+        </select>
+      </label>
       <LabeledInput label="CNPJ" value={form.cnpj} onChange={(v) => set("cnpj", v)} mono />
-      <LabeledInput label="Contrato" value={form.contrato} onChange={(v) => set("contrato", v)} />
+      <LabeledInput label="Observação de contrato" value={form.contrato} onChange={(v) => set("contrato", v)} placeholder="nota livre, opcional" />
       <LabeledInput label="Cidade" value={form.cidade} onChange={(v) => set("cidade", v)} />
       <LabeledInput label="UF" value={form.uf} onChange={(v) => set("uf", v)} />
       <LabeledInput label="Endereço" value={form.endereco} onChange={(v) => set("endereco", v)} full />
@@ -126,11 +137,12 @@ function CamposInstitucionais({ form, set }: { form: FormInst; set: <K extends k
 }
 
 /* ---------------- criar loja nova ---------------- */
-function NovaLojaDrawer({ onClose, onCriada }: { onClose: () => void; onCriada: (l: Loja) => void }) {
+function NovaLojaDrawer({ onClose, onCriada, empresas }: { onClose: () => void; onCriada: (l: Loja) => void; empresas: { id: string; nome: string }[] }) {
   const supabase = createClient();
   const [codigo, setCodigo] = useState("");
   const [coban, setCoban] = useState("MG");
   const [tipoPdv, setTipoPdv] = useState("PE");
+  const [empresaId, setEmpresaId] = useState("");
   const [form, setForm] = useState<FormInst>(CAMPOS_VAZIOS);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -143,7 +155,7 @@ function NovaLojaDrawer({ onClose, onCriada }: { onClose: () => void; onCriada: 
     setSalvando(true);
     setErro(null);
     const payload = {
-      codigo: codigo.trim(), coban, tipo_pdv: tipoPdv,
+      codigo: codigo.trim(), coban, tipo_pdv: tipoPdv, empresa_id: empresaId || null,
       ...Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v.trim() === "" ? null : v.trim()])),
     };
     const { data, error } = await supabase.from("lojas").insert(payload).select().single();
@@ -210,7 +222,7 @@ function NovaLojaDrawer({ onClose, onCriada }: { onClose: () => void; onCriada: 
 
           <div className="card p-4">
             <div className="font-disp text-[13px] font-semibold mb-3.5">Dados institucionais <span className="text-txt-3 font-normal text-[11px]">(opcional)</span></div>
-            <CamposInstitucionais form={form} set={set} />
+            <CamposInstitucionais form={form} set={set} empresas={empresas} empresaId={empresaId} setEmpresaId={setEmpresaId} />
           </div>
 
           {erro && <div className="mt-3 text-[12px] text-alerr bg-alerr-bg rounded-lg px-3 py-2">{erro}</div>}
@@ -226,12 +238,13 @@ function NovaLojaDrawer({ onClose, onCriada }: { onClose: () => void; onCriada: 
 }
 
 /* ---------------- ficha de loja existente ---------------- */
-function LojaDrawer({ loja, onClose, onSalvar }: { loja: Loja; onClose: () => void; onSalvar: (l: Loja) => void }) {
+function LojaDrawer({ loja, onClose, onSalvar, empresas }: { loja: Loja; onClose: () => void; onSalvar: (l: Loja) => void; empresas: { id: string; nome: string }[] }) {
   const supabase = createClient();
   const [codigo, setCodigo] = useState(loja.codigo);
   const [coban, setCoban] = useState(loja.coban);
   const [tipoPdv, setTipoPdv] = useState(loja.tipo_pdv ?? "PE");
   const [status, setStatus] = useState<"ativo" | "inativo">(loja.status === "inativo" ? "inativo" : "ativo");
+  const [empresaId, setEmpresaId] = useState(loja.empresa_id ?? "");
   const [form, setForm] = useState<FormInst>({
     setor: loja.setor ?? "", empresa: loja.empresa ?? "", cnpj: loja.cnpj ?? "",
     contrato: loja.contrato ?? "", endereco: loja.endereco ?? "", cidade: loja.cidade ?? "",
@@ -251,7 +264,7 @@ function LojaDrawer({ loja, onClose, onSalvar }: { loja: Loja; onClose: () => vo
     setSalvando(true);
     setErro(null);
     const institucional = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v.trim() === "" ? null : v.trim()]));
-    const payload: Partial<Loja> = { codigo: codigo.trim(), coban, tipo_pdv: tipoPdv, ...institucional };
+    const payload: Partial<Loja> = { codigo: codigo.trim(), coban, tipo_pdv: tipoPdv, empresa_id: empresaId || null, ...institucional };
     if (loja.status !== "encerrada") payload.status = status;
     const { error } = await supabase.from("lojas").update(payload).eq("id", loja.id);
     setSalvando(false);
@@ -339,7 +352,7 @@ function LojaDrawer({ loja, onClose, onSalvar }: { loja: Loja; onClose: () => vo
 
           <div className="card p-4 mb-4">
             <div className="font-disp text-[13px] font-semibold mb-3.5">Dados institucionais</div>
-            <CamposInstitucionais form={form} set={set} />
+            <CamposInstitucionais form={form} set={set} empresas={empresas} empresaId={empresaId} setEmpresaId={setEmpresaId} />
             {erro && <div className="mt-3 text-[12px] text-alerr bg-alerr-bg rounded-lg px-3 py-2">{erro}</div>}
             <button onClick={salvar} disabled={salvando}
               className="w-full mt-4 bg-amarelo text-ebano rounded-[9px] py-2.5 text-[12.5px] font-semibold disabled:opacity-50">
@@ -349,6 +362,8 @@ function LojaDrawer({ loja, onClose, onSalvar }: { loja: Loja; onClose: () => vo
           </div>
 
           <ContasVinculadas loja={loja} />
+
+          <ContratosVinculados lojaId={loja.id} lojaCodigo={loja.codigo} />
 
           {loja.status !== "encerrada" && (
             <div className="card p-4 mt-4">
@@ -437,6 +452,43 @@ function ContasVinculadas({ loja }: { loja: Loja }) {
       ) : (
         <NovaContaForm lojaId={loja.id} onCriada={() => { setAddAberto(false); carregar(); }} onCancelar={() => setAddAberto(false)} />
       )}
+    </div>
+  );
+}
+
+function ContratosVinculados({ lojaId, lojaCodigo }: { lojaId: string; lojaCodigo: string }) {
+  const supabase = createClient();
+  const [contratos, setContratos] = useState<{ id: string; numero: string; status: string; valor: number | null }[] | null>(null);
+
+  useEffect(() => {
+    supabase.from("contratos").select("id, numero, status, valor").eq("loja_id", lojaId).order("created_at", { ascending: false })
+      .then(({ data }) => setContratos((data ?? []) as any[]));
+  }, [lojaId]);
+
+  const STATUS_CLS: Record<string, string> = { ativo: "bg-ok-bg text-ok", encerrado: "bg-alerr-bg text-alerr", suspenso: "bg-amb-bg text-[#c9922a]" };
+
+  return (
+    <div className="card p-4 mt-4">
+      <div className="flex items-center gap-2 font-disp text-[13px] font-semibold mb-3.5">
+        Contratos vinculados
+        <span className="ml-auto text-[10px] font-mono text-info bg-info-bg px-2 py-0.5 rounded-full">
+          {contratos ? contratos.length : "..."}
+        </span>
+      </div>
+      {contratos && contratos.length === 0 && (
+        <div className="text-[12.5px] text-txt-3 mb-3">Nenhum contrato vinculado ainda.</div>
+      )}
+      {contratos && contratos.map((c) => (
+        <div key={c.id} className="flex items-center gap-2.5 py-2 border-b border-linha2 last:border-0 text-[13px]">
+          <span className="font-mono font-medium">{c.numero}</span>
+          <span className={`badge ${STATUS_CLS[c.status] ?? ""}`}>{c.status}</span>
+          <span className="ml-auto text-txt-3 font-mono text-[12px]">{c.valor ? `R$ ${Number(c.valor).toLocaleString("pt-br", { minimumFractionDigits: 2 })}` : "—"}</span>
+        </div>
+      ))}
+      <a href={`/contratos?loja=${encodeURIComponent(lojaCodigo)}`}
+        className="block w-full mt-3 text-center text-[12.5px] font-semibold text-info border border-info/30 bg-info-bg rounded-md py-2.5 hover:bg-info/10 transition">
+        + Gerenciar contratos em /contratos
+      </a>
     </div>
   );
 }

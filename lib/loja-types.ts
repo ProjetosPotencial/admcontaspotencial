@@ -5,6 +5,7 @@ export type Loja = {
   tipo_pdv: string | null;
   setor: string | null;
   empresa: string | null;
+  empresa_id: string | null;
   cnpj: string | null;
   contrato: string | null;
   endereco: string | null;
