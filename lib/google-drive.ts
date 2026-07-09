@@ -1,8 +1,10 @@
 import { google } from "googleapis";
 
 // Autentica com uma conta de serviço do Google (não é login pessoal). A conta
-// de serviço precisa ter sido convidada como editora da pasta raiz no Drive,
-// senão o upload falha com "permissão negada" mesmo com as chaves certas.
+// de serviço precisa ter sido convidada como membro do Drive Compartilhado
+// (não de uma pasta comum — contas de serviço não têm cota própria fora de
+// um Drive Compartilhado, e a criação de arquivo falha silenciosamente
+// mesmo com a permissão de Editor numa pasta comum).
 function getAuth() {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const key = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
@@ -23,6 +25,10 @@ function getDrive() {
 /**
  * Garante que uma subpasta com esse nome exista dentro de "paiId".
  * Se já existir, reaproveita; se não, cria. Devolve o ID da pasta.
+ *
+ * supportsAllDrives + includeItemsFromAllDrives são obrigatórios aqui:
+ * sem eles, a API do Drive simplesmente ignora Drives Compartilhados nas
+ * buscas e nas criações, como se não existissem.
  */
 async function garantirPasta(nome: string, paiId: string): Promise<string> {
   const drive = getDrive();
@@ -30,6 +36,9 @@ async function garantirPasta(nome: string, paiId: string): Promise<string> {
     q: `name='${nome.replace(/'/g, "\\'")}' and '${paiId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
     fields: "files(id, name)",
     spaces: "drive",
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+    corpora: "allDrives",
   });
   if (busca.data.files && busca.data.files.length > 0) {
     return busca.data.files[0].id!;
@@ -37,6 +46,7 @@ async function garantirPasta(nome: string, paiId: string): Promise<string> {
   const nova = await drive.files.create({
     requestBody: { name: nome, mimeType: "application/vnd.google-apps.folder", parents: [paiId] },
     fields: "id",
+    supportsAllDrives: true,
   });
   return nova.data.id!;
 }
@@ -45,6 +55,10 @@ async function garantirPasta(nome: string, paiId: string): Promise<string> {
  * Envia um boleto para o Drive, organizado como:
  * PASTA_RAIZ / {ano} / {mês} / {loja} - {tipo}.{extensão}
  * Devolve o link de visualização do arquivo no Drive.
+ *
+ * GOOGLE_DRIVE_FOLDER_ID precisa ser o ID de uma pasta dentro de um Drive
+ * Compartilhado (ou o próprio Drive Compartilhado). Uma pasta comum dentro
+ * de "Meu Drive" NÃO funciona pra criação de arquivo por conta de serviço.
  */
 export async function enviarBoletoParaDrive(params: {
   arquivo: Buffer;
@@ -74,6 +88,7 @@ export async function enviarBoletoParaDrive(params: {
     },
     media: { mimeType: params.mimeType, body: stream },
     fields: "id, webViewLink",
+    supportsAllDrives: true,
   });
 
   return {
