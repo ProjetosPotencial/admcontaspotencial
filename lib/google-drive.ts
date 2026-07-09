@@ -1,34 +1,36 @@
 import { google } from "googleapis";
 
-// Autentica com uma conta de serviço do Google (não é login pessoal). A conta
-// de serviço precisa ter sido convidada como membro do Drive Compartilhado
-// (não de uma pasta comum — contas de serviço não têm cota própria fora de
-// um Drive Compartilhado, e a criação de arquivo falha silenciosamente
-// mesmo com a permissão de Editor numa pasta comum).
-function getAuth() {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const key = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
-  if (!email || !key) {
-    throw new Error("Credenciais do Google Drive não configuradas (GOOGLE_SERVICE_ACCOUNT_EMAIL / GOOGLE_PRIVATE_KEY).");
+// Autentica AGINDO COMO a conta real do Google que já tem a pasta no Drive
+// pessoal (não uma conta de serviço "robô" — essas não têm cota própria de
+// armazenamento fora de um Drive Compartilhado, que só existe em contas
+// Google Workspace pagas). O acesso vem de um "refresh token" gerado uma
+// vez, através da rota /api/google-auth, autorizado pela conta dona da
+// pasta (grupopotencial.ti@gmail.com ou quem for o dono).
+function getOAuthClient() {
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI;
+  const refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
+
+  if (!clientId || !clientSecret || !redirectUri) {
+    throw new Error("Credenciais OAuth do Google não configuradas (GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET / GOOGLE_OAUTH_REDIRECT_URI).");
   }
-  return new google.auth.JWT({
-    email,
-    key,
-    scopes: ["https://www.googleapis.com/auth/drive"],
-  });
+  if (!refreshToken) {
+    throw new Error("GOOGLE_OAUTH_REFRESH_TOKEN não configurado ainda. Um admin precisa autorizar uma vez em /api/google-auth.");
+  }
+
+  const client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+  client.setCredentials({ refresh_token: refreshToken });
+  return client;
 }
 
 function getDrive() {
-  return google.drive({ version: "v3", auth: getAuth() });
+  return google.drive({ version: "v3", auth: getOAuthClient() });
 }
 
 /**
  * Garante que uma subpasta com esse nome exista dentro de "paiId".
  * Se já existir, reaproveita; se não, cria. Devolve o ID da pasta.
- *
- * supportsAllDrives + includeItemsFromAllDrives são obrigatórios aqui:
- * sem eles, a API do Drive simplesmente ignora Drives Compartilhados nas
- * buscas e nas criações, como se não existissem.
  */
 async function garantirPasta(nome: string, paiId: string): Promise<string> {
   const drive = getDrive();
@@ -36,9 +38,6 @@ async function garantirPasta(nome: string, paiId: string): Promise<string> {
     q: `name='${nome.replace(/'/g, "\\'")}' and '${paiId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
     fields: "files(id, name)",
     spaces: "drive",
-    supportsAllDrives: true,
-    includeItemsFromAllDrives: true,
-    corpora: "allDrives",
   });
   if (busca.data.files && busca.data.files.length > 0) {
     return busca.data.files[0].id!;
@@ -46,7 +45,6 @@ async function garantirPasta(nome: string, paiId: string): Promise<string> {
   const nova = await drive.files.create({
     requestBody: { name: nome, mimeType: "application/vnd.google-apps.folder", parents: [paiId] },
     fields: "id",
-    supportsAllDrives: true,
   });
   return nova.data.id!;
 }
@@ -55,10 +53,6 @@ async function garantirPasta(nome: string, paiId: string): Promise<string> {
  * Envia um boleto para o Drive, organizado como:
  * PASTA_RAIZ / {ano} / {mês} / {loja} - {tipo}.{extensão}
  * Devolve o link de visualização do arquivo no Drive.
- *
- * GOOGLE_DRIVE_FOLDER_ID precisa ser o ID de uma pasta dentro de um Drive
- * Compartilhado (ou o próprio Drive Compartilhado). Uma pasta comum dentro
- * de "Meu Drive" NÃO funciona pra criação de arquivo por conta de serviço.
  */
 export async function enviarBoletoParaDrive(params: {
   arquivo: Buffer;
@@ -88,7 +82,6 @@ export async function enviarBoletoParaDrive(params: {
     },
     media: { mimeType: params.mimeType, body: stream },
     fields: "id, webViewLink",
-    supportsAllDrives: true,
   });
 
   return {
