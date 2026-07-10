@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import MenuAdminClient from "./menu-admin-client";
+import TestarSlackButton from "./testar-slack-button";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,14 @@ export default async function ConfiguracoesPage() {
             <h2 className="text-[16px] font-semibold text-[#1a1a1a] mb-1">Menu do sistema</h2>
             <p className="text-[13px] text-[#6c757d] mb-4">Quem vê cada item, por papel mínimo. Só administradores acessam isto.</p>
             <MenuAdminClient itens={(menuItens ?? []) as any[]} />
+          </div>
+        )}
+
+        {ehAdmin && (
+          <div className="mt-8">
+            <h2 className="text-[16px] font-semibold text-[#1a1a1a] mb-1">Notificação diária no Slack</h2>
+            <p className="text-[13px] text-[#6c757d] mb-4">Testa agora, sem esperar o horário agendado. Manda de verdade pro canal configurado.</p>
+            <TestarSlackButton />
           </div>
         )}
       </div>
