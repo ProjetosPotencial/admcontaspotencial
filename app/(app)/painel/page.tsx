@@ -1,243 +1,287 @@
 import { createClient } from "@/lib/supabase/server";
-import Topbar from "@/components/topbar";
 import TipoIcon from "@/components/tipo-icon";
 import { TIPOS } from "@/lib/types";
 import { obterPeriodoAtual, formatarPeriodo, estaAtrasada, variacaoPct } from "@/lib/date-utils";
+import { money, MES } from "@/lib/format";
+import VencimentosProximosClient from "./vencimentos-proximos-client";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
+function saudacao(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Bom dia";
+  if (h < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
 export default async function PainelPage() {
   const supabase = createClient();
-
-  // Obtém o período atual dinamicamente
   const { ano, mes, mesAnterior, anoAnterior } = obterPeriodoAtual();
 
+  const { data: { session } } = await supabase.auth.getSession();
+
   const [
+    { data: perfil },
     { data: contas },
     { data: lancamentos },
-    { data: vencendoSemanaRaw },
+    { data: lancamentosDetalhados },
+    { data: lancamentosAno },
     { data: lojasEncerradas },
-    { count: totalLojasEncerradas },
     { data: metricaAnterior },
   ] = await Promise.all([
-    supabase
-      .from("contas")
-      .select("id, tipo, status, origem, dia_vencimento")
-      .eq("situacao_cadastro", "aprovada"),
-    supabase
-      .from("lancamentos")
-      .select("conta_id, situacao, contas!inner(tipo, dia_vencimento)")
-      .eq("ano", ano)
-      .eq("mes", mes),
-    supabase
-      .from("lancamentos")
-      .select("id, situacao, contas!inner ( tipo, dia_vencimento, fornecedor_nome, lojas ( codigo, coban ) )")
-      .eq("ano", ano)
-      .eq("mes", mes)
-      .eq("situacao", "pendente"),
-    supabase
-      .from("lojas")
-      .select("codigo, coban, empresa, cidade, uf, encerrada_em")
-      .eq("status", "encerrada")
-      .order("encerrada_em", { ascending: false })
-      .limit(6),
-    supabase
-      .from("lojas")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "encerrada"),
-    supabase
-      .from("metricas_mensais")
-      .select("contas_ativas, a_lancar, aguardando_pagamento, origem_a_mapear")
-      .eq("ano", anoAnterior)
-      .eq("mes", mesAnterior)
-      .maybeSingle(),
+    supabase.from("perfis").select("nome").eq("id", session?.user.id ?? "").maybeSingle(),
+    supabase.from("contas").select("id, tipo, status, origem, dia_vencimento").eq("situacao_cadastro", "aprovada"),
+    supabase.from("lancamentos").select("conta_id, situacao, contas!inner(tipo, dia_vencimento)").eq("ano", ano).eq("mes", mes),
+    supabase.from("lancamentos")
+      .select("id, valor, situacao, contas!inner ( tipo, dia_vencimento, fornecedor_nome, lojas ( codigo ) )")
+      .eq("ano", ano).eq("mes", mes).eq("situacao", "pendente"),
+    supabase.from("lancamentos")
+      .select("mes, valor, situacao, contas!inner ( fornecedor_nome )")
+      .eq("ano", ano).not("valor", "is", null),
+    supabase.from("lojas").select("codigo, coban, empresa, cidade, uf, encerrada_em").eq("status", "encerrada").order("encerrada_em", { ascending: false }).limit(6),
+    supabase.from("metricas_mensais").select("contas_ativas, a_lancar, aguardando_pagamento, origem_a_mapear").eq("ano", anoAnterior).eq("mes", mesAnterior).maybeSingle(),
   ]);
 
-  // Vencimentos dos próximos 7 dias, ainda não lançados, de qualquer tipo de conta.
+  const nome = perfil?.nome?.split(" ")[0] ?? "";
   const diaAtual = new Date().getDate();
-  const vencendoSemana = (vencendoSemanaRaw ?? [])
-    .filter((l: any) => {
-      const dv = l.contas?.dia_vencimento;
-      return dv != null && dv >= diaAtual && dv <= diaAtual + 7;
-    })
-    .sort((a: any, b: any) => (a.contas?.dia_vencimento ?? 0) - (b.contas?.dia_vencimento ?? 0));
 
-  // Calcula métricas por tipo de conta
+  // --- métricas por tipo (cards de baixo) ---
   const tipos = Object.keys(TIPOS);
   const porTipo = tipos.map((t) => {
     const doTipo = (contas ?? []).filter((c) => c.tipo === t && c.status === "ativo");
     const ativas = doTipo.length;
     const mapear = doTipo.filter((c) => c.origem === "a_definir").length;
     const lanc = (lancamentos ?? []).filter((l: any) => l.contas?.tipo === t);
-    const atrasadas = lanc.filter((l: any) =>
-      estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano)
-    ).length;
+    const atrasadas = lanc.filter((l: any) => estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano)).length;
     const pagas = lanc.filter((l) => l.situacao === "pago").length;
     const aguardando = lanc.filter((l) => l.situacao === "lancado" || l.situacao === "aprovado").length;
     const aLancar = lanc.filter((l) => l.situacao === "pendente").length;
-    const abertoTotal = lanc.filter((l) => l.situacao === "pendente").length;
-    const lancadoTotal = lanc.filter((l) => l.situacao === "lancado").length;
-    const aberto = abertoTotal - lanc.filter((l: any) =>
-      l.situacao === "pendente" && estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano)
-    ).length;
-    const lancado = lancadoTotal - lanc.filter((l: any) =>
-      l.situacao === "lancado" && estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano)
-    ).length;
-    return { t, ativas, mapear, aberto: Math.max(aberto, 0), lancado: Math.max(lancado, 0), atrasadas, pagas, aguardando, aLancar };
+    return { t, ativas, mapear, atrasadas, pagas, aguardando, aLancar };
   });
 
   const totAtivas = porTipo.reduce((s, x) => s + x.ativas, 0);
-  const totAberto = porTipo.reduce((s, x) => s + x.aberto, 0);
-  const totLancado = porTipo.reduce((s, x) => s + x.lancado, 0);
+  const totAberto = porTipo.reduce((s, x) => s + x.aLancar, 0);
+  const totLancado = porTipo.reduce((s, x) => s + x.aguardando, 0);
   const totMapear = porTipo.reduce((s, x) => s + x.mapear, 0);
 
+  // --- alertas importantes ---
+  const totAtrasadas = porTipo.reduce((s, x) => s + x.atrasadas, 0);
+  const aprovacoesPendentes = (lancamentos ?? []).filter((l) => l.situacao === "lancado").length;
+  const pagamentosComFalha = (lancamentos ?? []).filter((l) => l.situacao === "contestado").length;
+
+  // --- evolução mensal (soma real de lançamentos com valor, mês a mês do ano) ---
+  const evolucaoPorMes = Array.from({ length: 12 }, (_, i) => {
+    const total = (lancamentosAno ?? []).filter((l) => l.mes === i + 1).reduce((s, l) => s + Number(l.valor ?? 0), 0);
+    return { mes: i + 1, total };
+  }).filter((m) => m.mes <= mes); // só até o mês atual, não mostra futuro vazio
+  const maxEvolucao = Math.max(...evolucaoPorMes.map((m) => m.total), 1);
+  const totalMesAtual = evolucaoPorMes.find((m) => m.mes === mes)?.total ?? 0;
+  const totalMesAnteriorReal = evolucaoPorMes.find((m) => m.mes === mesAnterior)?.total ?? null;
+  const variacaoEvolucao = totalMesAnteriorReal ? variacaoPct(totalMesAtual, totalMesAnteriorReal) : null;
+
+  // --- top fornecedores (por valor, dentro do mês atual) ---
+  const porFornecedor: Record<string, number> = {};
+  (lancamentosAno ?? []).filter((l) => l.mes === mes).forEach((l: any) => {
+    const nomeF = l.contas?.fornecedor_nome ?? "Não identificado";
+    porFornecedor[nomeF] = (porFornecedor[nomeF] ?? 0) + Number(l.valor ?? 0);
+  });
+  const topFornecedores = Object.entries(porFornecedor)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+  const totalFornecedores = Object.values(porFornecedor).reduce((s, v) => s + v, 0) || 1;
+
+  // --- resumo financeiro do mês ---
+  const lancMesAtual = (lancamentosAno ?? []).filter((l) => l.mes === mes);
+  const totalAPagar = lancMesAtual.reduce((s, l) => s + Number(l.valor ?? 0), 0);
+  const totalPago = lancMesAtual.filter((l) => l.situacao === "pago").reduce((s, l) => s + Number(l.valor ?? 0), 0);
+  const totalPendente = totalAPagar - totalPago;
+  const pctPago = totalAPagar > 0 ? Math.round((totalPago / totalAPagar) * 1000) / 10 : 0;
+
   return (
-    <>
-      <Topbar title="Painel" />
-      <div className="px-8 py-8 max-w-[1240px] w-full">
-        {/* KPIs - grid 4 colunas */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-          <KpiCard icon="doc" value={totAtivas} label="Contas ativas" variacao={variacaoPct(totAtivas, metricaAnterior?.contas_ativas ?? null)} />
-          <KpiCard icon="calendar" value={totAberto} label={`A lançar em ${formatarPeriodo(mes, ano).split("/")[0].toLowerCase()}`} variacao={variacaoPct(totAberto, metricaAnterior?.a_lancar ?? null)} />
-          <KpiCard icon="hourglass" value={totLancado} label="Aguardando pagamento" variacao={variacaoPct(totLancado, metricaAnterior?.aguardando_pagamento ?? null)} />
-          <KpiCard icon="pin" value={totMapear} label="Origem a mapear" variacao={variacaoPct(totMapear, metricaAnterior?.origem_a_mapear ?? null)} />
-        </div>
-
-        {vencendoSemana.length > 0 && (
-          <div className="mb-10">
-            <div className="flex items-center gap-2.5 mb-4">
-              <span className="w-2.5 h-2.5 rounded-full bg-alerr alerta-piscando" />
-              <h2 className="text-[18px] font-bold text-[#1a1a1a]">Vence nos próximos 7 dias</h2>
-              <span className="badge bg-alerr-bg text-alerr">{vencendoSemana.length}</span>
-              <Link href="/alertas" className="ml-auto text-xs text-[#1976d2] hover:underline">ver alertas completos</Link>
-            </div>
-            <div className="card overflow-hidden border-alerr/30">
-              <ul>
-                {vencendoSemana.slice(0, 8).map((l: any) => {
-                  const T = TIPOS[l.contas.tipo];
-                  const venceHoje = l.contas.dia_vencimento === diaAtual;
-                  return (
-                    <li key={l.id} className="flex items-center gap-3.5 px-5 py-3 border-b border-linha2 last:border-0 text-[13px]">
-                      <div className="w-9 h-9 rounded-full grid place-items-center shrink-0" style={{ background: T?.bg }}>
-                        <TipoIcon tipo={l.contas.tipo} size={16} color={T?.c} />
-                      </div>
-                      <div className="min-w-0">
-                        <b className="font-semibold">{l.contas.lojas?.codigo}</b>
-                        <small className="block text-[#6c757d] text-[11px] mt-0.5 truncate">{T?.n} · {l.contas.fornecedor_nome ?? "—"}</small>
-                      </div>
-                      <span className={`ml-auto text-[11px] font-mono font-semibold shrink-0 ${venceHoje ? "text-alerr alerta-piscando" : "text-[#6c757d]"}`}>
-                        {venceHoje ? "vence hoje" : `dia ${l.contas.dia_vencimento}`}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          </div>
-        )}
-
-        <div className="flex items-end justify-between mb-5">
-          <div>
-            <h2 className="text-[20px] font-semibold text-[#1a1a1a]">Situação por tipo de conta</h2>
-            <p className="text-[13px] text-[#6c757d] mt-0.5">Visão geral do status das contas por categoria</p>
-          </div>
-          <div className="flex items-center gap-1.5 text-[13px] font-medium text-txt border border-linha rounded-lg px-3.5 py-2 bg-white">
-            Exibir todas
-            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#6c757d" strokeWidth="1.6"><path d="M6 8l4 4 4-4" /></svg>
-          </div>
-        </div>
-
-        {/* grid de cards de tipo */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
-          {porTipo.map(({ t, ativas, mapear, pagas, aguardando, aLancar, atrasadas }) => {
-            const T = TIPOS[t];
-            const base = ativas || 1;
-            const pctPagas = Math.round((pagas / base) * 100);
-            return (
-              <div key={t} className="bg-white border border-linha rounded-xl p-6 shadow-leve hover:shadow-media transition flex flex-col">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-full grid place-items-center shrink-0" style={{ background: T.bg }}>
-                    <TipoIcon tipo={t} size={22} color={T.c} />
-                  </div>
-                  <div>
-                    <div className="text-[15px] font-semibold text-[#1a1a1a] leading-tight">{T.n}</div>
-                    <div className="text-[12px] text-[#6c757d]">Total de contas</div>
-                  </div>
-                </div>
-
-                <div className="text-[26px] font-bold text-[#1a1a1a] leading-none mb-3">{ativas}</div>
-
-                <div className="flex items-center gap-2.5 mb-4">
-                  <div className="flex-1 h-1.5 rounded-full bg-[#f1f3f5] overflow-hidden">
-                    <div className="h-full rounded-full" style={{ width: `${Math.min(pctPagas, 100)}%`, background: T.c }} />
-                  </div>
-                  <span className="text-[12px] font-semibold text-[#1a1a1a] shrink-0">{pctPagas}%</span>
-                </div>
-
-                <div className="space-y-2 flex-1">
-                  <LinhaLegenda cor="#2196f3" label="Pagas" valor={pagas} base={base} />
-                  <LinhaLegenda cor="#FFC107" label="Aguardando" valor={aguardando} base={base} />
-                  <LinhaLegenda cor="#f44336" label="A Lançar" valor={aLancar} base={base} extra={atrasadas > 0 ? `${atrasadas} atrasada${atrasadas > 1 ? "s" : ""}` : undefined} />
-                </div>
-
-                {mapear > 0 && (
-                  <div className="mt-3 text-[11px] text-alerr font-medium">{mapear} sem origem mapeada</div>
-                )}
-
-                <Link href={`/contas?tipo=${t}`}
-                  className="mt-4 pt-4 border-t border-linha2 flex items-center justify-between text-[13px] font-semibold text-txt hover:text-amarelo-dark transition">
-                  Ver detalhes
-                  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M7.5 4.5l6 5.5-6 5.5" /></svg>
-                </Link>
-              </div>
-            );
-          })}
-        </div>
-
-        {(lojasEncerradas ?? []).length > 0 && (
-          <>
-            <div className="flex items-baseline gap-3 mb-4">
-              <h2 className="text-[20px] font-semibold text-[#1a1a1a]">Lojas encerradas recentemente</h2>
-              <Link href="/lojas?status=encerrada" className="text-xs text-[#1976d2] hover:underline">ver todas</Link>
-            </div>
-            <div className="card overflow-hidden">
-              <ul>
-                {(lojasEncerradas ?? []).map((l: any, i: number) => (
-                  <li key={i} className="flex items-center gap-3.5 px-5 py-3 border-b border-linha2 last:border-0 text-[13px]">
-                    <div className="w-8 h-8 rounded-lg bg-alerr-bg text-alerr grid place-items-center text-[11px] font-bold shrink-0">
-                      {l.coban?.slice(0, 2) ?? "—"}
-                    </div>
-                    <div className="min-w-0">
-                      <b className="font-semibold">{l.codigo}</b>
-                      <small className="block text-[#adb5bd] text-[11px] mt-0.5 truncate">
-                        {[l.empresa, l.cidade && l.uf ? `${l.cidade}/${l.uf}` : null].filter(Boolean).join(" · ") || "sem dados adicionais"}
-                      </small>
-                    </div>
-                    <span className="ml-auto text-[11px] text-[#adb5bd] font-mono shrink-0">
-                      {l.encerrada_em ? new Date(l.encerrada_em).toLocaleDateString("pt-br") : "—"}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </>
-        )}
+    <div className="px-8 py-8 max-w-[1400px] w-full">
+      <div className="mb-6">
+        <h1 className="text-[24px] font-bold text-[#1a1a1a]">👋 {saudacao()}{nome ? `, ${nome}` : ""}!</h1>
+        <p className="text-[14px] text-[#6c757d] mt-1">Aqui está o resumo da sua gestão financeira.</p>
       </div>
-    </>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
+        <div className="min-w-0">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+            <KpiCard icon="doc" cor="#c9922a" value={totAtivas} label="Contas ativas" variacao={variacaoPct(totAtivas, metricaAnterior?.contas_ativas ?? null)} />
+            <KpiCard icon="calendar" cor="#c9922a" value={totAberto} label={`A lançar em ${formatarPeriodo(mes, ano).split("/")[0].toLowerCase()}`} variacao={variacaoPct(totAberto, metricaAnterior?.a_lancar ?? null)} />
+            <KpiCard icon="hourglass" cor="#B23B3B" value={totLancado} label="Aguardando pagamento" variacao={variacaoPct(totLancado, metricaAnterior?.aguardando_pagamento ?? null)} />
+            <KpiCard icon="pin" cor="#2E7D57" value={totMapear} label="Origem a mapear" variacao={variacaoPct(totMapear, metricaAnterior?.origem_a_mapear ?? null)} />
+          </div>
+
+          <div className="mb-6">
+            <VencimentosProximosClient itens={(lancamentosDetalhados ?? []) as any[]} diaAtual={diaAtual} />
+          </div>
+
+          <div className="flex items-end justify-between mb-4">
+            <div>
+              <h2 className="text-[18px] font-bold text-[#1a1a1a]">Situação por tipo de conta</h2>
+              <p className="text-[13px] text-[#6c757d] mt-0.5">Visão geral do status das contas por categoria</p>
+            </div>
+            <Link href="/contas" className="text-[12.5px] font-semibold text-info hover:underline">Ver todas as contas</Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
+            {porTipo.map(({ t, ativas, mapear, pagas, aguardando, aLancar, atrasadas }) => {
+              const T = TIPOS[t];
+              const base = ativas || 1;
+              const pctPagas = Math.round((pagas / base) * 100);
+              return (
+                <div key={t} className="bg-white border border-linha rounded-xl p-5 shadow-leve hover:shadow-media transition">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-full grid place-items-center shrink-0" style={{ background: T.bg }}>
+                      <TipoIcon tipo={t} size={18} color={T.c} />
+                    </div>
+                    <div>
+                      <div className="text-[14px] font-semibold text-[#1a1a1a] leading-tight">{T.n}</div>
+                      <div className="text-[11.5px] text-[#6c757d]">{ativas} contas</div>
+                    </div>
+                    <Link href={`/contas?tipo=${t}`} className="ml-auto text-[#adb5bd] hover:text-[#1a1a1a]">
+                      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M7.5 4.5l6 5.5-6 5.5" /></svg>
+                    </Link>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2.5">
+                    <div className="flex-1 h-1.5 rounded-full bg-[#f1f3f5] overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${Math.min(pctPagas, 100)}%`, background: T.c }} />
+                    </div>
+                    <span className="text-[11.5px] font-semibold shrink-0">{pctPagas}%</span>
+                  </div>
+                  <div className="flex gap-3 text-[11px] text-[#6c757d]">
+                    <span>Pagas <b className="text-[#1a1a1a]">{pagas}</b></span>
+                    <span>Aguardando <b className="text-[#1a1a1a]">{aguardando}</b></span>
+                    <span>A lançar <b className="text-[#1a1a1a]">{aLancar}</b></span>
+                    {atrasadas > 0 && <span className="text-alerr font-semibold ml-auto">{atrasadas} atrasada{atrasadas > 1 ? "s" : ""}</span>}
+                  </div>
+                  {mapear > 0 && <div className="mt-2 text-[10.5px] text-alerr font-medium">{mapear} sem origem mapeada</div>}
+                </div>
+              );
+            })}
+          </div>
+
+          {(lojasEncerradas ?? []).length > 0 && (
+            <>
+              <div className="flex items-baseline gap-3 mb-3">
+                <h2 className="text-[16px] font-bold text-[#1a1a1a]">Lojas encerradas recentemente</h2>
+                <Link href="/lojas?status=encerrada" className="text-xs text-info hover:underline">ver todas</Link>
+              </div>
+              <div className="card overflow-hidden">
+                <ul>
+                  {(lojasEncerradas ?? []).map((l: any, i: number) => (
+                    <li key={i} className="flex items-center gap-3.5 px-5 py-3 border-b border-linha2 last:border-0 text-[13px]">
+                      <div className="w-8 h-8 rounded-lg bg-alerr-bg text-alerr grid place-items-center text-[11px] font-bold shrink-0">{l.coban?.slice(0, 2) ?? "—"}</div>
+                      <div className="min-w-0">
+                        <b className="font-semibold">{l.codigo}</b>
+                        <small className="block text-[#adb5bd] text-[11px] mt-0.5 truncate">
+                          {[l.empresa, l.cidade && l.uf ? `${l.cidade}/${l.uf}` : null].filter(Boolean).join(" · ") || "sem dados adicionais"}
+                        </small>
+                      </div>
+                      <span className="ml-auto text-[11px] text-[#adb5bd] font-mono shrink-0">{l.encerrada_em ? new Date(l.encerrada_em).toLocaleDateString("pt-br") : "—"}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="space-y-6">
+          <div className="rounded-xl p-5 border border-amarelo/30" style={{ background: "#FFF8E8" }}>
+            <div className="flex items-center gap-2 mb-3.5">
+              <span className="text-lg">⚠️</span>
+              <h3 className="text-[14px] font-bold text-[#1a1a1a]">Alertas importantes</h3>
+            </div>
+            <div className="space-y-2.5">
+              <LinhaAlerta emoji="⚠️" label="Contas atrasadas" valor={totAtrasadas} href="/alertas" />
+              <LinhaAlerta emoji="🔔" label="Aprovações pendentes" valor={aprovacoesPendentes} href="/aprovacoes" />
+              <LinhaAlerta emoji="⛔" label="Pagamentos com falha" valor={pagamentosComFalha} href="/pagamentos" />
+              <LinhaAlerta emoji="📍" label="Origem não mapeada" valor={totMapear} href="/alertas" />
+            </div>
+            <Link href="/alertas" className="block text-center mt-4 text-[12.5px] font-bold text-amarelo-dark hover:underline">
+              Ver todos os alertas →
+            </Link>
+          </div>
+
+          <div className="card p-5">
+            <h3 className="text-[14px] font-bold text-[#1a1a1a] mb-3.5">Evolução mensal</h3>
+            <div className="text-[22px] font-bold text-[#1a1a1a] leading-none">{money(totalMesAtual)}</div>
+            <div className="text-[11.5px] text-[#6c757d] mt-1 mb-4">
+              Total em {formatarPeriodo(mes, ano).split("/")[0]}
+              {variacaoEvolucao !== null && (
+                <span className={variacaoEvolucao >= 0 ? "text-ok font-semibold ml-1.5" : "text-alerr font-semibold ml-1.5"}>
+                  {variacaoEvolucao >= 0 ? "↑" : "↓"} {Math.abs(variacaoEvolucao)}% vs {MES[mesAnterior - 1]}
+                </span>
+              )}
+            </div>
+            <div className="flex items-end gap-1.5 h-[90px]">
+              {evolucaoPorMes.map((m) => (
+                <div key={m.mes} className="flex-1 flex flex-col items-center gap-1.5" title={`${MES[m.mes - 1]}: ${money(m.total)}`}>
+                  <div className="w-full flex items-end h-[70px]">
+                    <div className="w-full rounded-t" style={{ height: `${Math.max((m.total / maxEvolucao) * 100, 3)}%`, background: m.mes === mes ? "#FFC107" : "#FFE9A8" }} />
+                  </div>
+                  <span className="text-[9.5px] text-[#adb5bd] font-mono">{MES[m.mes - 1]}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card p-5">
+            <h3 className="text-[14px] font-bold text-[#1a1a1a] mb-3.5">Top fornecedores</h3>
+            <div className="space-y-3">
+              {topFornecedores.map(([nomeF, valor]) => (
+                <div key={nomeF} className="flex items-center justify-between text-[12.5px]">
+                  <span className="font-semibold text-[#1a1a1a] truncate max-w-[130px]">{nomeF}</span>
+                  <div className="text-right shrink-0">
+                    <div className="font-mono font-semibold">{money(valor)}</div>
+                    <div className="text-[10.5px] text-[#adb5bd]">{Math.round((valor / totalFornecedores) * 100)}%</div>
+                  </div>
+                </div>
+              ))}
+              {topFornecedores.length === 0 && <div className="text-[12.5px] text-[#adb5bd]">Sem lançamentos com valor este mês.</div>}
+            </div>
+            <Link href="/fornecedores" className="block text-center mt-4 pt-3 border-t border-linha2 text-[12px] font-semibold text-info hover:underline">Ver todos</Link>
+          </div>
+
+          <div className="card p-5">
+            <h3 className="text-[14px] font-bold text-[#1a1a1a] mb-1">Resumo financeiro</h3>
+            <p className="text-[11.5px] text-[#6c757d] mb-4">{formatarPeriodo(mes, ano)}</p>
+            <div className="flex items-center gap-4">
+              <Donut pct={pctPago} />
+              <div className="flex-1 space-y-2 text-[12.5px]">
+                <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-ok" />Pago <b className="ml-auto font-mono">{money(totalPago)}</b></div>
+                <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full" style={{ background: "#FFC107" }} />Pendente <b className="ml-auto font-mono">{money(totalPendente)}</b></div>
+              </div>
+            </div>
+            <Link href="/relatorios" className="block text-center mt-4 pt-3 border-t border-linha2 text-[12px] font-semibold text-info hover:underline">Ver relatório completo</Link>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
-function LinhaLegenda({ cor, label, valor, base, extra }: { cor: string; label: string; valor: number; base: number; extra?: string }) {
-  const pct = Math.round((valor / base) * 100);
+function LinhaAlerta({ emoji, label, valor, href }: { emoji: string; label: string; valor: number; href: string }) {
   return (
-    <div className="flex items-center gap-2 text-[12.5px]">
-      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: cor }} />
-      <span className="text-[#6c757d] font-medium">{label}</span>
-      {extra && <span className="text-[10.5px] text-alerr font-semibold">({extra})</span>}
-      <span className="ml-auto text-[#1a1a1a] font-semibold">{valor}</span>
-      <span className="text-[#adb5bd] w-9 text-right">({pct}%)</span>
-    </div>
+    <Link href={href} className="flex items-center gap-2 text-[12.5px] hover:opacity-70 transition">
+      <span>{emoji}</span>
+      <span className="text-[#5c4a1f] font-medium">{label}</span>
+      <span className="ml-auto font-bold text-[#1a1a1a] bg-white/70 rounded-full px-2 py-0.5 text-[11px]">{valor}</span>
+    </Link>
+  );
+}
+
+function Donut({ pct }: { pct: number }) {
+  const raio = 30, circ = 2 * Math.PI * raio;
+  const offset = circ - (pct / 100) * circ;
+  return (
+    <svg width="76" height="76" viewBox="0 0 76 76" className="shrink-0 -rotate-90">
+      <circle cx="38" cy="38" r={raio} fill="none" stroke="#FFE9A8" strokeWidth="10" />
+      <circle cx="38" cy="38" r={raio} fill="none" stroke="#2E7D57" strokeWidth="10" strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" />
+      <text x="38" y="42" textAnchor="middle" fontSize="15" fontWeight="700" fill="#1a1a1a" transform="rotate(90 38 38)">{pct}%</text>
+    </svg>
   );
 }
 
@@ -248,32 +292,25 @@ const KPI_ICONS: Record<string, React.ReactNode> = {
   pin: <><path d="M10 18.5s6-5.4 6-9.9A6 6 0 004 8.6c0 4.5 6 9.9 6 9.9z" /><circle cx="10" cy="8.5" r="2.2" /></>,
 };
 
-function KpiCard({ icon, value, label, variacao }: { icon: string; value: number; label: string; variacao: number | null }) {
+function KpiCard({ icon, cor, value, label, variacao }: { icon: string; cor: string; value: number; label: string; variacao: number | null }) {
   return (
-    <div className="relative bg-white border border-linha rounded-xl p-6 shadow-leve overflow-hidden">
-      <div className="flex items-start justify-between mb-4">
-        <div className="w-14 h-14 rounded-full grid place-items-center" style={{ background: "#fdf3e3" }}>
-          <svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="#c9922a" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{KPI_ICONS[icon]}</svg>
+    <div className="relative bg-white border border-linha rounded-xl p-5 shadow-leve overflow-hidden">
+      <div className="flex items-start justify-between mb-3">
+        <div className="w-11 h-11 rounded-full grid place-items-center" style={{ background: "#fdf3e3" }}>
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#c9922a" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{KPI_ICONS[icon]}</svg>
         </div>
-        <svg width="46" height="20" viewBox="0 0 46 20" fill="none" className="mt-2 opacity-80">
-          <path d="M1 14c4-2 6 4 10 2s5-9 9-7 6 8 10 5 5-10 9-8" stroke="#FFC107" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+        <svg width="44" height="18" viewBox="0 0 46 20" fill="none" className="mt-1 opacity-80">
+          <path d="M1 14c4-2 6 4 10 2s5-9 9-7 6 8 10 5 5-10 9-8" stroke={cor} strokeWidth="1.8" strokeLinecap="round" fill="none" />
         </svg>
       </div>
-      <div className="text-sm text-gray-500 font-medium">{label}</div>
-      <div className="text-3xl font-bold text-gray-900 leading-none mt-1.5">{value}</div>
+      <div className="text-[12.5px] text-gray-500 font-medium">{label}</div>
+      <div className="text-[26px] font-bold text-gray-900 leading-none mt-1">{value}</div>
       {variacao !== null ? (
-        <div className={`text-[12.5px] font-medium mt-3 flex items-center gap-1.5 ${variacao > 0 ? "text-ok" : variacao < 0 ? "text-alerr" : "text-[#adb5bd]"}`}>
-          {variacao > 0 ? (
-            <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 14l6-6 4 4 6-7M14 5h6v6" /></svg>
-          ) : variacao < 0 ? (
-            <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6l6 6 4-4 6 7M14 15h6V9" /></svg>
-          ) : (
-            <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 10h12" /></svg>
-          )}
-          {Math.abs(variacao)}% {variacao >= 0 ? "acima" : "abaixo"} do mês anterior
+        <div className={`text-[11.5px] font-medium mt-2 flex items-center gap-1 ${variacao > 0 ? "text-ok" : variacao < 0 ? "text-alerr" : "text-[#adb5bd]"}`}>
+          {variacao >= 0 ? "↑" : "↓"} {Math.abs(variacao)}% <span className="text-[#adb5bd] font-normal">vs mês anterior</span>
         </div>
       ) : (
-        <div className="text-[11px] text-[#bbb] font-normal mt-3">sem dado do mês anterior ainda</div>
+        <div className="text-[10.5px] text-[#bbb] font-normal mt-2">sem dado do mês anterior ainda</div>
       )}
     </div>
   );

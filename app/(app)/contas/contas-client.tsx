@@ -16,8 +16,32 @@ function StatusBadge({ status }: { status: string }) {
   return <span className="badge bg-ok-bg text-ok">Ativa</span>;
 }
 
-export default function ContasClient({ contas, situacaoPorConta, lojas }: {
-  contas: Conta[]; situacaoPorConta: Record<string, string>; lojas: { id: string; codigo: string }[];
+function VencimentoCell({ dia, ano, mes }: { dia: number | null; ano: number; mes: number }) {
+  if (!dia) return <span className="text-[13px] text-[#adb5bd]">—</span>;
+  const diaAtual = new Date().getDate();
+  const diff = dia - diaAtual;
+  const dataFormatada = new Date(ano, mes - 1, dia).toLocaleDateString("pt-br");
+
+  let label: string; let cor: string;
+  if (diff < 0) { label = "Atrasada"; cor = "text-alerr"; }
+  else if (diff === 0) { label = "Hoje"; cor = "text-alerr"; }
+  else if (diff === 1) { label = "Amanhã"; cor = "text-amb"; }
+  else if (diff <= 7) { label = `${diff} dias`; cor = "text-amb"; }
+  else { label = `${diff} dias`; cor = "text-ok"; }
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${diff < 0 || diff === 0 ? "bg-alerr" : diff <= 7 ? "bg-amb" : "bg-ok"}`} />
+      <div>
+        <div className={`text-[12.5px] font-semibold ${cor}`}>{label}</div>
+        <div className="text-[11px] text-[#adb5bd] font-mono">{dataFormatada}</div>
+      </div>
+    </div>
+  );
+}
+
+export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes }: {
+  contas: Conta[]; situacaoPorConta: Record<string, string>; lojas: { id: string; codigo: string }[]; ano: number; mes: number;
 }) {
   const params = useSearchParams();
   const [fTipo, setFTipo] = useState<string>(params.get("tipo") ?? "todos");
@@ -128,7 +152,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas }: {
                   {c.fornecedor_nome ?? "—"}
                   {c.eh_rateio && <span className="text-[10px] font-mono text-amb border border-amarelo rounded px-1 ml-1.5">RATEIO</span>}
                 </td>
-                <td className="px-4 text-[13px] font-medium font-mono">{c.dia_vencimento ? `dia ${c.dia_vencimento}` : "—"}</td>
+                <td className="px-4"><VencimentoCell dia={c.dia_vencimento} ano={ano} mes={mes} /></td>
                 <td className="px-4 text-[13px]"><span className="badge bg-info-bg text-info">{ORIGENS[c.origem]}</span></td>
                 <td className="px-4 text-[13px]"><StatusBadge status={c.status} /></td>
                 <td className="px-4 text-right">
