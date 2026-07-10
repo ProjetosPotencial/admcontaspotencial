@@ -21,7 +21,7 @@ export default async function RelatoriosPage() {
   ]);
 
   return (
-    <div className="px-8 py-8">
+    <div className="px-4 sm:px-8 py-6 sm:py-8">
       <h1 className="text-[32px] font-bold text-[#1a1a1a] leading-none">Relatórios</h1>
       <p className="text-[14px] text-[#6c757d] mt-2.5">Exportações reais de {formatarPeriodo(1, ano).split("/")[1]}, prontas para baixar em CSV</p>
       <div className="max-w-[700px] mt-6">

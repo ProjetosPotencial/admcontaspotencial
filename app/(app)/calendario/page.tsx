@@ -25,11 +25,11 @@ export default async function CalendarioPage() {
 
   return (
     <>
-      <div className="px-8 py-8">
+      <div className="px-4 sm:px-8 py-6 sm:py-8">
         <h1 className="text-[32px] font-bold text-[#1a1a1a] leading-none">Calendário</h1>
         <p className="text-[14px] text-[#6c757d] mt-2.5">Vencimentos recorrentes das contas ativas, por dia do mês</p>
       </div>
-      <div className="px-8 pb-8 max-w-[1100px]">
+      <div className="px-4 sm:px-8 pb-6 sm:pb-8 max-w-[1100px]">
         <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-7 gap-3">
           {dias.map((d) => {
             const itens = porDia[d] ?? [];

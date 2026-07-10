@@ -5,6 +5,7 @@ import { contarAlertas } from "@/lib/alertas";
 import { obterPeriodoAtual } from "@/lib/date-utils";
 import Sidebar from "@/components/sidebar";
 import TopNav from "@/components/topnav";
+import AppShell from "@/components/app-shell";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -19,7 +20,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const [{ data: perfil }, alertas, { data: menuItens }] = await Promise.all([
     supabase.from("perfis").select("nome, email, papel").eq("id", user.id).single(),
     contarAlertas(supabase, ano, mes),
-    // já vem filtrado pelo papel do usuário logado, calculado no banco (vw_menu_visivel)
     supabase.from("vw_menu_visivel").select("id, label, href, icone"),
   ]);
 
@@ -27,14 +27,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const email = perfil?.email ?? user.email ?? "";
 
   return (
-    <div className="min-h-screen flex bg-papel">
-      <Suspense fallback={<div className="bg-ebano w-[248px] shrink-0 h-screen sticky top-0" />}>
+    <AppShell>
+      <Suspense fallback={<div className="bg-ebano w-[248px] shrink-0 h-screen sticky top-0 hidden md:block" />}>
         <Sidebar nome={nome} email={email} itens={menuItens ?? []} />
       </Suspense>
       <div className="flex-1 flex flex-col min-w-0">
         <TopNav notificacoes={alertas.total} />
         <main className="flex-1 min-w-0">{children}</main>
       </div>
-    </div>
+    </AppShell>
   );
 }

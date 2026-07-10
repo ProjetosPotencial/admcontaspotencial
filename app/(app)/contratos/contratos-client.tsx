@@ -50,7 +50,7 @@ export default function ContratosClient({ contratos: iniciais, lojas, empresas, 
       </div>
 
       <div className="card overflow-hidden">
-        <table className="w-full border-collapse">
+        <div className="overflow-x-auto"><table className="w-full border-collapse min-w-[720px]">
           <thead>
             <tr className="bg-[#f1f3f5] h-12">
               {["Número", "Loja", "Empresa", "Tipo", "Vigência", "Valor", "Status"].map((h) => (
@@ -77,7 +77,7 @@ export default function ContratosClient({ contratos: iniciais, lojas, empresas, 
               <tr><td colSpan={7} className="text-center py-12 text-[#adb5bd]">Nenhum contrato encontrado.</td></tr>
             )}
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       {criando && <ContratoDrawer lojas={lojas} empresas={empresas} onClose={() => setCriando(false)} onSalvar={(c) => { upsertLocal(c); setCriando(false); }} />}

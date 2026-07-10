@@ -20,7 +20,7 @@ export default function FornecedoresClient({ fornecedores }: { fornecedores: For
           className="w-full h-10 bg-[#f8f9fa] border border-linha rounded-md pl-10 pr-3 text-[13px] focus:outline-none focus:border-amarelo focus:ring-[3px] focus:ring-amarelo/10" />
       </div>
       <div className="card overflow-hidden">
-        <table className="w-full border-collapse">
+        <div className="overflow-x-auto"><table className="w-full border-collapse min-w-[720px]">
           <thead>
             <tr className="bg-[#f1f3f5] h-12">
               <th className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">Fornecedor</th>
@@ -45,7 +45,7 @@ export default function FornecedoresClient({ fornecedores }: { fornecedores: For
               <tr><td colSpan={3} className="text-center py-12 text-[#adb5bd]">Nenhum fornecedor encontrado.</td></tr>
             )}
           </tbody>
-        </table>
+        </table></div>
       </div>
     </>
   );

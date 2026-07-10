@@ -28,11 +28,11 @@ export default async function AlertasPage() {
 
   return (
     <>
-      <div className="px-8 py-8">
+      <div className="px-4 sm:px-8 py-6 sm:py-8">
         <h1 className="text-[32px] font-bold text-[#1a1a1a] leading-none">Alertas</h1>
         <p className="text-[14px] text-[#6c757d] mt-2.5">O que precisa de atenção agora</p>
       </div>
-      <div className="px-8 pb-8 max-w-[900px] space-y-8">
+      <div className="px-4 sm:px-8 pb-6 sm:pb-8 max-w-[900px] space-y-8">
         <section>
           <h2 className="text-[16px] font-semibold text-[#1a1a1a] mb-3 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-alerr" /> Contas atrasadas ({atrasadas.length})

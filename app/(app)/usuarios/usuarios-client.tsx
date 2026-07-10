@@ -43,7 +43,7 @@ export default function UsuariosClient({ usuarios: iniciais, ehAdmin, meuId }: {
   return (
     <>
       <div className="card overflow-hidden">
-        <table className="w-full border-collapse">
+        <div className="overflow-x-auto"><table className="w-full border-collapse min-w-[720px]">
           <thead>
             <tr className="bg-[#f1f3f5] h-12">
               <th className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">Nome</th>
@@ -95,7 +95,7 @@ export default function UsuariosClient({ usuarios: iniciais, ehAdmin, meuId }: {
               <tr><td colSpan={4} className="text-center py-12 text-[#adb5bd]">Nenhum usuário encontrado.</td></tr>
             )}
           </tbody>
-        </table>
+        </table></div>
         {aviso && <div className="px-4 py-2.5 text-[12px] text-alerr bg-alerr-bg border-t border-linha2">{aviso}</div>}
       </div>
       {ehAdmin && (

@@ -65,7 +65,7 @@ export default function LojasClient({ lojas: lojasIniciais, statusInicial, empre
       <div className="text-[12px] text-txt-3 mb-3">{filtradas.length} de {lojas.length} lojas</div>
 
       <div className="card overflow-hidden">
-        <table className="w-full border-collapse">
+        <div className="overflow-x-auto"><table className="w-full border-collapse min-w-[720px]">
           <thead>
             <tr>
               {["Loja", "Praça", "Setor", "Empresa", "Cidade/UF", "Status"].map((h) => (
@@ -88,7 +88,7 @@ export default function LojasClient({ lojas: lojasIniciais, statusInicial, empre
               <tr><td colSpan={6} className="text-center py-12 text-txt-3">Nenhuma loja com esses filtros.</td></tr>
             )}
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       {aberta && <LojaDrawer loja={aberta} onClose={() => setAberta(null)} onSalvar={atualizarNaLista} empresas={empresas} />}

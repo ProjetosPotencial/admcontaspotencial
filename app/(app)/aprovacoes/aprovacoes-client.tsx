@@ -49,7 +49,7 @@ export default function AprovacoesClient({ itens }: { itens: Item[] }) {
         </p>
       </div>
 
-      <div className="px-8 py-6 max-w-[1100px]">
+      <div className="px-4 sm:px-8 py-4 sm:py-6 max-w-[1100px]">
         {fila.length === 0 ? (
           <div className="card">
             <div className="text-center py-16 text-[#adb5bd]">

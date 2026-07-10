@@ -24,11 +24,11 @@ export default async function PagamentosPage() {
 
   return (
     <>
-      <div className="px-8 py-8">
+      <div className="px-4 sm:px-8 py-6 sm:py-8">
         <h1 className="text-[32px] font-bold text-[#1a1a1a] leading-none">Pagamentos</h1>
         <p className="text-[14px] text-[#6c757d] mt-2.5">Lançamentos já aprovados, prontos para pagar ou já pagos</p>
       </div>
-      <div className="px-8 pb-8 max-w-[1000px] space-y-8">
+      <div className="px-4 sm:px-8 pb-6 sm:pb-8 max-w-[1000px] space-y-8">
         <section>
           <div className="flex items-baseline gap-2 mb-3">
             <h2 className="text-[16px] font-semibold text-[#1a1a1a]">Prontos para pagamento</h2>

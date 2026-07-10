@@ -30,13 +30,13 @@ export default async function CentrosDeCustoPage() {
 
   return (
     <>
-      <div className="px-8 py-8">
+      <div className="px-4 sm:px-8 py-6 sm:py-8">
         <h1 className="text-[32px] font-bold text-[#1a1a1a] leading-none">Centros de custo</h1>
         <p className="text-[14px] text-[#6c757d] mt-2.5">Gasto acumulado de {ano} por loja, com base nos lançamentos reais</p>
       </div>
-      <div className="px-8 pb-8 max-w-[900px]">
+      <div className="px-4 sm:px-8 pb-6 sm:pb-8 max-w-[900px]">
         <div className="card overflow-hidden">
-          <table className="w-full border-collapse">
+          <div className="overflow-x-auto"><table className="w-full border-collapse min-w-[720px]">
             <thead>
               <tr className="bg-[#f1f3f5] h-12">
                 <th className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">Loja</th>
@@ -61,7 +61,7 @@ export default async function CentrosDeCustoPage() {
                 <tr><td colSpan={4} className="text-center py-12 text-[#adb5bd]">Sem lançamentos com valor em {ano}.</td></tr>
               )}
             </tbody>
-          </table>
+          </table></div>
         </div>
       </div>
     </>

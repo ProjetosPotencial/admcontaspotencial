@@ -23,7 +23,7 @@ export default function EmpresasClient({ empresas: iniciais, contagemLojas }: { 
       </div>
 
       <div className="card overflow-hidden">
-        <table className="w-full border-collapse">
+        <div className="overflow-x-auto"><table className="w-full border-collapse min-w-[720px]">
           <thead>
             <tr className="bg-[#f1f3f5] h-12">
               {["Empresa", "CNPJ", "Lojas vinculadas", "Status", ""].map((h) => (
@@ -50,7 +50,7 @@ export default function EmpresasClient({ empresas: iniciais, contagemLojas }: { 
               <tr><td colSpan={5} className="text-center py-12 text-[#adb5bd]">Nenhuma empresa cadastrada ainda.</td></tr>
             )}
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       {criando && <EmpresaDrawer onClose={() => setCriando(false)} onSalvar={(e) => { upsertLocal(e); setCriando(false); }} />}

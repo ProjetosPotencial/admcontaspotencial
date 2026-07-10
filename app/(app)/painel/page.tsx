@@ -99,7 +99,7 @@ export default async function PainelPage() {
   const pctPago = totalAPagar > 0 ? Math.round((totalPago / totalAPagar) * 1000) / 10 : 0;
 
   return (
-    <div className="px-8 py-8 max-w-[1400px] w-full">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-[1400px] w-full">
       <div className="mb-6">
         <h1 className="text-[24px] font-bold text-[#1a1a1a]">👋 {saudacao()}{nome ? `, ${nome}` : ""}!</h1>
         <p className="text-[14px] text-[#6c757d] mt-1">Aqui está o resumo da sua gestão financeira.</p>

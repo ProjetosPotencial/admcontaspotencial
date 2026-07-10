@@ -68,7 +68,7 @@ export default async function ContasPage() {
   const totalGeralResumo = totalPagas + totalAVencer + totalAtrasadasValor || 1;
 
   return (
-    <div className="px-8 py-8 max-w-[1400px] w-full">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-[1400px] w-full">
       <div className="mb-6">
         <h1 className="text-[24px] font-bold text-[#1a1a1a]">Contas de consumo</h1>
         <p className="text-[14px] text-[#6c757d] mt-1">Gerencie todas as contas cadastradas e acompanhe vencimentos, pendências e origem.</p>

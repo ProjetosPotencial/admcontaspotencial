@@ -23,7 +23,7 @@ export default function MenuAdminClient({ itens: itensIniciais }: { itens: Item[
 
   return (
     <div className="card overflow-hidden">
-      <table className="w-full border-collapse">
+      <div className="overflow-x-auto"><table className="w-full border-collapse min-w-[720px]">
         <thead>
           <tr className="bg-[#f1f3f5] h-11">
             <th className="text-left text-[11.5px] font-semibold text-[#1a1a1a] px-4">Item</th>
@@ -59,7 +59,7 @@ export default function MenuAdminClient({ itens: itensIniciais }: { itens: Item[
             <tr><td colSpan={3} className="text-center py-8 text-[#adb5bd] text-[13px]">Nenhum item cadastrado ainda.</td></tr>
           )}
         </tbody>
-      </table>
+      </table></div>
       {aviso && <div className="px-4 py-2.5 text-[12px] text-alerr bg-alerr-bg">{aviso}</div>}
       <div className="px-4 py-2.5 text-[11px] text-[#adb5bd] border-t border-linha2">
         "Papel mínimo" significa: esse papel e os acima dele veem o item. Ex.: definir "gestor" esconde de operador e leitura, mas gestor e admin continuam vendo.

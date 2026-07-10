@@ -12,11 +12,11 @@ export default async function FornecedoresPage() {
 
   return (
     <>
-      <div className="px-8 py-8">
+      <div className="px-4 sm:px-8 py-6 sm:py-8">
         <h1 className="text-[32px] font-bold text-[#1a1a1a] leading-none">Fornecedores</h1>
         <p className="text-[14px] text-[#6c757d] mt-2.5">{(data ?? []).length} fornecedores cadastrados a partir das contas lançadas</p>
       </div>
-      <div className="px-8 pb-8 max-w-[900px]">
+      <div className="px-4 sm:px-8 pb-6 sm:pb-8 max-w-[900px]">
         <FornecedoresClient fornecedores={(data ?? []) as any[]} />
       </div>
     </>

@@ -19,11 +19,11 @@ const REGRAS = [
 export default function RegrasAprovacaoPage() {
   return (
     <>
-      <div className="px-8 py-8">
+      <div className="px-4 sm:px-8 py-6 sm:py-8">
         <h1 className="text-[32px] font-bold text-[#1a1a1a] leading-none">Regras de aprovação</h1>
         <p className="text-[14px] text-[#6c757d] mt-2.5">Como o sistema decide o que precisa de aprovação, e quem pode aprovar</p>
       </div>
-      <div className="px-8 pb-8 max-w-[760px] space-y-4">
+      <div className="px-4 sm:px-8 pb-6 sm:pb-8 max-w-[760px] space-y-4">
         {REGRAS.map((r) => (
           <div key={r.tipo} className="card p-5 flex gap-4 items-start">
             <span className="w-3 h-3 rounded-full mt-1.5 shrink-0" style={{ background: r.cor }} />

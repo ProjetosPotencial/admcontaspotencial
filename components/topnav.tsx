@@ -3,24 +3,26 @@
 import { useState } from "react";
 import Link from "next/link";
 import { formatarPeriodo, obterPeriodoAtual } from "@/lib/date-utils";
+import { useMenuMobile } from "@/components/app-shell";
 
 export default function TopNav({ notificacoes = 0 }: { notificacoes?: number }) {
   const [sinoAberto, setSinoAberto] = useState(false);
+  const { setAberto } = useMenuMobile();
   const { ano, mes } = obterPeriodoAtual();
   const periodo = formatarPeriodo(mes, ano);
 
   return (
-    <header className="h-16 bg-white border-b border-linha px-6 flex items-center justify-between shrink-0 sticky top-0 z-30">
-      <button className="text-txt-2 hover:text-txt md:hidden" aria-label="Abrir menu">
+    <header className="h-16 bg-white border-b border-linha px-4 sm:px-6 flex items-center justify-between shrink-0 sticky top-0 z-30">
+      <button onClick={() => setAberto(true)} className="text-txt-2 hover:text-txt md:hidden shrink-0" aria-label="Abrir menu">
         <svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M3 6h14M3 10h14M3 14h14" /></svg>
       </button>
 
       <div className="flex-1" />
 
-      <div className="flex items-center gap-3">
-        <div className="hidden sm:flex items-center gap-2 border border-linha rounded-lg px-3.5 py-2 text-[13px] font-medium text-txt bg-white">
-          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="#6c757d" strokeWidth="1.6"><rect x="3.5" y="5" width="13" height="12" rx="1.5" /><path d="M3.5 8.5h13M7 3v3.5M13 3v3.5" /></svg>
-          {periodo}
+      <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-2 border border-linha rounded-lg px-2.5 sm:px-3.5 py-2 text-[12px] sm:text-[13px] font-medium text-txt bg-white">
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="#6c757d" strokeWidth="1.6" className="shrink-0"><rect x="3.5" y="5" width="13" height="12" rx="1.5" /><path d="M3.5 8.5h13M7 3v3.5M13 3v3.5" /></svg>
+          <span className="hidden xs:inline">{periodo}</span>
         </div>
 
         <div className="relative">

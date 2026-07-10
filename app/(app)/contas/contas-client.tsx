@@ -126,7 +126,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
 
       {/* Tabela */}
       <div className="bg-white border border-linha rounded-xl overflow-hidden shadow-leve">
-        <table className="w-full border-collapse">
+        <div className="overflow-x-auto"><table className="w-full border-collapse min-w-[720px]">
           <thead>
             <tr className="bg-[#f1f3f5] h-12">
               {["Loja", "Tipo", "Fornecedor", "Venc.", "Origem", "Status", ""].map((h) => (
@@ -164,7 +164,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
               <tr><td colSpan={7} className="text-center py-14 text-[#adb5bd]">Nenhuma conta com esses filtros.</td></tr>
             )}
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       {aberta && <ContaDrawer conta={aberta} onClose={() => setAberta(null)} />}

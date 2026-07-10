@@ -16,11 +16,11 @@ export default async function ConfiguracoesPage() {
 
   return (
     <>
-      <div className="px-8 py-8">
+      <div className="px-4 sm:px-8 py-6 sm:py-8">
         <h1 className="text-[32px] font-bold text-[#1a1a1a] leading-none">Configurações</h1>
         <p className="text-[14px] text-[#6c757d] mt-2.5">Sua conta neste sistema</p>
       </div>
-      <div className="px-8 pb-8 max-w-[720px]">
+      <div className="px-4 sm:px-8 pb-6 sm:pb-8 max-w-[720px]">
         <div className="card p-6">
           <div className="grid grid-cols-2 gap-y-4">
             <div>
