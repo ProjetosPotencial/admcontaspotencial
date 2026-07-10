@@ -6,6 +6,7 @@ import { obterPeriodoAtual } from "@/lib/date-utils";
 import Sidebar from "@/components/sidebar";
 import TopNav from "@/components/topnav";
 import AppShell from "@/components/app-shell";
+import IaFlutuante from "@/components/ia-flutuante";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -35,6 +36,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <TopNav notificacoes={alertas.total} />
         <main className="flex-1 min-w-0">{children}</main>
       </div>
+      <IaFlutuante />
     </AppShell>
   );
 }
