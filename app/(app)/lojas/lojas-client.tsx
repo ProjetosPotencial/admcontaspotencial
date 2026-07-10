@@ -176,9 +176,10 @@ function NovaLojaDrawer({ onClose, onCriada, empresas }: { onClose: () => void; 
           </div>
           <div className="px-6 py-5">
             <div className="text-[12.5px] text-txt-2 mb-4 leading-snug">
-              Agora vincule as contas de consumo dela, água, energia, telefone e o que mais precisar.
+              Agora vincule as contas de consumo dela (água, energia, telefone...) e, se for o caso, o contrato ligado a ela.
             </div>
             <ContasVinculadas loja={criada} />
+            <ContratosVinculados lojaId={criada.id} lojaCodigo={criada.codigo} />
             <button onClick={() => onCriada(criada)}
               className="w-full mt-4 bg-ebano text-white rounded-[9px] py-2.5 text-[12.5px] font-semibold">
               Concluir

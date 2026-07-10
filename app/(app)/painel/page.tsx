@@ -16,6 +16,7 @@ export default async function PainelPage() {
   const [
     { data: contas },
     { data: lancamentos },
+    { data: vencendoSemanaRaw },
     { data: lojasEncerradas },
     { count: totalLojasEncerradas },
     { data: metricaAnterior },
@@ -29,6 +30,12 @@ export default async function PainelPage() {
       .select("conta_id, situacao, contas!inner(tipo, dia_vencimento)")
       .eq("ano", ano)
       .eq("mes", mes),
+    supabase
+      .from("lancamentos")
+      .select("id, situacao, contas!inner ( tipo, dia_vencimento, fornecedor_nome, lojas ( codigo, coban ) )")
+      .eq("ano", ano)
+      .eq("mes", mes)
+      .eq("situacao", "pendente"),
     supabase
       .from("lojas")
       .select("codigo, coban, empresa, cidade, uf, encerrada_em")
@@ -46,6 +53,15 @@ export default async function PainelPage() {
       .eq("mes", mesAnterior)
       .maybeSingle(),
   ]);
+
+  // Vencimentos dos próximos 7 dias, ainda não lançados, de qualquer tipo de conta.
+  const diaAtual = new Date().getDate();
+  const vencendoSemana = (vencendoSemanaRaw ?? [])
+    .filter((l: any) => {
+      const dv = l.contas?.dia_vencimento;
+      return dv != null && dv >= diaAtual && dv <= diaAtual + 7;
+    })
+    .sort((a: any, b: any) => (a.contas?.dia_vencimento ?? 0) - (b.contas?.dia_vencimento ?? 0));
 
   // Calcula métricas por tipo de conta
   const tipos = Object.keys(TIPOS);
@@ -87,6 +103,39 @@ export default async function PainelPage() {
           <KpiCard icon="hourglass" value={totLancado} label="Aguardando pagamento" variacao={variacaoPct(totLancado, metricaAnterior?.aguardando_pagamento ?? null)} />
           <KpiCard icon="pin" value={totMapear} label="Origem a mapear" variacao={variacaoPct(totMapear, metricaAnterior?.origem_a_mapear ?? null)} />
         </div>
+
+        {vencendoSemana.length > 0 && (
+          <div className="mb-10">
+            <div className="flex items-center gap-2.5 mb-4">
+              <span className="w-2.5 h-2.5 rounded-full bg-alerr alerta-piscando" />
+              <h2 className="text-[18px] font-bold text-[#1a1a1a]">Vence nos próximos 7 dias</h2>
+              <span className="badge bg-alerr-bg text-alerr">{vencendoSemana.length}</span>
+              <Link href="/alertas" className="ml-auto text-xs text-[#1976d2] hover:underline">ver alertas completos</Link>
+            </div>
+            <div className="card overflow-hidden border-alerr/30">
+              <ul>
+                {vencendoSemana.slice(0, 8).map((l: any) => {
+                  const T = TIPOS[l.contas.tipo];
+                  const venceHoje = l.contas.dia_vencimento === diaAtual;
+                  return (
+                    <li key={l.id} className="flex items-center gap-3.5 px-5 py-3 border-b border-linha2 last:border-0 text-[13px]">
+                      <div className="w-9 h-9 rounded-full grid place-items-center shrink-0" style={{ background: T?.bg }}>
+                        <TipoIcon tipo={l.contas.tipo} size={16} color={T?.c} />
+                      </div>
+                      <div className="min-w-0">
+                        <b className="font-semibold">{l.contas.lojas?.codigo}</b>
+                        <small className="block text-[#6c757d] text-[11px] mt-0.5 truncate">{T?.n} · {l.contas.fornecedor_nome ?? "—"}</small>
+                      </div>
+                      <span className={`ml-auto text-[11px] font-mono font-semibold shrink-0 ${venceHoje ? "text-alerr alerta-piscando" : "text-[#6c757d]"}`}>
+                        {venceHoje ? "vence hoje" : `dia ${l.contas.dia_vencimento}`}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+        )}
 
         <div className="flex items-end justify-between mb-5">
           <div>
