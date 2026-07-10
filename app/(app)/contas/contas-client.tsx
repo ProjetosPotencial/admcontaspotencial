@@ -231,6 +231,7 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
         form.append("ano", String(ANO_ATUAL));
         form.append("mes", MES[MES_ATUAL - 1]);
         form.append("mesNumero", String(MES_ATUAL).padStart(2, "0"));
+        form.append("dia", String(new Date().getDate()).padStart(2, "0"));
         form.append("loja", conta.lojas?.codigo ?? "loja");
         form.append("tipo", T?.n ?? conta.tipo);
         try {
@@ -356,7 +357,7 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
           <div className="pt-5 mt-5 border-t border-linha">
             <div className="text-[14px] font-semibold text-[#1a1a1a] mb-3.5">Fatura de {formatarPeriodo(MES_ATUAL, ANO_ATUAL)}</div>
 
-            {lancamentoAtual && lancamentoAtual.situacao !== "pendente" ? (
+            {lancamentoAtual && lancamentoAtual.situacao !== "pendente" && !lancando ? (
               <div className="card p-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -380,9 +381,13 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
                     )}
                   </div>
                 </div>
+                <button onClick={() => { setValorLancar(String(lancamentoAtual.valor ?? "")); setLancando(true); }}
+                  className="w-full mt-3 pt-3 border-t border-linha2 text-[12px] font-semibold text-[#6c757d] hover:text-amb transition text-center">
+                  Boleto errado? Substituir
+                </button>
               </div>
             ) : !lancando ? (
-              <button onClick={() => setLancando(true)}
+              <button onClick={() => { setValorLancar(lancamentoAtual ? String(lancamentoAtual.valor ?? "") : ""); setLancando(true); }}
                 className="w-full text-[12.5px] font-semibold text-amb border border-amarelo/40 bg-amb-bg rounded-md py-2.5 hover:bg-amarelo/10 transition">
                 {lancamentoAtual ? `Lançar fatura de ${formatarPeriodo(MES_ATUAL, ANO_ATUAL).toLowerCase()}` : `Lançar fatura de ${formatarPeriodo(MES_ATUAL, ANO_ATUAL).toLowerCase()} (sem lançamento pendente ainda)`}
               </button>

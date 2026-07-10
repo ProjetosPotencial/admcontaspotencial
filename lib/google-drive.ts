@@ -52,13 +52,15 @@ async function garantirPasta(nome: string, paiId: string): Promise<string> {
 
 /**
  * Envia um boleto para o Drive, organizado como:
- * PASTA_RAIZ / {loja} / {tipo} / {loja} - {tipo} - {mesNumero}-{ano}.{extensão}
+ * PASTA_RAIZ / {ano} / {mês} / {dia} / {tipo} / {loja} - {tipo} - {dia}-{mesNumero}-{ano}.{extensão}
  *
- * Cada loja vira uma pasta, e dentro dela cada tipo de conta (Água, Energia,
- * Telefone, IPTU...) vira uma subpasta - assim quem abre a pasta de uma
- * loja já vê tudo separado por tipo, em vez de misturado por mês.
- * O nome do arquivo repete loja/tipo/competência mesmo estando nas pastas
- * certas, pra continuar identificável se alguém mover ou baixar o arquivo.
+ * A loja não vira pasta - ela fica só no nome do arquivo, já que dentro de
+ * uma pasta de dia+tipo podem cair boletos de lojas diferentes no mesmo dia.
+ *
+ * Se já existir um boleto dessa loja+tipo no MESMO DIA (pasta atual), ele é
+ * apagado antes de subir o novo - corrige sem duplicar. Se a correção
+ * acontecer num dia diferente do lançamento original, o arquivo antigo fica
+ * na pasta do dia antigo (não é buscado nas outras pastas de dia).
  * Devolve o link de visualização do arquivo no Drive.
  */
 export async function enviarBoletoParaDrive(params: {
@@ -66,8 +68,9 @@ export async function enviarBoletoParaDrive(params: {
   nomeArquivo: string;
   mimeType: string;
   ano: number;
-  mes: string; // nome do mes, ex "Julho" (não usado na pasta, mantido pro nome do arquivo se precisar)
+  mes: string; // nome do mes, ex "Julho"
   mesNumero: string; // "07"
+  dia: string; // "10"
   loja: string;
   tipo: string;
 }): Promise<{ fileId: string; webViewLink: string }> {
@@ -77,11 +80,27 @@ export async function enviarBoletoParaDrive(params: {
   }
   const drive = getDrive();
 
-  const pastaLoja = await garantirPasta(params.loja, raizId);
-  const pastaTipo = await garantirPasta(params.tipo, pastaLoja);
+  const pastaAno = await garantirPasta(String(params.ano), raizId);
+  const pastaMes = await garantirPasta(params.mes, pastaAno);
+  const pastaDia = await garantirPasta(params.dia.padStart(2, "0"), pastaMes);
+  const pastaTipo = await garantirPasta(params.tipo, pastaDia);
+
+  // apaga qualquer boleto da mesma loja+tipo já existente nessa pasta de dia,
+  // pra corrigir sem duplicar (ex.: relançou duas vezes no mesmo dia).
+  const prefixoLoja = `${params.loja} - ${params.tipo} - `;
+  const existentes = await drive.files.list({
+    q: `'${pastaTipo}' in parents and trashed=false`,
+    fields: "files(id, name)",
+    spaces: "drive",
+  });
+  for (const f of existentes.data.files ?? []) {
+    if (f.name?.startsWith(prefixoLoja) && f.id) {
+      await drive.files.delete({ fileId: f.id }).catch(() => {});
+    }
+  }
 
   const stream = Readable.from(params.arquivo);
-  const nomeArquivo = `${params.loja} - ${params.tipo} - ${params.mesNumero}-${params.ano}${extensaoDoNome(params.nomeArquivo)}`;
+  const nomeArquivo = `${params.loja} - ${params.tipo} - ${params.dia}-${params.mesNumero}-${params.ano}${extensaoDoNome(params.nomeArquivo)}`;
 
   const resultado = await drive.files.create({
     requestBody: {

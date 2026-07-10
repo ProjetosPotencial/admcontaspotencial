@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
     const ano = form.get("ano") as string;
     const mes = form.get("mes") as string;
     const mesNumero = form.get("mesNumero") as string;
+    const dia = form.get("dia") as string;
     const loja = form.get("loja") as string;
     const tipo = form.get("tipo") as string;
 
@@ -33,6 +34,7 @@ export async function POST(req: NextRequest) {
       ano: Number(ano),
       mes,
       mesNumero: mesNumero || "00",
+      dia: dia || "01",
       loja,
       tipo,
     });
