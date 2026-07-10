@@ -62,7 +62,15 @@ export default async function ConfiguracoesPage() {
           <div className="mt-8">
             <h2 className="text-[16px] font-semibold text-[#1a1a1a] mb-1">Notificação diária no Slack</h2>
             <p className="text-[13px] text-[#6c757d] mb-4">Testa agora, sem esperar o horário agendado. Manda de verdade pro canal configurado.</p>
-            <TestarSlackButton />
+            <TestarSlackButton endpoint="/api/notificar-slack/testar" />
+          </div>
+        )}
+
+        {ehAdmin && (
+          <div className="mt-8">
+            <h2 className="text-[16px] font-semibold text-[#1a1a1a] mb-1">Resumo semanal no Slack</h2>
+            <p className="text-[13px] text-[#6c757d] mb-4">Lançado e aprovado nos últimos 7 dias, mais o ranking de lojas com mais atraso. Roda sozinho toda segunda de manhã.</p>
+            <TestarSlackButton endpoint="/api/notificar-slack-semanal/testar" />
           </div>
         )}
       </div>

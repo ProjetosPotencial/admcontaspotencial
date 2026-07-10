@@ -47,7 +47,19 @@ export async function enviarResumoDiarioSlack() {
     blocos.push({ type: "divider" });
     blocos.push({ type: "section", text: { type: "mrkdwn", text: `*🔴 Atrasadas, ninguém lançou ainda (${atrasadas.length})*\n${atrasadas.map(linha).join("\n")}` } });
   }
+  const urlSite = process.env.APP_URL ?? "https://admcontaspotencial.vercel.app";
   blocos.push({ type: "context", elements: [{ type: "mrkdwn", text: "Sistema Potencial Contas · lança pelo sistema pra sair dessa lista" }] });
+  blocos.push({
+    type: "actions",
+    elements: [
+      {
+        type: "button",
+        text: { type: "plain_text", text: "Abrir sistema", emoji: true },
+        url: `${urlSite}/alertas`,
+        style: "primary",
+      },
+    ],
+  });
 
   const resposta = await fetch(webhookUrl, {
     method: "POST",

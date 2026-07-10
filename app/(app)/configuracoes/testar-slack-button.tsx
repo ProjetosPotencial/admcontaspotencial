@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-export default function TestarSlackButton() {
+export default function TestarSlackButton({ endpoint = "/api/notificar-slack/testar" }: { endpoint?: string }) {
   const [rodando, setRodando] = useState(false);
   const [resultado, setResultado] = useState<string | null>(null);
   const [erro, setErro] = useState(false);
@@ -12,15 +12,19 @@ export default function TestarSlackButton() {
     setResultado(null);
     setErro(false);
     try {
-      const resp = await fetch("/api/notificar-slack/testar", { method: "POST" });
+      const resp = await fetch(endpoint, { method: "POST" });
       const json = await resp.json();
       if (!resp.ok || json.error) {
         setErro(true);
         setResultado(json.error ?? "Erro desconhecido.");
       } else if (json.enviado) {
-        setResultado(`Enviado! ${json.venceHoje} vencendo hoje, ${json.atrasadas} atrasada(s). Confere o canal do Slack.`);
+        const partes = Object.entries(json)
+          .filter(([k]) => !["ok", "enviado"].includes(k))
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(" · ");
+        setResultado(`Enviado! ${partes}. Confere o canal do Slack.`);
       } else {
-        setResultado("Rodou certinho, mas não tinha nada vencendo ou atrasado hoje — por isso não mandou mensagem.");
+        setResultado(`Rodou certinho, mas não tinha nada pra avisar (${json.motivo ?? "sem movimento"}) — por isso não mandou mensagem.`);
       }
     } catch {
       setErro(true);
