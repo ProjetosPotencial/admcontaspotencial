@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Loja } from "@/lib/loja-types";
 import { TIPOS, ORIGENS } from "@/lib/types";
 import { CAMPOS_TIPO } from "@/lib/campos-tipo";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 
 const COBANS = ["MG", "MS", "SP", "QUIOSQUE", "CORP"];
 const TIPO_PDVS = ["PE", "OP", "QQ", "AC", "PT"];
@@ -20,6 +21,9 @@ export default function LojasClient({ lojas: lojasIniciais, statusInicial, empre
   const [fCoban, setFCoban] = useState("todos");
   const [fStatus, setFStatus] = useState(statusInicial ?? "todos");
   const [busca, setBusca] = useState("");
+  const buscaDebounced = useDebounce(busca, 250);
+  const [pagina, setPagina] = useState(1);
+  const [itensPorPagina, setItensPorPagina] = useState(25);
   const [aberta, setAberta] = useState<Loja | null>(null);
   const [criando, setCriando] = useState(false);
 
@@ -27,13 +31,20 @@ export default function LojasClient({ lojas: lojasIniciais, statusInicial, empre
     return lojas.filter((l) => {
       const cb = fCoban === "todos" || l.coban === fCoban;
       const st = fStatus === "todos" || l.status === fStatus;
-      const q = busca === "" ||
-        l.codigo.toLowerCase().includes(busca.toLowerCase()) ||
-        (l.cidade ?? "").toLowerCase().includes(busca.toLowerCase()) ||
-        (l.empresa ?? "").toLowerCase().includes(busca.toLowerCase());
+      const q = buscaDebounced === "" ||
+        l.codigo.toLowerCase().includes(buscaDebounced.toLowerCase()) ||
+        (l.cidade ?? "").toLowerCase().includes(buscaDebounced.toLowerCase()) ||
+        (l.empresa ?? "").toLowerCase().includes(buscaDebounced.toLowerCase());
       return cb && st && q;
     });
-  }, [lojas, fCoban, fStatus, busca]);
+  }, [lojas, fCoban, fStatus, buscaDebounced]);
+
+  useEffect(() => { setPagina(1); }, [fCoban, fStatus, buscaDebounced]);
+
+  const totalPaginas = Math.max(Math.ceil(filtradas.length / itensPorPagina), 1);
+  const paginaSegura = Math.min(pagina, totalPaginas);
+  const inicio = (paginaSegura - 1) * itensPorPagina;
+  const visiveis = filtradas.slice(inicio, inicio + itensPorPagina);
 
   function atualizarNaLista(loja: Loja) {
     setLojas((ls) => (ls.some((l) => l.id === loja.id) ? ls.map((l) => (l.id === loja.id ? loja : l)) : [loja, ...ls]));
@@ -74,7 +85,7 @@ export default function LojasClient({ lojas: lojasIniciais, statusInicial, empre
             </tr>
           </thead>
           <tbody>
-            {filtradas.map((l) => (
+            {visiveis.map((l) => (
               <tr key={l.id} onClick={() => setAberta(l)} className="cursor-pointer hover:bg-[#FBFAF7] transition">
                 <td className="px-4 py-3 border-b border-linha2 text-[13px]"><b className="font-semibold">{l.codigo}</b></td>
                 <td className="px-4 py-3 border-b border-linha2 text-[13px] font-mono">{l.coban}</td>
@@ -89,6 +100,27 @@ export default function LojasClient({ lojas: lojasIniciais, statusInicial, empre
             )}
           </tbody>
         </table></div>
+
+        {/* paginação real - evita renderizar as ~200 linhas de uma vez */}
+        <div className="flex items-center justify-between px-4 py-3 border-t border-linha2 flex-wrap gap-3">
+          <span className="text-[12px] text-txt-3">
+            Mostrando {filtradas.length === 0 ? 0 : inicio + 1} a {Math.min(inicio + itensPorPagina, filtradas.length)} de {filtradas.length} lojas
+          </span>
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => setPagina((p) => Math.max(p - 1, 1))} disabled={paginaSegura === 1}
+              className="w-8 h-8 rounded-md border border-linha text-txt-3 disabled:opacity-40 hover:bg-off">‹</button>
+            <span className="text-[12.5px] text-txt font-semibold px-2">{paginaSegura} / {totalPaginas}</span>
+            <button onClick={() => setPagina((p) => Math.min(p + 1, totalPaginas))} disabled={paginaSegura === totalPaginas}
+              className="w-8 h-8 rounded-md border border-linha text-txt-3 disabled:opacity-40 hover:bg-off">›</button>
+          </div>
+          <label className="flex items-center gap-2 text-[12px] text-txt-3">
+            Por página
+            <select value={itensPorPagina} onChange={(e) => { setItensPorPagina(Number(e.target.value)); setPagina(1); }}
+              className="border border-linha rounded-md px-2 py-1.5 text-[12.5px]">
+              {[25, 50, 100, 200].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+        </div>
       </div>
 
       {aberta && <LojaDrawer loja={aberta} onClose={() => setAberta(null)} onSalvar={atualizarNaLista} empresas={empresas} />}

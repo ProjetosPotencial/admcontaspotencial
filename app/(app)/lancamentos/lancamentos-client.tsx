@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { TIPOS, SITUACAO } from "@/lib/types";
 import TipoIcon from "@/components/tipo-icon";
 import { money, MES } from "@/lib/format";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 
 type Item = {
   id: string; ano: number; mes: number; valor: number | null; situacao: string;
@@ -23,6 +24,7 @@ export default function LancamentosClient({ itens, ano, resumo }: { itens: Item[
   const [fTipo, setFTipo] = useState("todos");
   const [fSituacao, setFSituacao] = useState("todos");
   const [busca, setBusca] = useState("");
+  const buscaDebounced = useDebounce(busca, 250);
   const [ordemVenc, setOrdemVenc] = useState<"asc" | "desc" | null>(null);
   const [pagina, setPagina] = useState(1);
   const [itensPorPagina, setItensPorPagina] = useState(12);
@@ -33,8 +35,8 @@ export default function LancamentosClient({ itens, ano, resumo }: { itens: Item[
       const m = fMes === "todos" || String(l.mes) === fMes;
       const t = fTipo === "todos" || l.contas.tipo === fTipo;
       const s = fSituacao === "todos" || l.situacao === fSituacao;
-      const q = busca === "" || (l.contas.lojas?.codigo ?? "").toLowerCase().includes(busca.toLowerCase()) ||
-        (l.contas.fornecedor_nome ?? "").toLowerCase().includes(busca.toLowerCase());
+      const q = buscaDebounced === "" || (l.contas.lojas?.codigo ?? "").toLowerCase().includes(buscaDebounced.toLowerCase()) ||
+        (l.contas.fornecedor_nome ?? "").toLowerCase().includes(buscaDebounced.toLowerCase());
       return m && t && s && q;
     });
     if (ordemVenc) {
@@ -45,7 +47,7 @@ export default function LancamentosClient({ itens, ano, resumo }: { itens: Item[
       });
     }
     return lista;
-  }, [itens, fMes, fTipo, fSituacao, busca, ordemVenc]);
+  }, [itens, fMes, fTipo, fSituacao, buscaDebounced, ordemVenc]);
 
   const totalPaginas = Math.max(Math.ceil(filtrados.length / itensPorPagina), 1);
   const paginaSegura = Math.min(pagina, totalPaginas);

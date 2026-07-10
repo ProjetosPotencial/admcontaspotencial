@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { TIPOS, ORIGENS, SITUACAO, type Conta, type Lancamento } from "@/lib/types";
 import { CAMPOS_TIPO } from "@/lib/campos-tipo";
 import { useContaForm } from "@/lib/hooks/useContaForm";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 import { obterPeriodoAtual, formatarPeriodo } from "@/lib/date-utils";
 import TipoIcon from "@/components/tipo-icon";
 import { money, MES, nomeArquivoSeguro } from "@/lib/format";
@@ -49,6 +50,9 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
   const [fStatus, setFStatus] = useState(params.get("status") ?? "todos");
   const [fSituacao, setFSituacao] = useState(params.get("situacao") ?? "todos");
   const [busca, setBusca] = useState("");
+  const buscaDebounced = useDebounce(busca, 250);
+  const [pagina, setPagina] = useState(1);
+  const [itensPorPagina, setItensPorPagina] = useState(25);
   const [aberta, setAberta] = useState<Conta | null>(null);
   const [criando, setCriando] = useState(false);
 
@@ -59,12 +63,19 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
       const st = fStatus === "todos" || c.status === fStatus;
       const si = fSituacao === "todos" || (situacaoPorConta[c.id] ?? "pendente") === fSituacao;
       const q =
-        busca === "" ||
-        (c.lojas?.codigo ?? "").toLowerCase().includes(busca.toLowerCase()) ||
-        (c.fornecedor_nome ?? "").toLowerCase().includes(busca.toLowerCase());
+        buscaDebounced === "" ||
+        (c.lojas?.codigo ?? "").toLowerCase().includes(buscaDebounced.toLowerCase()) ||
+        (c.fornecedor_nome ?? "").toLowerCase().includes(buscaDebounced.toLowerCase());
       return t && cb && st && si && q;
     });
-  }, [contas, fTipo, fCoban, fStatus, fSituacao, busca, situacaoPorConta]);
+  }, [contas, fTipo, fCoban, fStatus, fSituacao, buscaDebounced, situacaoPorConta]);
+
+  useEffect(() => { setPagina(1); }, [fTipo, fCoban, fStatus, fSituacao, buscaDebounced]);
+
+  const totalPaginas = Math.max(Math.ceil(filtradas.length / itensPorPagina), 1);
+  const paginaSegura = Math.min(pagina, totalPaginas);
+  const inicio = (paginaSegura - 1) * itensPorPagina;
+  const visiveis = filtradas.slice(inicio, inicio + itensPorPagina);
 
   const limparFiltros = () => { setFTipo("todos"); setFCoban("todos"); setFStatus("todos"); setFSituacao("todos"); setBusca(""); };
   const temFiltro = fTipo !== "todos" || fCoban !== "todos" || fStatus !== "todos" || fSituacao !== "todos" || busca !== "";
@@ -135,7 +146,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
             </tr>
           </thead>
           <tbody>
-            {filtradas.map((c) => (
+            {visiveis.map((c) => (
               <tr key={c.id} onClick={() => setAberta(c)} className="h-14 cursor-pointer border-b border-[#f1f3f5] last:border-0 hover:bg-[#f8f9fa] transition group relative">
                 <td className="px-4 text-[13px] font-medium relative">
                   <span className="absolute left-0 top-0 bottom-0 w-1 bg-amarelo opacity-0 group-hover:opacity-100 transition" />
@@ -165,6 +176,27 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
             )}
           </tbody>
         </table></div>
+
+        {/* paginação real - evita renderizar as 450 linhas de uma vez */}
+        <div className="flex items-center justify-between px-4 py-3 border-t border-linha2 flex-wrap gap-3">
+          <span className="text-[12px] text-[#6c757d]">
+            Mostrando {filtradas.length === 0 ? 0 : inicio + 1} a {Math.min(inicio + itensPorPagina, filtradas.length)} de {filtradas.length} contas
+          </span>
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => setPagina((p) => Math.max(p - 1, 1))} disabled={paginaSegura === 1}
+              className="w-8 h-8 rounded-md border border-linha text-[#6c757d] disabled:opacity-40 hover:bg-off">‹</button>
+            <span className="text-[12.5px] text-[#1a1a1a] font-semibold px-2">{paginaSegura} / {totalPaginas}</span>
+            <button onClick={() => setPagina((p) => Math.min(p + 1, totalPaginas))} disabled={paginaSegura === totalPaginas}
+              className="w-8 h-8 rounded-md border border-linha text-[#6c757d] disabled:opacity-40 hover:bg-off">›</button>
+          </div>
+          <label className="flex items-center gap-2 text-[12px] text-[#6c757d]">
+            Por página
+            <select value={itensPorPagina} onChange={(e) => { setItensPorPagina(Number(e.target.value)); setPagina(1); }}
+              className="border border-linha rounded-md px-2 py-1.5 text-[12.5px]">
+              {[25, 50, 100, 200].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+        </div>
       </div>
 
       {aberta && <ContaDrawer conta={aberta} onClose={() => setAberta(null)} />}

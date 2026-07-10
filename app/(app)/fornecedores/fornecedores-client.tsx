@@ -2,14 +2,16 @@
 
 import { useState, useMemo } from "react";
 import { TIPOS } from "@/lib/types";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 
 type Fornecedor = { id: string; nome: string; tipo_padrao: string | null; portal_padrao: string | null };
 
 export default function FornecedoresClient({ fornecedores }: { fornecedores: Fornecedor[] }) {
   const [busca, setBusca] = useState("");
+  const buscaDebounced = useDebounce(busca, 250);
   const filtrados = useMemo(
-    () => fornecedores.filter((f) => f.nome.toLowerCase().includes(busca.toLowerCase())),
-    [fornecedores, busca]
+    () => fornecedores.filter((f) => f.nome.toLowerCase().includes(buscaDebounced.toLowerCase())),
+    [fornecedores, buscaDebounced]
   );
 
   return (

@@ -52,7 +52,16 @@ export function periodoPassed(mes: number, ano: number, dataAtual?: Date): boole
 }
 
 /**
- * Verifica se uma data de vencimento está atrasada
+ * Verifica se uma data de vencimento está atrasada.
+ *
+ * Importante: só uma conta PENDENTE (que ninguém lançou ainda) pode estar
+ * atrasada. Uma conta já LANÇADA não conta mais como atrasada mesmo que o
+ * vencimento tenha passado - nesse ponto ela já foi tratada e está
+ * esperando aprovação/pagamento, é uma situação diferente de "ninguém
+ * lançou ainda". Sem essa distinção, uma conta lançada com o vencimento
+ * já passado ficava presa pra sempre na lista de atrasadas, mesmo depois
+ * de resolvida.
+ *
  * @param situacao - situação do lançamento (pendente, lancado, etc)
  * @param diaVencimento - dia do mês do vencimento
  * @param mes - mês do período
@@ -66,8 +75,9 @@ export function estaAtrasada(
   ano: number,
   dataAtual?: Date
 ): boolean {
-  // Apenas pendente e lancado podem estar atrasados
-  if (situacao !== "pendente" && situacao !== "lancado") {
+  // Só pendente pode estar atrasada. Lançada, aprovada, paga ou contestada
+  // já saíram do estado de "ninguém tratou ainda".
+  if (situacao !== "pendente") {
     return false;
   }
 

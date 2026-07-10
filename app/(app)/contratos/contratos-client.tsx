@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/format";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 
 type ContratoRow = {
   id: string; numero: string; loja_id: string | null; empresa_id: string | null;
@@ -20,15 +21,16 @@ export default function ContratosClient({ contratos: iniciais, lojas, empresas, 
 }) {
   const [contratos, setContratos] = useState(iniciais);
   const [busca, setBusca] = useState(buscaInicial ?? "");
+  const buscaDebounced = useDebounce(busca, 250);
   const [fStatus, setFStatus] = useState("todos");
   const [criando, setCriando] = useState(false);
   const [editando, setEditando] = useState<ContratoRow | null>(null);
 
   const filtrados = useMemo(() => contratos.filter((c) => {
     const s = fStatus === "todos" || c.status === fStatus;
-    const q = busca === "" || c.numero.toLowerCase().includes(busca.toLowerCase()) || (c.lojas?.codigo ?? "").toLowerCase().includes(busca.toLowerCase());
+    const q = buscaDebounced === "" || c.numero.toLowerCase().includes(buscaDebounced.toLowerCase()) || (c.lojas?.codigo ?? "").toLowerCase().includes(buscaDebounced.toLowerCase());
     return s && q;
-  }), [contratos, busca, fStatus]);
+  }), [contratos, buscaDebounced, fStatus]);
 
   function upsertLocal(c: ContratoRow) {
     setContratos((lista) => (lista.some((x) => x.id === c.id) ? lista.map((x) => (x.id === c.id ? c : x)) : [c, ...lista]));
