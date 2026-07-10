@@ -19,6 +19,9 @@ export default function MenuAdminClient({ itens: itensIniciais }: { itens: Item[
     setSalvandoId(null);
     if (error) { setAviso("Sem permissão para editar o menu."); return; }
     setItens((lista) => lista.map((i) => (i.id === id ? { ...i, [campo]: valor } : i)));
+    // avisa o servidor pra esquecer o menu cacheado - senão a mudança só
+    // apareceria pra todo mundo depois de uns minutos.
+    fetch("/api/revalidar-menu", { method: "POST" }).catch(() => {});
   }
 
   return (

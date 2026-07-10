@@ -1,15 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { formatarPeriodo, obterPeriodoAtual } from "@/lib/date-utils";
 import { useMenuMobile } from "@/components/app-shell";
 
-export default function TopNav({ notificacoes = 0 }: { notificacoes?: number }) {
+export default function TopNav() {
   const [sinoAberto, setSinoAberto] = useState(false);
+  const [notificacoes, setNotificacoes] = useState<number | null>(null);
   const { setAberto } = useMenuMobile();
+  const pathname = usePathname();
   const { ano, mes } = obterPeriodoAtual();
   const periodo = formatarPeriodo(mes, ano);
+
+  useEffect(() => {
+    // busca depois da tela já ter aparecido - não trava nenhuma navegação
+    // esperando isso. Se falhar, só não mostra o número, sem quebrar nada.
+    let cancelado = false;
+    fetch("/api/alertas-contagem")
+      .then((r) => r.json())
+      .then((json) => { if (!cancelado) setNotificacoes(json.total ?? 0); })
+      .catch(() => {});
+    return () => { cancelado = true; };
+  }, [pathname]);
 
   return (
     <header className="h-16 bg-white border-b border-linha px-4 sm:px-6 flex items-center justify-between shrink-0 sticky top-0 z-30">
@@ -28,13 +42,15 @@ export default function TopNav({ notificacoes = 0 }: { notificacoes?: number }) 
         <div className="relative">
           <button onClick={() => setSinoAberto((v) => !v)} className="relative text-txt-2 hover:text-txt w-9 h-9 grid place-items-center rounded-lg hover:bg-off transition">
             <svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M5 8a5 5 0 0110 0c0 4 1.5 5 1.5 5h-13S5 12 5 8z" /><path d="M8 16a2 2 0 004 0" /></svg>
-            {notificacoes > 0 && (
+            {!!notificacoes && notificacoes > 0 && (
               <span className="absolute top-1 right-1 bg-alerr text-white text-[10px] font-bold w-4 h-4 rounded-full grid place-items-center">{notificacoes}</span>
             )}
           </button>
           {sinoAberto && (
             <div className="absolute right-0 top-11 bg-white border border-linha rounded-lg shadow-media w-64 py-3 px-4 z-40">
-              {notificacoes > 0 ? (
+              {notificacoes == null ? (
+                <p className="text-[13px] text-txt-2">Carregando...</p>
+              ) : notificacoes > 0 ? (
                 <>
                   <p className="text-[13px] text-txt font-medium leading-snug">
                     <b className="text-alerr">{notificacoes}</b> {notificacoes === 1 ? "item precisa" : "itens precisam"} de atenção agora.
