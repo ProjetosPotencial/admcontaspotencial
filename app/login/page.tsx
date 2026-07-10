@@ -38,7 +38,7 @@ export default function LoginPage() {
     if (!email) { setErro("Digita seu e-mail primeiro."); return; }
     setLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/login`,
+      redirectTo: `${window.location.origin}/redefinir-senha`,
     });
     setLoading(false);
     if (error) { setErro("Não foi possível enviar o link de recuperação."); return; }

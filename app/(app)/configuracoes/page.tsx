@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import MenuAdminClient from "./menu-admin-client";
 import TestarSlackButton from "./testar-slack-button";
+import TrocarSenhaForm from "./trocar-senha-form";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +49,13 @@ export default async function ConfiguracoesPage() {
             </div>
           </div>
         </div>
-        <p className="text-[12px] text-[#adb5bd] mt-4">Para trocar de senha ou dados, peça ao administrador do sistema.</p>
+        <p className="text-[12px] text-[#adb5bd] mt-4">Pra trocar seus dados (nome, e-mail), peça ao administrador do sistema.</p>
+
+        <div className="mt-8">
+          <h2 className="text-[16px] font-semibold text-[#1a1a1a] mb-1">Trocar senha</h2>
+          <p className="text-[13px] text-[#6c757d] mb-4">Pede sua senha atual antes de trocar, por segurança.</p>
+          <TrocarSenhaForm />
+        </div>
 
         {ehAdmin && (
           <div className="mt-8">
