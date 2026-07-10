@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import ContratosClient from "./contratos-client";
+import IaContratosPanel from "./ia-contratos-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -20,8 +21,11 @@ export default async function ContratosPage({ searchParams }: { searchParams: { 
         <h1 className="text-[32px] font-bold text-[#1a1a1a] leading-none">Contratos</h1>
         <p className="text-[14px] text-[#6c757d] mt-2.5">Contratos de aluguel, prestação de serviço e afins, ligados a loja e empresa</p>
       </div>
-      <div className="px-4 sm:px-8 pb-6 sm:pb-8 max-w-[1100px]">
-        <ContratosClient contratos={(contratos ?? []) as any[]} lojas={lojas ?? []} empresas={empresas ?? []} buscaInicial={searchParams.loja ?? ""} />
+      <div className="px-4 sm:px-8 pb-6 sm:pb-8 max-w-[1500px]">
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6">
+          <ContratosClient contratos={(contratos ?? []) as any[]} lojas={lojas ?? []} empresas={empresas ?? []} buscaInicial={searchParams.loja ?? ""} />
+          <IaContratosPanel />
+        </div>
       </div>
     </>
   );
