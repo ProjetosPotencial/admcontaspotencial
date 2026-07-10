@@ -50,7 +50,6 @@ export default function LoginPage() {
       <CircuitoFundo />
 
       <div className="relative z-10 flex flex-col items-center text-center mb-8">
-        <div className="text-[#9a9a9a] font-disp font-semibold text-[13px] tracking-[8px]">GRUPO</div>
         <Image src="/logo-grupo-potencial.png" alt="Grupo Potencial" width={340} height={80} priority className="my-1" />
         <div className="text-[12px] tracking-[3px] mt-1">
           <span className="text-white/70 font-semibold">AUTOMAÇÃO </span>
@@ -60,17 +59,14 @@ export default function LoginPage() {
 
       <div className="relative z-10 w-full max-w-[420px] bg-[#141416] border border-white/10 rounded-2xl p-8 shadow-forte">
         <div className="flex flex-col items-center mb-6">
-          <div className="w-14 h-14 rounded-xl bg-[#1c1c1f] border border-white/10 grid place-items-center mb-4 relative overflow-hidden">
-            <span className="absolute left-0 top-0 bottom-0 w-2.5 bg-amarelo rounded-l-lg" />
-            <span className="text-white font-disp font-extrabold text-xl ml-1">P</span>
+          <div className="w-14 h-14 rounded-xl bg-ebano border border-white/10 grid place-items-center mb-4 shrink-0">
+            <svg width="30" height="30" viewBox="0 0 72 72" fill="none">
+              <path d="M18 8h20c11 0 18 7 18 17s-7 17-18 17H30v22H18V8z" fill="#FFC107" />
+              <path d="M30 20h7c4.5 0 7 2.2 7 5.5S41.5 31 37 31h-7V20z" fill="#1a1c1e" />
+            </svg>
           </div>
           {!modoRecuperar ? (
-            <>
-              <h1 className="text-white font-disp font-bold text-[19px]">
-                Bem-vindo ao <span className="text-amarelo">Grupo Potencial</span>
-              </h1>
-              <p className="text-white/40 text-[13px] mt-1">Acesse sua conta para continuar</p>
-            </>
+            <p className="text-white/40 text-[13px] mt-1">Acesse sua conta para continuar</p>
           ) : (
             <>
               <h1 className="text-white font-disp font-bold text-[19px]">Recuperar senha</h1>
