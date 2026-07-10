@@ -28,6 +28,7 @@ export default async function PainelPage() {
     { data: lancamentosDetalhados },
     { data: lancamentosAno },
     { data: lojasEncerradas },
+    { count: totalLojasFechadas },
     { data: metricaAnterior },
   ] = await Promise.all([
     supabase.from("perfis").select("nome").eq("id", session?.user.id ?? "").maybeSingle(),
@@ -39,7 +40,8 @@ export default async function PainelPage() {
     supabase.from("lancamentos")
       .select("mes, valor, situacao, contas!inner ( fornecedor_nome )")
       .eq("ano", ano).not("valor", "is", null),
-    supabase.from("lojas").select("codigo, coban, empresa, cidade, uf, encerrada_em").eq("status", "encerrada").order("encerrada_em", { ascending: false }).limit(6),
+    supabase.from("lojas").select("codigo, coban, empresa, cidade, uf, encerrada_em").eq("status", "encerrada").order("encerrada_em", { ascending: false }).limit(5),
+    supabase.from("lojas").select("id", { count: "exact", head: true }).eq("status", "encerrada"),
     supabase.from("metricas_mensais").select("contas_ativas, a_lancar, aguardando_pagamento, origem_a_mapear").eq("ano", anoAnterior).eq("mes", mesAnterior).maybeSingle(),
   ]);
 
@@ -161,31 +163,6 @@ export default async function PainelPage() {
               );
             })}
           </div>
-
-          {(lojasEncerradas ?? []).length > 0 && (
-            <>
-              <div className="flex items-baseline gap-3 mb-3">
-                <h2 className="text-[16px] font-bold text-[#1a1a1a]">Lojas encerradas recentemente</h2>
-                <Link href="/lojas?status=encerrada" className="text-xs text-info hover:underline">ver todas</Link>
-              </div>
-              <div className="card overflow-hidden">
-                <ul>
-                  {(lojasEncerradas ?? []).map((l: any, i: number) => (
-                    <li key={i} className="flex items-center gap-3.5 px-5 py-3 border-b border-linha2 last:border-0 text-[13px]">
-                      <div className="w-8 h-8 rounded-lg bg-alerr-bg text-alerr grid place-items-center text-[11px] font-bold shrink-0">{l.coban?.slice(0, 2) ?? "—"}</div>
-                      <div className="min-w-0">
-                        <b className="font-semibold">{l.codigo}</b>
-                        <small className="block text-[#adb5bd] text-[11px] mt-0.5 truncate">
-                          {[l.empresa, l.cidade && l.uf ? `${l.cidade}/${l.uf}` : null].filter(Boolean).join(" · ") || "sem dados adicionais"}
-                        </small>
-                      </div>
-                      <span className="ml-auto text-[11px] text-[#adb5bd] font-mono shrink-0">{l.encerrada_em ? new Date(l.encerrada_em).toLocaleDateString("pt-br") : "—"}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </>
-          )}
         </div>
 
         <div className="space-y-6">
@@ -203,6 +180,29 @@ export default async function PainelPage() {
             <Link href="/alertas" className="block text-center mt-4 text-[12.5px] font-bold text-amarelo-dark hover:underline">
               Ver todos os alertas →
             </Link>
+          </div>
+
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-[14px] font-bold text-[#1a1a1a]">Lojas fechadas</h3>
+              <Link href="/lojas?status=encerrada" className="text-[11.5px] font-semibold text-info hover:underline">Ver todas</Link>
+            </div>
+            <div className="text-[26px] font-bold text-[#1a1a1a] leading-none mt-2 mb-3">{totalLojasFechadas ?? 0}</div>
+            {(lojasEncerradas ?? []).length > 0 ? (
+              <ul className="space-y-2.5">
+                {(lojasEncerradas ?? []).map((l: any, i: number) => (
+                  <li key={i} className="flex items-center gap-2.5 text-[12.5px]">
+                    <div className="w-7 h-7 rounded-lg bg-alerr-bg text-alerr grid place-items-center text-[10px] font-bold shrink-0">{l.coban?.slice(0, 2) ?? "—"}</div>
+                    <div className="min-w-0 flex-1">
+                      <b className="font-semibold block truncate">{l.codigo}</b>
+                    </div>
+                    <span className="text-[10.5px] text-[#adb5bd] font-mono shrink-0">{l.encerrada_em ? new Date(l.encerrada_em).toLocaleDateString("pt-br") : "—"}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-[12.5px] text-[#adb5bd]">Nenhuma loja fechada ainda.</p>
+            )}
           </div>
 
           <div className="card p-5">
