@@ -1,12 +1,21 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0a0a0c]" />}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
@@ -16,6 +25,12 @@ export default function LoginPage() {
   const [verSenha, setVerSenha] = useState(false);
   const [lembrar, setLembrar] = useState(true);
   const [modoRecuperar, setModoRecuperar] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("erro") === "link-expirado") {
+      setErro("Esse link de recuperação já expirou ou já foi usado. Pede um novo abaixo.");
+    }
+  }, [searchParams]);
 
   async function entrar(e: React.FormEvent) {
     e.preventDefault();
@@ -38,7 +53,7 @@ export default function LoginPage() {
     if (!email) { setErro("Digita seu e-mail primeiro."); return; }
     setLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/redefinir-senha`,
+      redirectTo: `${window.location.origin}/auth/callback?next=/redefinir-senha`,
     });
     setLoading(false);
     if (error) { setErro("Não foi possível enviar o link de recuperação."); return; }

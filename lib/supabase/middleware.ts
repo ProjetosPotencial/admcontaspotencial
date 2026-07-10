@@ -24,7 +24,7 @@ export async function updateSession(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
-  const isAuthPage = path.startsWith("/login") || path.startsWith("/redefinir-senha");
+  const isAuthPage = path.startsWith("/login") || path.startsWith("/redefinir-senha") || path.startsWith("/auth/callback");
   const isApiRoute = path.startsWith("/api/");
 
   if (!user && !isAuthPage && !isApiRoute) {
