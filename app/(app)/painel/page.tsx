@@ -35,7 +35,7 @@ export default async function PainelPage() {
     supabase.from("contas").select("id, tipo, status, origem, dia_vencimento").eq("situacao_cadastro", "aprovada"),
     supabase.from("lancamentos").select("conta_id, situacao, contas!inner(tipo, dia_vencimento)").eq("ano", ano).eq("mes", mes),
     supabase.from("lancamentos")
-      .select("id, valor, situacao, contas!inner ( tipo, dia_vencimento, fornecedor_nome, lojas ( codigo ) )")
+      .select("id, valor, situacao, contas!inner ( id, tipo, dia_vencimento, fornecedor_nome, lojas ( codigo ) )")
       .eq("ano", ano).eq("mes", mes).eq("situacao", "pendente"),
     supabase.from("lancamentos")
       .select("mes, valor, situacao, contas!inner ( fornecedor_nome )")

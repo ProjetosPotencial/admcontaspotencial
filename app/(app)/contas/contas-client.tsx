@@ -56,6 +56,17 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
   const [aberta, setAberta] = useState<Conta | null>(null);
   const [criando, setCriando] = useState(false);
 
+  // abre direto a conta específica quando a URL vem com ?conta=id (ex.: um
+  // clique em "atrasada" no Painel ou em Alertas) - sem isso, a pessoa cai
+  // numa lista de centenas de contas e precisa procurar a certa na mão.
+  useEffect(() => {
+    const contaId = params.get("conta");
+    if (contaId) {
+      const encontrada = contas.find((c) => c.id === contaId);
+      if (encontrada) setAberta(encontrada);
+    }
+  }, [params, contas]);
+
   const filtradas = useMemo(() => {
     return contas.filter((c) => {
       const t = fTipo === "todos" || c.tipo === fTipo;
@@ -207,6 +218,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
 
 function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) {
   const supabase = createClient();
+  const router = useRouter();
   const T = TIPOS[conta.tipo];
   const [lancs, setLancs] = useState<Lancamento[]>([]);
   const [login, setLogin] = useState<string | null>(null);
@@ -315,7 +327,10 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
     setLancando(false);
     setValorLancar("");
     setArquivoBoleto(null);
-    carregarLancamentos();
+    // a conta acabou de sair de "a lançar" e entrou na fila de aprovação -
+    // faz sentido a tela já te levar pra lá, em vez de deixar preso em Contas.
+    onClose();
+    router.push("/aprovacoes");
   }
 
   async function verBoleto(caminho: string) {

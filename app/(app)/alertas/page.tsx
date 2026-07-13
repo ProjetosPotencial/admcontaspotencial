@@ -13,7 +13,7 @@ export default async function AlertasPage() {
   const [{ data: lancMes }, { data: mapear }] = await Promise.all([
     supabase
       .from("lancamentos")
-      .select("id, situacao, contas!inner ( tipo, dia_vencimento, fornecedor_nome, lojas ( codigo ) )")
+      .select("id, situacao, contas!inner ( id, tipo, dia_vencimento, fornecedor_nome, lojas ( codigo ) )")
       .eq("ano", ano).eq("mes", mes)
       .in("situacao", ["pendente", "lancado"]),
     supabase
@@ -39,7 +39,7 @@ export default async function AlertasPage() {
           </h2>
           <div className="card divide-y divide-[#f1f3f5]">
             {atrasadas.slice(0, 20).map((l: any) => (
-              <Link key={l.id} href={`/contas?tipo=${l.contas.tipo}`} className="flex items-center gap-3 px-5 py-3 text-[13px] hover:bg-[#f8f9fa]">
+              <Link key={l.id} href={`/contas?conta=${l.contas.id}`} className="flex items-center gap-3 px-5 py-3 text-[13px] hover:bg-[#f8f9fa]">
                 <TipoIcon tipo={l.contas.tipo} size={15} color={TIPOS[l.contas.tipo]?.c} />
                 <b className="font-semibold">{l.contas.lojas?.codigo}</b>
                 <span className="text-[#6c757d]">{TIPOS[l.contas.tipo]?.n} · {l.contas.fornecedor_nome ?? "—"}</span>
@@ -56,7 +56,7 @@ export default async function AlertasPage() {
           </h2>
           <div className="card divide-y divide-[#f1f3f5]">
             {(mapear ?? []).slice(0, 20).map((c: any) => (
-              <Link key={c.id} href={`/contas?tipo=${c.tipo}`} className="flex items-center gap-3 px-5 py-3 text-[13px] hover:bg-[#f8f9fa]">
+              <Link key={c.id} href={`/contas?conta=${c.id}`} className="flex items-center gap-3 px-5 py-3 text-[13px] hover:bg-[#f8f9fa]">
                 <TipoIcon tipo={c.tipo} size={15} color={TIPOS[c.tipo]?.c} />
                 <b className="font-semibold">{c.lojas?.codigo}</b>
                 <span className="text-[#6c757d]">{TIPOS[c.tipo]?.n} · {c.fornecedor_nome ?? "—"}</span>
