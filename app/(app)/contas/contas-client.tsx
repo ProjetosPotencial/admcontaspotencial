@@ -233,13 +233,18 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
   const [valorLancar, setValorLancar] = useState("");
   const [arquivoBoleto, setArquivoBoleto] = useState<File | null>(null);
   const [enviarDrive, setEnviarDrive] = useState(false);
+  const [codigoBarras, setCodigoBarras] = useState("");
+  const [extraindo, setExtraindo] = useState(false);
+  const [avisoExtracao, setAvisoExtracao] = useState<string | null>(null);
   const [salvandoLancamento, setSalvandoLancamento] = useState(false);
   const [erroLancamento, setErroLancamento] = useState<string | null>(null);
 
   const { ano: ANO_ATUAL, mes: MES_ATUAL } = obterPeriodoAtual();
 
+  const [aprovadorNome, setAprovadorNome] = useState<string | null>(null);
+
   function carregarLancamentos() {
-    supabase.from("lancamentos").select("id, ano, mes, valor, situacao, comprovante_url, comprovante_drive_url")
+    supabase.from("lancamentos").select("id, ano, mes, valor, situacao, comprovante_url, comprovante_drive_url, aprovado_por, aprovado_em")
       .eq("conta_id", conta.id).eq("ano", ANO_ATUAL)
       .then(({ data }) => setLancs((data ?? []) as Lancamento[]));
   }
@@ -251,6 +256,13 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
   }, [conta.id]);
 
   const lancamentoAtual = lancs.find((l) => l.mes === MES_ATUAL);
+
+  useEffect(() => {
+    const idAprovador = (lancamentoAtual as any)?.aprovado_por;
+    if (!idAprovador) { setAprovadorNome(null); return; }
+    supabase.from("perfis").select("nome").eq("id", idAprovador).maybeSingle()
+      .then(({ data }) => setAprovadorNome(data?.nome ?? null));
+  }, [(lancamentoAtual as any)?.aprovado_por]);
 
   async function revelar() {
     setRevelando(true);
@@ -274,6 +286,32 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
     setSenha(null);
     setEditandoCred(false);
     setAviso("Credencial atualizada.");
+  }
+
+  async function selecionarArquivo(arquivo: File | null) {
+    setArquivoBoleto(arquivo);
+    setAvisoExtracao(null);
+    if (!arquivo) return;
+
+    setExtraindo(true);
+    try {
+      const form = new FormData();
+      form.append("arquivo", arquivo);
+      const resp = await fetch("/api/extrair-boleto", { method: "POST", body: form });
+      const json = await resp.json();
+      if (resp.ok) {
+        // só preenche sozinho se a pessoa ainda não tinha digitado nada -
+        // nunca sobrescreve um valor que já foi digitado na mão.
+        if (json.valor != null && !valorLancar.trim()) setValorLancar(String(json.valor).replace(".", ","));
+        if (json.codigo_barras) setCodigoBarras(json.codigo_barras);
+        if (json.valor == null && !json.codigo_barras) setAvisoExtracao("Não consegui ler o valor nem o código de barras automaticamente - confere e preenche na mão.");
+      } else {
+        setAvisoExtracao("Não foi possível ler o boleto automaticamente. Confere e preenche na mão.");
+      }
+    } catch {
+      setAvisoExtracao("Não foi possível ler o boleto automaticamente. Confere e preenche na mão.");
+    }
+    setExtraindo(false);
   }
 
   async function lancarComBoleto() {
@@ -319,6 +357,7 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
       valor: Number(valorLancar.replace(",", ".")),
       situacao: "lancado", comprovante_url: caminhoBoleto,
       lancado_em: new Date().toISOString(),
+      codigo_barras: codigoBarras.trim() || null,
     };
     if (linkDrive) payload.comprovante_drive_url = linkDrive;
     const { error } = await supabase.from("lancamentos").upsert(payload, { onConflict: "conta_id,ano,mes" });
@@ -453,6 +492,12 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
                     )}
                   </div>
                 </div>
+                {(lancamentoAtual.situacao === "aprovado" || lancamentoAtual.situacao === "pago" || lancamentoAtual.situacao === "contestado") && (aprovadorNome || (lancamentoAtual as any).aprovado_em) && (
+                  <div className="mt-3 pt-3 border-t border-linha2 text-[11.5px] text-[#6c757d]">
+                    {lancamentoAtual.situacao === "contestado" ? "Recusado" : "Aprovado"} por <b className="text-[#1a1a1a]">{aprovadorNome ?? "—"}</b>
+                    {(lancamentoAtual as any).aprovado_em && ` em ${new Date((lancamentoAtual as any).aprovado_em).toLocaleString("pt-br", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}`}
+                  </div>
+                )}
                 <button onClick={() => { setValorLancar(String(lancamentoAtual.valor ?? "")); setLancando(true); }}
                   className="w-full mt-3 pt-3 border-t border-linha2 text-[12px] font-semibold text-[#6c757d] hover:text-amb transition text-center">
                   Boleto errado? Substituir
@@ -472,8 +517,28 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
                 </label>
                 <label className="block mb-3">
                   <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Boleto (PDF ou imagem)</div>
-                  <input type="file" accept=".pdf,image/*" onChange={(e) => setArquivoBoleto(e.target.files?.[0] ?? null)}
+                  <input type="file" accept=".pdf,image/*" onChange={(e) => selecionarArquivo(e.target.files?.[0] ?? null)}
                     className="w-full text-[12.5px] file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-[#f1f3f5] file:text-[12px] file:font-medium" />
+                </label>
+                {extraindo && (
+                  <div className="text-[11.5px] text-info bg-info-bg rounded-md px-3 py-2 mb-3 flex items-center gap-2">
+                    <svg className="animate-spin" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 3a7 7 0 107 7" strokeLinecap="round" /></svg>
+                    Lendo o boleto automaticamente...
+                  </div>
+                )}
+                {avisoExtracao && <div className="text-[11.5px] text-[#adb5bd] mb-3">{avisoExtracao}</div>}
+                <label className="block mb-3">
+                  <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Código de barras (linha digitável)</div>
+                  <div className="flex gap-1.5">
+                    <input value={codigoBarras} onChange={(e) => setCodigoBarras(e.target.value)} placeholder="Preenche sozinho se conseguir ler do boleto"
+                      className="input-padrao w-full font-mono text-[11.5px]" />
+                    {codigoBarras && (
+                      <button type="button" onClick={() => navigator.clipboard.writeText(codigoBarras)}
+                        className="shrink-0 px-3 rounded-md border border-linha text-[11px] font-semibold text-[#6c757d] hover:bg-off">
+                        Copiar
+                      </button>
+                    )}
+                  </div>
                 </label>
                 <label className="flex items-center gap-2 mb-3">
                   <input type="checkbox" checked={enviarDrive} onChange={(e) => setEnviarDrive(e.target.checked)}

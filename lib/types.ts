@@ -50,4 +50,7 @@ export type Lancamento = {
   situacao: string;
   comprovante_url?: string | null;
   comprovante_drive_url?: string | null;
+  codigo_barras?: string | null;
+  aprovado_por?: string | null;
+  aprovado_em?: string | null;
 };
