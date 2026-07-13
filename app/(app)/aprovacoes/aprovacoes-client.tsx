@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TIPOS } from "@/lib/types";
 import TipoIcon from "@/components/tipo-icon";
@@ -24,6 +25,7 @@ export default function AprovacoesClient({ itens, resumoMes }: {
   resumoMes: { aprovado: { qtd: number; total: number }; contestado: { qtd: number; total: number } };
 }) {
   const supabase = createClient();
+  const router = useRouter();
   const [fila, setFila] = useState<Item[]>(itens);
   const [toast, setToast] = useState<string | null>(null);
   const [decidindo, setDecidindo] = useState<string | null>(null);
@@ -42,10 +44,14 @@ export default function AprovacoesClient({ itens, resumoMes }: {
       })
       .eq("id", item.id);
     setDecidindo(null);
-    if (error) { setToast("Sem permissão para decidir."); return; }
+    if (error) { setToast(`Não foi possível decidir: ${error.message}`); return; }
     setFila((f) => f.filter((x) => x.id !== item.id));
     setToast(`${aprovar ? "Aprovado" : "Recusado"}: ${item.contas.lojas?.codigo}.`);
     setTimeout(() => setToast(null), 2600);
+    // sem isso, o Next.js pode continuar mostrando por até 30s a versão
+    // antiga da lista (de antes da decisão) se a pessoa navegar pra outra
+    // tela e voltar - o item "reaparecia" mesmo já decidido de verdade.
+    router.refresh();
   }
 
   async function verBoleto(caminho: string) {
@@ -256,7 +262,7 @@ function KpiMini({ label, value, sub, cor, bg }: { label: string; value: string 
         <span className="w-2.5 h-2.5 rounded-full" style={{ background: cor }} />
       </div>
       <div className="text-[11.5px] text-[#6c757d] font-medium">{label}</div>
-      <div className="text-[19px] font-bold text-[#1a1a1a] leading-none mt-1">{value}</div>
+      <div className="text-[15px] sm:text-[19px] font-bold text-[#1a1a1a] leading-none mt-1 truncate">{value}</div>
       {sub && <div className="text-[10.5px] text-[#adb5bd] mt-1.5">{sub}</div>}
     </div>
   );

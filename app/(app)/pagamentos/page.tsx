@@ -114,7 +114,7 @@ function KpiMini({ label, value, sub, cor, bg }: { label: string; value: string 
         <span className="w-2.5 h-2.5 rounded-full" style={{ background: cor }} />
       </div>
       <div className="text-[11.5px] text-[#6c757d] font-medium">{label}</div>
-      <div className="text-[19px] font-bold text-[#1a1a1a] leading-none mt-1">{value}</div>
+      <div className="text-[15px] sm:text-[19px] font-bold text-[#1a1a1a] leading-none mt-1 truncate">{value}</div>
       {sub && <div className="text-[10.5px] text-[#adb5bd] mt-1.5">{sub}</div>}
     </div>
   );

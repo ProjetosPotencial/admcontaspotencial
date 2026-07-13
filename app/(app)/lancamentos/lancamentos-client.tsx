@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { TIPOS, SITUACAO } from "@/lib/types";
 import TipoIcon from "@/components/tipo-icon";
@@ -10,6 +10,7 @@ import { useDebounce } from "@/lib/hooks/useDebounce";
 type Item = {
   id: string; ano: number; mes: number; valor: number | null; situacao: string;
   comprovante_url?: string | null; comprovante_drive_url?: string | null;
+  codigo_barras?: string | null; aprovado_por?: string | null; aprovado_em?: string | null;
   contas: { tipo: string; dia_vencimento: number | null; fornecedor_nome: string | null; lojas: { codigo: string; coban: string } | null };
 };
 
@@ -202,6 +203,13 @@ function DetalheDrawer({ item, onClose }: { item: Item; onClose: () => void }) {
   const T = TIPOS[item.contas.tipo];
   const s = SITUACAO[item.situacao] ?? { label: item.situacao, cls: "bg-[#f5f5f5] text-[#999]" };
   const [aviso, setAviso] = useState<string | null>(null);
+  const [aprovadorNome, setAprovadorNome] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!item.aprovado_por) { setAprovadorNome(null); return; }
+    supabase.from("perfis").select("nome").eq("id", item.aprovado_por).maybeSingle()
+      .then(({ data }) => setAprovadorNome(data?.nome ?? null));
+  }, [item.aprovado_por]);
 
   async function verBoleto() {
     if (!item.comprovante_url) return;
@@ -236,6 +244,13 @@ function DetalheDrawer({ item, onClose }: { item: Item; onClose: () => void }) {
             <div><div className="text-[11px] text-[#999] font-medium mb-0.5">Fornecedor</div><div className="text-[13px] font-semibold">{item.contas.fornecedor_nome ?? "—"}</div></div>
             <div><div className="text-[11px] text-[#999] font-medium mb-0.5">Vencimento</div><div className="text-[13px] font-semibold font-mono">{item.contas.dia_vencimento ? `dia ${item.contas.dia_vencimento}` : "—"}</div></div>
           </div>
+
+          {(item.situacao === "aprovado" || item.situacao === "pago" || item.situacao === "contestado") && (aprovadorNome || item.aprovado_em) && (
+            <div className="text-[12px] text-[#666] bg-[#f8f9fa] rounded-md px-3 py-2.5">
+              {item.situacao === "contestado" ? "Recusado" : "Aprovado"} por <b className="text-[#1a1a1a]">{aprovadorNome ?? "—"}</b>
+              {item.aprovado_em && ` em ${new Date(item.aprovado_em).toLocaleString("pt-br", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}`}
+            </div>
+          )}
 
           {(item.comprovante_url || item.comprovante_drive_url) && (
             <div className="pt-4 border-t border-linha2 space-y-2">
