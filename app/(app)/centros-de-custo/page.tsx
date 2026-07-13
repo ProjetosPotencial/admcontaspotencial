@@ -5,6 +5,8 @@ import { obterPeriodoAtual } from "@/lib/date-utils";
 
 export const dynamic = "force-dynamic";
 
+const CORES_PRACA: Record<string, string> = { MG: "#1976d2", SP: "#2E7D57", MS: "#c9922a", QUIOSQUE: "#6B5B95", CORP: "#B23B3B" };
+
 export default async function CentrosDeCustoPage() {
   const supabase = createClient();
   const { ano } = obterPeriodoAtual();
@@ -27,43 +29,102 @@ export default async function CentrosDeCustoPage() {
 
   const ranking = Object.values(porLoja).sort((a, b) => b.total - a.total).slice(0, 40);
   const totalGeral = ranking.reduce((s, x) => s + x.total, 0);
+  const totalLojas = Object.keys(porLoja).length;
+  const mediaPorLoja = totalLojas > 0 ? totalGeral / totalLojas : 0;
+  const acimaDaMedia = Object.values(porLoja).filter((l) => l.total > mediaPorLoja).length;
+
+  const porPraca: Record<string, number> = {};
+  Object.values(porLoja).forEach((l) => { porPraca[l.coban] = (porPraca[l.coban] ?? 0) + l.total; });
+  const totalPraca = Object.values(porPraca).reduce((s, v) => s + v, 0) || 1;
 
   return (
     <>
       <div className="px-4 sm:px-8 py-6 sm:py-8">
         <h1 className="text-[32px] font-bold text-[#1a1a1a] leading-none">Centros de custo</h1>
-        <p className="text-[14px] text-[#6c757d] mt-2.5">Gasto acumulado de {ano} por loja, com base nos lançamentos reais</p>
+        <p className="text-[14px] text-[#6c757d] mt-2.5">Gasto acumulado de {ano} por loja, com base nos lançamentos reais.</p>
       </div>
-      <div className="px-4 sm:px-8 pb-6 sm:pb-8 max-w-[900px]">
-        <div className="card overflow-hidden">
-          <div className="overflow-x-auto"><table className="w-full border-collapse min-w-[720px]">
-            <thead>
-              <tr className="bg-[#f1f3f5] h-12">
-                <th className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">Loja</th>
-                <th className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">Lançamentos</th>
-                <th className="text-right text-[12px] font-semibold text-[#1a1a1a] px-4">Total {ano}</th>
-                <th className="text-right text-[12px] font-semibold text-[#1a1a1a] px-4">% do total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ranking.map((r, i) => (
-                <tr key={i} className="h-12 border-b border-[#f1f3f5] last:border-0 hover:bg-[#f8f9fa]">
-                  <td className="px-4 text-[13px] font-medium">
-                    <Link href="/lojas" className="hover:text-info">{r.codigo}</Link>
-                    <small className="block text-[#adb5bd] text-[11px] font-mono">{r.coban}</small>
-                  </td>
-                  <td className="px-4 text-[13px] font-mono text-[#6c757d]">{r.qtd}</td>
-                  <td className="px-4 text-[13px] font-mono font-semibold text-right">{money(r.total)}</td>
-                  <td className="px-4 text-[12px] text-[#adb5bd] text-right">{totalGeral ? ((r.total / totalGeral) * 100).toFixed(1) : "0"}%</td>
-                </tr>
-              ))}
-              {ranking.length === 0 && (
-                <tr><td colSpan={4} className="text-center py-12 text-[#adb5bd]">Sem lançamentos com valor em {ano}.</td></tr>
-              )}
-            </tbody>
-          </table></div>
+      <div className="px-4 sm:px-8 pb-6 sm:pb-8 max-w-[1400px]">
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-6">
+          <div className="min-w-0">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <KpiMini label={`Total gasto (${ano})`} value={money(totalGeral)} cor="#1976d2" bg="#e3f2fd" />
+              <KpiMini label="Lojas com gasto" value={totalLojas} cor="#2E7D57" bg="#E4F1EA" />
+              <KpiMini label="Média por loja" value={money(mediaPorLoja)} cor="#c9922a" bg="#fdf3e3" />
+              <KpiMini label="Lojas acima da média" value={acimaDaMedia} sub={totalLojas ? `${Math.round((acimaDaMedia / totalLojas) * 100)}% do total` : undefined} cor="#B23B3B" bg="#F7E4E2" />
+            </div>
+
+            <div className="card overflow-hidden">
+              <div className="overflow-x-auto"><table className="w-full border-collapse min-w-[720px]">
+                <thead>
+                  <tr className="bg-[#f1f3f5] h-12">
+                    <th className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">Loja</th>
+                    <th className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">Lançamentos</th>
+                    <th className="text-right text-[12px] font-semibold text-[#1a1a1a] px-4">Total {ano}</th>
+                    <th className="text-right text-[12px] font-semibold text-[#1a1a1a] px-4">% do total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ranking.map((r, i) => (
+                    <tr key={i} className="h-12 border-b border-[#f1f3f5] last:border-0 hover:bg-[#f8f9fa]">
+                      <td className="px-4 text-[13px] font-medium">
+                        <Link href="/lojas" className="hover:text-info">{r.codigo}</Link>
+                        <small className="block text-[#adb5bd] text-[11px] font-mono">{r.coban}</small>
+                      </td>
+                      <td className="px-4 text-[13px] font-mono text-[#6c757d]">{r.qtd}</td>
+                      <td className="px-4 text-[13px] font-mono font-semibold text-right">{money(r.total)}</td>
+                      <td className="px-4 text-[12px] text-[#adb5bd] text-right">{totalGeral ? ((r.total / totalGeral) * 100).toFixed(1) : "0"}%</td>
+                    </tr>
+                  ))}
+                  {ranking.length === 0 && (
+                    <tr><td colSpan={4} className="text-center py-12 text-[#adb5bd]">Sem lançamentos com valor em {ano}.</td></tr>
+                  )}
+                </tbody>
+              </table></div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="card p-5">
+              <h3 className="text-[14px] font-bold text-[#1a1a1a] mb-3.5">Distribuição por praça</h3>
+              <div className="space-y-2.5">
+                {Object.entries(porPraca).sort((a, b) => b[1] - a[1]).map(([praca, valor]) => (
+                  <div key={praca} className="flex items-center gap-2 text-[12.5px]">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: CORES_PRACA[praca] ?? "#adb5bd" }} />
+                    <span className="text-[#1a1a1a]">{praca}</span>
+                    <span className="ml-auto font-mono font-semibold">{money(valor)}</span>
+                    <span className="text-[10.5px] text-[#adb5bd] w-9 text-right">{Math.round((valor / totalPraca) * 100)}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="card p-5">
+              <h3 className="text-[14px] font-bold text-[#1a1a1a] mb-3.5">Top 5 maiores gastos</h3>
+              <div className="space-y-3">
+                {ranking.slice(0, 5).map((r, i) => (
+                  <div key={i} className="flex items-center justify-between text-[12.5px]">
+                    <span className="font-semibold text-[#1a1a1a] truncate max-w-[150px]">{r.codigo}</span>
+                    <span className="font-mono font-semibold shrink-0">{money(r.total)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </>
+  );
+}
+
+function KpiMini({ label, value, sub, cor, bg }: { label: string; value: string | number; sub?: string; cor: string; bg: string }) {
+  return (
+    <div className="bg-white border border-linha rounded-xl p-4 shadow-leve">
+      <div className="w-9 h-9 rounded-full grid place-items-center mb-2.5" style={{ background: bg }}>
+        <span className="w-2.5 h-2.5 rounded-full" style={{ background: cor }} />
+      </div>
+      <div className="text-[11.5px] text-[#6c757d] font-medium">{label}</div>
+      <div className="text-[19px] font-bold text-[#1a1a1a] leading-none mt-1">{value}</div>
+      {sub && <div className="text-[10.5px] text-[#adb5bd] mt-1.5">{sub}</div>}
+    </div>
   );
 }

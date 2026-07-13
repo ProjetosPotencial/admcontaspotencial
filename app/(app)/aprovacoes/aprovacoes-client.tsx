@@ -19,12 +19,16 @@ type Item = {
   };
 };
 
-export default function AprovacoesClient({ itens }: { itens: Item[] }) {
+export default function AprovacoesClient({ itens, resumoMes }: {
+  itens: Item[];
+  resumoMes: { aprovado: { qtd: number; total: number }; contestado: { qtd: number; total: number } };
+}) {
   const supabase = createClient();
   const [fila, setFila] = useState<Item[]>(itens);
   const [toast, setToast] = useState<string | null>(null);
   const [decidindo, setDecidindo] = useState<string | null>(null);
   const total = itens.length;
+  const totalPendenteValor = itens.reduce((s, i) => s + Number(i.valor ?? 0), 0);
 
   async function decidir(item: Item, aprovar: boolean) {
     setDecidindo(item.id);
@@ -83,7 +87,16 @@ export default function AprovacoesClient({ itens }: { itens: Item[] }) {
         </p>
       </div>
 
-      <div className="px-4 sm:px-8 py-4 sm:py-6 max-w-[1400px]">
+      <div className="px-4 sm:px-8 py-4 sm:py-6 max-w-[1500px]">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <KpiMini label="Pendentes" value={fila.length} sub={money(totalPendenteValor)} cor="#6B5B95" bg="#EDE7F6" />
+          <KpiMini label="Aprovados (mês)" value={resumoMes.aprovado.qtd} sub={money(resumoMes.aprovado.total)} cor="#2E7D57" bg="#E4F1EA" />
+          <KpiMini label="Recusados (mês)" value={resumoMes.contestado.qtd} sub={money(resumoMes.contestado.total)} cor="#B23B3B" bg="#F7E4E2" />
+          <KpiMini label="Total do mês" value={resumoMes.aprovado.qtd + resumoMes.contestado.qtd + fila.length} sub={money(resumoMes.aprovado.total + resumoMes.contestado.total + totalPendenteValor)} cor="#1976d2" bg="#e3f2fd" />
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-6">
+        <div className="min-w-0">
         {fila.length === 0 ? (
           <div className="card">
             <div className="text-center py-16 text-[#adb5bd]">
@@ -190,6 +203,41 @@ export default function AprovacoesClient({ itens }: { itens: Item[] }) {
             Exibindo {fila.length} de {total} aprovações pendentes
           </div>
         )}
+        </div>
+
+        <div className="space-y-6">
+          <div className="card p-5">
+            <h3 className="text-[14px] font-bold text-[#1a1a1a] mb-1">Resumo do mês</h3>
+            <p className="text-[11.5px] text-[#6c757d] mb-4">Situação das aprovações</p>
+            <div className="flex items-center gap-4">
+              <DonutTriplo pendente={totalPendenteValor} aprovado={resumoMes.aprovado.total} recusado={resumoMes.contestado.total} />
+              <div className="flex-1 space-y-1.5 text-[12px]">
+                <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-ok" />Aprovado <b className="ml-auto font-mono">{money(resumoMes.aprovado.total)}</b></div>
+                <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ background: "#FFC107" }} />Pendente <b className="ml-auto font-mono">{money(totalPendenteValor)}</b></div>
+                <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-alerr" />Recusado <b className="ml-auto font-mono">{money(resumoMes.contestado.total)}</b></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card p-5">
+            <h3 className="text-[14px] font-bold text-[#1a1a1a] mb-3.5">Pendentes por empresa</h3>
+            <div className="space-y-2.5">
+              {porEmpresa.map(([empresa, porLoja]) => {
+                const todos = Array.from(porLoja.values()).flat();
+                const total = todos.reduce((s, i) => s + Number(i.valor ?? 0), 0);
+                return (
+                  <div key={empresa} className="flex items-center gap-2 text-[12.5px]">
+                    <span className="text-[#1a1a1a] truncate max-w-[130px]">{empresa}</span>
+                    <span className="ml-auto font-mono font-semibold">{money(total)}</span>
+                    <span className="badge bg-[#f1f3f5] text-[#6c757d] shrink-0">{todos.length}</span>
+                  </div>
+                );
+              })}
+              {porEmpresa.length === 0 && <p className="text-[12.5px] text-[#adb5bd]">Nada pendente agora.</p>}
+            </div>
+          </div>
+        </div>
+        </div>
       </div>
 
       {toast && (
@@ -198,5 +246,40 @@ export default function AprovacoesClient({ itens }: { itens: Item[] }) {
         </div>
       )}
     </>
+  );
+}
+
+function KpiMini({ label, value, sub, cor, bg }: { label: string; value: string | number; sub?: string; cor: string; bg: string }) {
+  return (
+    <div className="bg-white border border-linha rounded-xl p-4 shadow-leve">
+      <div className="w-9 h-9 rounded-full grid place-items-center mb-2.5" style={{ background: bg }}>
+        <span className="w-2.5 h-2.5 rounded-full" style={{ background: cor }} />
+      </div>
+      <div className="text-[11.5px] text-[#6c757d] font-medium">{label}</div>
+      <div className="text-[19px] font-bold text-[#1a1a1a] leading-none mt-1">{value}</div>
+      {sub && <div className="text-[10.5px] text-[#adb5bd] mt-1.5">{sub}</div>}
+    </div>
+  );
+}
+
+function DonutTriplo({ pendente, aprovado, recusado }: { pendente: number; aprovado: number; recusado: number }) {
+  const raio = 28, circ = 2 * Math.PI * raio;
+  const total = pendente + aprovado + recusado || 1;
+  const partes = [{ v: aprovado, cor: "#2E7D57" }, { v: pendente, cor: "#FFC107" }, { v: recusado, cor: "#f44336" }];
+  let acumulado = 0;
+  return (
+    <svg width="72" height="72" viewBox="0 0 72 72" className="shrink-0">
+      <circle cx="36" cy="36" r={raio} fill="none" stroke="#f1f3f5" strokeWidth="9" />
+      {partes.map((p, i) => {
+        const pct = p.v / total;
+        const offset = circ * (1 - pct);
+        const rot = acumulado * 360 - 90;
+        acumulado += pct;
+        return pct > 0 ? (
+          <circle key={i} cx="36" cy="36" r={raio} fill="none" stroke={p.cor} strokeWidth="9"
+            strokeDasharray={circ} strokeDashoffset={offset} transform={`rotate(${rot} 36 36)`} />
+        ) : null;
+      })}
+    </svg>
   );
 }
