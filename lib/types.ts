@@ -39,7 +39,7 @@ export type Conta = {
   rateio_divisor: number | null;
   observacoes: string | null;
   status: string;
-  lojas: { codigo: string; coban: string } | null;
+  lojas: { codigo: string; coban: string; empresas: { nome: string } | null } | null;
 };
 
 export type Lancamento = {

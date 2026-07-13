@@ -290,6 +290,7 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
         form.append("dia", String(new Date().getDate()).padStart(2, "0"));
         form.append("loja", conta.lojas?.codigo ?? "loja");
         form.append("tipo", T?.n ?? conta.tipo);
+        form.append("empresa", conta.lojas?.empresas?.nome ?? "");
         try {
           const resp = await fetch("/api/upload-drive", { method: "POST", body: form });
           const json = await resp.json();

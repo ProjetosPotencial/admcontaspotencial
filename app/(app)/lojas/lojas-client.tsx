@@ -17,6 +17,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function LojasClient({ lojas: lojasIniciais, statusInicial, empresas }: { lojas: Loja[]; statusInicial?: string; empresas: { id: string; nome: string }[] }) {
+  const supabase = createClient();
   const [lojas, setLojas] = useState(lojasIniciais);
   const [fCoban, setFCoban] = useState("todos");
   const [fStatus, setFStatus] = useState(statusInicial ?? "todos");
@@ -26,6 +27,9 @@ export default function LojasClient({ lojas: lojasIniciais, statusInicial, empre
   const [itensPorPagina, setItensPorPagina] = useState(25);
   const [aberta, setAberta] = useState<Loja | null>(null);
   const [criando, setCriando] = useState(false);
+  const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
+  const [empresaEmLote, setEmpresaEmLote] = useState("");
+  const [aplicandoLote, setAplicandoLote] = useState(false);
 
   const filtradas = useMemo(() => {
     return lojas.filter((l) => {
@@ -49,6 +53,18 @@ export default function LojasClient({ lojas: lojasIniciais, statusInicial, empre
   function atualizarNaLista(loja: Loja) {
     setLojas((ls) => (ls.some((l) => l.id === loja.id) ? ls.map((l) => (l.id === loja.id ? loja : l)) : [loja, ...ls]));
     setAberta(loja);
+  }
+
+  async function aplicarEmpresaEmLote() {
+    if (!empresaEmLote || selecionadas.size === 0) return;
+    setAplicandoLote(true);
+    const ids = Array.from(selecionadas);
+    const { error } = await supabase.from("lojas").update({ empresa_id: empresaEmLote }).in("id", ids);
+    setAplicandoLote(false);
+    if (error) return;
+    setLojas((ls) => ls.map((l) => (selecionadas.has(l.id) ? { ...l, empresa_id: empresaEmLote } : l)));
+    setSelecionadas(new Set());
+    setEmpresaEmLote("");
   }
 
   return (
@@ -75,10 +91,40 @@ export default function LojasClient({ lojas: lojasIniciais, statusInicial, empre
       </div>
       <div className="text-[12px] text-txt-3 mb-3">{filtradas.length} de {lojas.length} lojas</div>
 
+      {selecionadas.size > 0 && (
+        <div className="flex items-center gap-2.5 mb-3 bg-amb-bg border border-amarelo/40 rounded-lg px-4 py-2.5 flex-wrap">
+          <span className="text-[12.5px] font-semibold text-[#1a1a1a]">{selecionadas.size} loja{selecionadas.size > 1 ? "s" : ""} selecionada{selecionadas.size > 1 ? "s" : ""}</span>
+          <select value={empresaEmLote} onChange={(e) => setEmpresaEmLote(e.target.value)}
+            className="border border-linha bg-white px-3 py-1.5 rounded-md text-[12.5px]">
+            <option value="">Escolher empresa...</option>
+            {empresas.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
+          </select>
+          <button onClick={aplicarEmpresaEmLote} disabled={!empresaEmLote || aplicandoLote}
+            className="btn-primario disabled:opacity-50">
+            {aplicandoLote ? "Aplicando..." : "Atribuir empresa"}
+          </button>
+          <button onClick={() => setSelecionadas(new Set())} className="text-[12.5px] text-txt-2 hover:text-txt ml-auto">
+            Limpar seleção
+          </button>
+        </div>
+      )}
+
       <div className="card overflow-hidden">
         <div className="overflow-x-auto"><table className="w-full border-collapse min-w-[720px]">
           <thead>
             <tr>
+              <th className="px-4 py-3 border-b border-linha bg-off w-10">
+                <input type="checkbox"
+                  checked={visiveis.length > 0 && visiveis.every((l) => selecionadas.has(l.id))}
+                  onChange={(e) => {
+                    setSelecionadas((s) => {
+                      const novo = new Set(s);
+                      visiveis.forEach((l) => e.target.checked ? novo.add(l.id) : novo.delete(l.id));
+                      return novo;
+                    });
+                  }}
+                  className="w-4 h-4" />
+              </th>
               {["Loja", "Praça", "Setor", "Empresa", "Cidade/UF", "Status"].map((h) => (
                 <th key={h} className="text-left text-[10.5px] tracking-wide uppercase text-txt-3 font-semibold px-4 py-3 border-b border-linha bg-off">{h}</th>
               ))}
@@ -86,17 +132,28 @@ export default function LojasClient({ lojas: lojasIniciais, statusInicial, empre
           </thead>
           <tbody>
             {visiveis.map((l) => (
-              <tr key={l.id} onClick={() => setAberta(l)} className="cursor-pointer hover:bg-[#FBFAF7] transition">
-                <td className="px-4 py-3 border-b border-linha2 text-[13px]"><b className="font-semibold">{l.codigo}</b></td>
-                <td className="px-4 py-3 border-b border-linha2 text-[13px] font-mono">{l.coban}</td>
-                <td className="px-4 py-3 border-b border-linha2 text-[13px]">{l.setor ?? "—"}</td>
-                <td className="px-4 py-3 border-b border-linha2 text-[13px]">{l.empresa ?? "—"}</td>
-                <td className="px-4 py-3 border-b border-linha2 text-[13px]">{l.cidade ? `${l.cidade}${l.uf ? "/" + l.uf : ""}` : "—"}</td>
-                <td className="px-4 py-3 border-b border-linha2 text-[13px]"><StatusBadge status={l.status} /></td>
+              <tr key={l.id} className="hover:bg-[#FBFAF7] transition">
+                <td className="px-4 py-3 border-b border-linha2" onClick={(e) => e.stopPropagation()}>
+                  <input type="checkbox" checked={selecionadas.has(l.id)}
+                    onChange={(e) => {
+                      setSelecionadas((s) => {
+                        const novo = new Set(s);
+                        e.target.checked ? novo.add(l.id) : novo.delete(l.id);
+                        return novo;
+                      });
+                    }}
+                    className="w-4 h-4" />
+                </td>
+                <td onClick={() => setAberta(l)} className="cursor-pointer px-4 py-3 border-b border-linha2 text-[13px]"><b className="font-semibold">{l.codigo}</b></td>
+                <td onClick={() => setAberta(l)} className="cursor-pointer px-4 py-3 border-b border-linha2 text-[13px] font-mono">{l.coban}</td>
+                <td onClick={() => setAberta(l)} className="cursor-pointer px-4 py-3 border-b border-linha2 text-[13px]">{l.setor ?? "—"}</td>
+                <td onClick={() => setAberta(l)} className="cursor-pointer px-4 py-3 border-b border-linha2 text-[13px]">{empresaNomePorId(l.empresa_id, empresas) ?? l.empresa ?? "—"}</td>
+                <td onClick={() => setAberta(l)} className="cursor-pointer px-4 py-3 border-b border-linha2 text-[13px]">{l.cidade ? `${l.cidade}${l.uf ? "/" + l.uf : ""}` : "—"}</td>
+                <td onClick={() => setAberta(l)} className="cursor-pointer px-4 py-3 border-b border-linha2 text-[13px]"><StatusBadge status={l.status} /></td>
               </tr>
             ))}
             {filtradas.length === 0 && (
-              <tr><td colSpan={6} className="text-center py-12 text-txt-3">Nenhuma loja com esses filtros.</td></tr>
+              <tr><td colSpan={7} className="text-center py-12 text-txt-3">Nenhuma loja com esses filtros.</td></tr>
             )}
           </tbody>
         </table></div>
@@ -616,4 +673,9 @@ function LabeledInput({ label, value, onChange, mono, full, placeholder }: {
         className={`w-full border border-linha rounded-[8px] px-2.5 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-amarelo ${mono ? "font-mono" : ""}`} />
     </label>
   );
+}
+
+function empresaNomePorId(id: string | null | undefined, empresas: { id: string; nome: string }[]): string | null {
+  if (!id) return null;
+  return empresas.find((e) => e.id === id)?.nome ?? null;
 }

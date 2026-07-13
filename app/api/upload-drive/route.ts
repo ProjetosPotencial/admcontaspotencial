@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
     const dia = form.get("dia") as string;
     const loja = form.get("loja") as string;
     const tipo = form.get("tipo") as string;
+    const empresa = form.get("empresa") as string | null;
 
     if (!arquivo || !ano || !mes || !loja || !tipo) {
       return NextResponse.json({ error: "Dados incompletos." }, { status: 400 });
@@ -37,6 +38,7 @@ export async function POST(req: NextRequest) {
       dia: dia || "01",
       loja,
       tipo,
+      empresa,
     });
 
     return NextResponse.json(resultado);
