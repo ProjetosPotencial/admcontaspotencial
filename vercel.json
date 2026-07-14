@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/importar-caixa-entrada",
-      "schedule": "0 12,18 * * 1-5"
+      "schedule": "0 12 * * 1-5"
     }
   ]
 }
