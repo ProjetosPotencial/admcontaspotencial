@@ -1,12 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
-import { obterPeriodoAtual, formatarPeriodo } from "@/lib/date-utils";
+import { formatarPeriodo } from "@/lib/date-utils";
+import { obterPeriodoSelecionado } from "@/lib/periodo";
 import RelatoriosClient from "./relatorios-client";
 
 export const dynamic = "force-dynamic";
 
 export default async function RelatoriosPage() {
   const supabase = createClient();
-  const { ano } = obterPeriodoAtual();
+  const { ano } = obterPeriodoSelecionado();
 
   const [{ data: lancamentos }, { data: centrosCusto }] = await Promise.all([
     supabase

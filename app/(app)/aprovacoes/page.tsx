@@ -1,12 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import AprovacoesClient from "./aprovacoes-client";
-import { obterPeriodoAtual } from "@/lib/date-utils";
+import { obterPeriodoSelecionado } from "@/lib/periodo";
 
 export const dynamic = "force-dynamic";
 
 export default async function AprovacoesPage() {
   const supabase = createClient();
-  const { ano, mes } = obterPeriodoAtual();
+  const { ano, mes } = obterPeriodoSelecionado();
 
   const [{ data }, { data: resumoRaw }] = await Promise.all([
     supabase

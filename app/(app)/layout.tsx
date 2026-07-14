@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getMenuParaPapel } from "@/lib/menu-cache";
+import { obterPeriodoSelecionado } from "@/lib/periodo";
 import Sidebar from "@/components/sidebar";
 import TopNav from "@/components/topnav";
 import AppShell from "@/components/app-shell";
@@ -16,12 +17,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!session) redirect("/login");
   const user = session.user;
 
-  // o papel do usuário precisa ser sempre fresco (se um admin rebaixar
-  // alguém, isso tem que valer na hora, não pode ficar em cache). Já o
-  // CONTEÚDO do menu (estrutura, não a visibilidade) quase nunca muda,
-  // então esse sim fica em cache - ver lib/menu-cache.ts.
   const { data: perfil } = await supabase.from("perfis").select("nome, email, papel").eq("id", user.id).single();
   const menuItens = await getMenuParaPapel(perfil?.papel ?? "leitura");
+  const { mes, ano, ehPeriodoAtual } = obterPeriodoSelecionado();
 
   const nome = perfil?.nome ?? user.email ?? "Usuário";
   const email = perfil?.email ?? user.email ?? "";
@@ -32,7 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Sidebar nome={nome} email={email} itens={menuItens} />
       </Suspense>
       <div className="flex-1 flex flex-col min-w-0">
-        <TopNav />
+        <TopNav mes={mes} ano={ano} ehPeriodoAtual={ehPeriodoAtual} />
         <main className="flex-1 min-w-0">{children}</main>
       </div>
       <IaFlutuante />

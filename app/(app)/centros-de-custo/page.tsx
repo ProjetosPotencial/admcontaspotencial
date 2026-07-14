@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { money } from "@/lib/format";
-import { obterPeriodoAtual } from "@/lib/date-utils";
+import { obterPeriodoSelecionado } from "@/lib/periodo";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +9,7 @@ const CORES_PRACA: Record<string, string> = { MG: "#1976d2", SP: "#2E7D57", MS: 
 
 export default async function CentrosDeCustoPage() {
   const supabase = createClient();
-  const { ano } = obterPeriodoAtual();
+  const { ano } = obterPeriodoSelecionado();
 
   const { data } = await supabase
     .from("lancamentos")

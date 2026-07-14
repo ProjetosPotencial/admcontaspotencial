@@ -2,7 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import ContasClient from "./contas-client";
 import type { Conta } from "@/lib/types";
 import { TIPOS } from "@/lib/types";
-import { obterPeriodoAtual, formatarPeriodo, estaAtrasada, variacaoPct } from "@/lib/date-utils";
+import { formatarPeriodo, estaAtrasada, variacaoPct } from "@/lib/date-utils";
+import { obterPeriodoSelecionado } from "@/lib/periodo";
 import { money, MES } from "@/lib/format";
 import Link from "next/link";
 
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ContasPage() {
   const supabase = createClient();
-  const { ano, mes, mesAnterior, anoAnterior } = obterPeriodoAtual();
+  const { ano, mes, mesAnterior, anoAnterior, ehPeriodoAtual } = obterPeriodoSelecionado();
   const diaAtual = new Date().getDate();
 
   const [
@@ -42,11 +43,11 @@ export default async function ContasPage() {
   const totalCadastradas = contas.filter((c) => c.status === "ativo").length;
 
   const pendentes = (lancDetalhado ?? []).filter((l: any) => l.situacao === "pendente" || l.situacao === "lancado");
-  const venceHoje = pendentes.filter((l: any) => l.contas?.dia_vencimento === diaAtual);
-  const proximos7 = pendentes.filter((l: any) => {
+  const venceHoje = ehPeriodoAtual ? pendentes.filter((l: any) => l.contas?.dia_vencimento === diaAtual) : [];
+  const proximos7 = ehPeriodoAtual ? pendentes.filter((l: any) => {
     const dv = l.contas?.dia_vencimento;
     return dv != null && dv >= diaAtual && dv <= diaAtual + 7;
-  });
+  }) : [];
   const atrasadas = pendentes.filter((l: any) => estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano));
   const semOrigem = pendentes.filter((l: any) => l.contas?.origem === "a_definir");
 

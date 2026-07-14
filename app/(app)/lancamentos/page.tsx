@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import LancamentosClient from "./lancamentos-client";
-import { obterPeriodoAtual, formatarPeriodo, estaAtrasada } from "@/lib/date-utils";
+import { formatarPeriodo, estaAtrasada } from "@/lib/date-utils";
+import { obterPeriodoSelecionado } from "@/lib/periodo";
 import { money } from "@/lib/format";
 import Link from "next/link";
 
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function LancamentosPage() {
   const supabase = createClient();
-  const { ano, mes } = obterPeriodoAtual();
+  const { ano, mes, ehPeriodoAtual } = obterPeriodoSelecionado();
   const diaAtual = new Date().getDate();
 
   const [{ data }, { data: mesAtualDetalhado }] = await Promise.all([
@@ -31,13 +32,13 @@ export default async function LancamentosPage() {
   const totalContestados = contestados.reduce((s, l) => s + Number(l.valor ?? 0), 0);
 
   const mesAtual = (mesAtualDetalhado ?? []) as any[];
-  const venceHoje = mesAtual.filter((l) => l.contas?.dia_vencimento === diaAtual && (l.situacao === "pendente" || l.situacao === "lancado"));
-  const amanha = mesAtual.filter((l) => l.contas?.dia_vencimento === diaAtual + 1 && (l.situacao === "pendente" || l.situacao === "lancado"));
-  const proximos7 = mesAtual.filter((l) => {
+  const venceHoje = ehPeriodoAtual ? mesAtual.filter((l) => l.contas?.dia_vencimento === diaAtual && (l.situacao === "pendente" || l.situacao === "lancado")) : [];
+  const amanha = ehPeriodoAtual ? mesAtual.filter((l) => l.contas?.dia_vencimento === diaAtual + 1 && (l.situacao === "pendente" || l.situacao === "lancado")) : [];
+  const proximos7 = ehPeriodoAtual ? mesAtual.filter((l) => {
     const dv = l.contas?.dia_vencimento;
     return dv != null && dv >= diaAtual && dv <= diaAtual + 7 && (l.situacao === "pendente" || l.situacao === "lancado");
-  });
-  const atrasadas = mesAtual.filter((l) => estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano));
+  }) : [];
+  const atrasadas = ehPeriodoAtual ? mesAtual.filter((l) => estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano)) : [];
   const somaValor = (arr: any[]) => arr.reduce((s, l) => s + Number(l.valor ?? 0), 0);
 
   const totalPago = mesAtual.filter((l) => l.situacao === "pago").reduce((s, l) => s + Number(l.valor ?? 0), 0);

@@ -7,7 +7,7 @@ import { TIPOS, ORIGENS, SITUACAO, type Conta, type Lancamento } from "@/lib/typ
 import { CAMPOS_TIPO } from "@/lib/campos-tipo";
 import { useContaForm } from "@/lib/hooks/useContaForm";
 import { useDebounce } from "@/lib/hooks/useDebounce";
-import { obterPeriodoAtual, formatarPeriodo } from "@/lib/date-utils";
+import { formatarPeriodo } from "@/lib/date-utils";
 import TipoIcon from "@/components/tipo-icon";
 import { money, MES, nomeArquivoSeguro } from "@/lib/format";
 
@@ -210,13 +210,13 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
         </div>
       </div>
 
-      {aberta && <ContaDrawer conta={aberta} onClose={() => setAberta(null)} />}
+      {aberta && <ContaDrawer conta={aberta} onClose={() => setAberta(null)} ano={ano} mes={mes} />}
       {criando && <NovaContaDrawer lojas={lojas} onClose={() => setCriando(false)} />}
     </>
   );
 }
 
-function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) {
+function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta: Conta; onClose: () => void; ano: number; mes: number }) {
   const supabase = createClient();
   const router = useRouter();
   const T = TIPOS[conta.tipo];
@@ -243,7 +243,9 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
   const [salvandoLancamento, setSalvandoLancamento] = useState(false);
   const [erroLancamento, setErroLancamento] = useState<string | null>(null);
 
-  const { ano: ANO_ATUAL, mes: MES_ATUAL } = obterPeriodoAtual();
+  // ano/mes agora vêm por props (período selecionado no topo do sistema),
+  // não mais calculado aqui dentro - assim a ficha respeita o mês que a
+  // pessoa está navegando, não sempre o mês real atual.
 
   const [aprovadorNome, setAprovadorNome] = useState<string | null>(null);
 

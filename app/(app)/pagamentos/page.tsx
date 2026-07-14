@@ -1,13 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 import PagamentosClient from "./pagamentos-client";
-import { obterPeriodoAtual, estaAtrasada } from "@/lib/date-utils";
+import { estaAtrasada } from "@/lib/date-utils";
+import { obterPeriodoSelecionado } from "@/lib/periodo";
 import { money } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
 export default async function PagamentosPage() {
   const supabase = createClient();
-  const { ano, mes } = obterPeriodoAtual();
+  const { ano, mes, ehPeriodoAtual } = obterPeriodoSelecionado();
   const diaAtual = new Date().getDate();
 
   const { data } = await supabase
@@ -24,11 +25,11 @@ export default async function PagamentosPage() {
   const totalPagoMes = pagosMes.reduce((s, i) => s + Number(i.valor ?? 0), 0);
   const totalAguardando = prontosPagar.reduce((s, i) => s + Number(i.valor ?? 0), 0);
 
-  const vencendo7 = prontosPagar.filter((i) => {
+  const vencendo7 = ehPeriodoAtual ? prontosPagar.filter((i) => {
     const dv = i.contas?.dia_vencimento;
     return dv != null && dv >= diaAtual && dv <= diaAtual + 7;
-  });
-  const vencidos = prontosPagar.filter((i) => estaAtrasada("aprovado", i.contas?.dia_vencimento, mes, ano) || (i.contas?.dia_vencimento != null && i.contas.dia_vencimento < diaAtual));
+  }) : [];
+  const vencidos = ehPeriodoAtual ? prontosPagar.filter((i) => estaAtrasada("aprovado", i.contas?.dia_vencimento, mes, ano) || (i.contas?.dia_vencimento != null && i.contas.dia_vencimento < diaAtual)) : [];
   const totalVencido = vencidos.reduce((s, i) => s + Number(i.valor ?? 0), 0);
 
   const totalGeral = totalPagoMes + totalAguardando || 1;

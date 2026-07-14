@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import TipoIcon from "@/components/tipo-icon";
 import { TIPOS } from "@/lib/types";
-import { obterPeriodoAtual, formatarPeriodo, estaAtrasada, variacaoPct } from "@/lib/date-utils";
+import { formatarPeriodo, estaAtrasada, variacaoPct } from "@/lib/date-utils";
+import { obterPeriodoSelecionado } from "@/lib/periodo";
 import { money, MES } from "@/lib/format";
 import VencimentosProximosClient from "./vencimentos-proximos-client";
 import Link from "next/link";
@@ -17,7 +18,7 @@ function saudacao(): string {
 
 export default async function PainelPage() {
   const supabase = createClient();
-  const { ano, mes, mesAnterior, anoAnterior } = obterPeriodoAtual();
+  const { ano, mes, mesAnterior, anoAnterior, ehPeriodoAtual } = obterPeriodoSelecionado();
 
   const { data: { session } } = await supabase.auth.getSession();
 
@@ -104,7 +105,9 @@ export default async function PainelPage() {
     <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-[1400px] w-full">
       <div className="mb-6">
         <h1 className="text-[24px] font-bold text-[#1a1a1a]">👋 {saudacao()}{nome ? `, ${nome}` : ""}!</h1>
-        <p className="text-[14px] text-[#6c757d] mt-1">Aqui está o resumo da sua gestão financeira.</p>
+        <p className="text-[14px] text-[#6c757d] mt-1">
+          {ehPeriodoAtual ? "Aqui está o resumo da sua gestão financeira." : `Você está vendo o histórico de ${formatarPeriodo(mes, ano)}.`}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
@@ -116,9 +119,11 @@ export default async function PainelPage() {
             <KpiCard icon="pin" cor="#2E7D57" value={totMapear} label="Origem a mapear" variacao={variacaoPct(totMapear, metricaAnterior?.origem_a_mapear ?? null)} />
           </div>
 
-          <div className="mb-6">
-            <VencimentosProximosClient itens={(lancamentosDetalhados ?? []) as any[]} diaAtual={diaAtual} />
-          </div>
+          {ehPeriodoAtual && (
+            <div className="mb-6">
+              <VencimentosProximosClient itens={(lancamentosDetalhados ?? []) as any[]} diaAtual={diaAtual} />
+            </div>
+          )}
 
           <div className="flex items-end justify-between mb-4">
             <div>

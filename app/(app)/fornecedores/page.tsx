@@ -2,14 +2,14 @@ import { createClient } from "@/lib/supabase/server";
 import FornecedoresClient from "./fornecedores-client";
 import { TIPOS } from "@/lib/types";
 import { money } from "@/lib/format";
-import { obterPeriodoAtual } from "@/lib/date-utils";
+import { obterPeriodoSelecionado } from "@/lib/periodo";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
 export default async function FornecedoresPage() {
   const supabase = createClient();
-  const { ano, mes } = obterPeriodoAtual();
+  const { ano, mes } = obterPeriodoSelecionado();
 
   const [{ data: fornecedores }, { data: contas }, { data: lancMes }] = await Promise.all([
     supabase.from("fornecedores").select("id, nome, tipo_padrao, portal_padrao").order("nome"),
