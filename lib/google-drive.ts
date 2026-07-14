@@ -123,3 +123,30 @@ function extensaoDoNome(nome: string): string {
   const m = nome.match(/\.[a-zA-Z0-9]+$/);
   return m ? m[0] : "";
 }
+
+/**
+ * Lista os arquivos direto dentro de uma pasta (sem entrar em subpastas),
+ * usado pra ler a "Caixa de Entrada" de boletos que alguém colocou solto
+ * numa pasta do Drive.
+ */
+export async function listarArquivosNaPasta(pastaId: string): Promise<{ id: string; name: string; webViewLink: string; mimeType: string }[]> {
+  const drive = getDrive();
+  const resposta = await drive.files.list({
+    q: `'${pastaId}' in parents and trashed=false and mimeType != 'application/vnd.google-apps.folder'`,
+    fields: "files(id, name, webViewLink, mimeType)",
+    spaces: "drive",
+    pageSize: 100,
+  });
+  return (resposta.data.files ?? []).map((f) => ({
+    id: f.id!, name: f.name ?? "sem-nome", webViewLink: f.webViewLink ?? "", mimeType: f.mimeType ?? "application/octet-stream",
+  }));
+}
+
+/**
+ * Baixa os bytes de um arquivo do Drive pelo ID.
+ */
+export async function baixarArquivoDoDrive(fileId: string): Promise<Buffer> {
+  const drive = getDrive();
+  const resposta = await drive.files.get({ fileId, alt: "media" }, { responseType: "arraybuffer" });
+  return Buffer.from(resposta.data as ArrayBuffer);
+}

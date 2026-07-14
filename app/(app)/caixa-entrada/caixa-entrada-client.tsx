@@ -1,0 +1,170 @@
+"use client";
+
+import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { TIPOS } from "@/lib/types";
+import { money } from "@/lib/format";
+
+type Item = {
+  id: string; nome_arquivo: string; drive_web_view_link: string | null;
+  valor_detectado: number | null; codigo_barras_detectado: string | null; tipo_detectado: string | null;
+  loja_sugerida_id: string | null; loja_sugerida_texto: string | null; conta_sugerida_id: string | null;
+  confianca: "alta" | "media" | "baixa"; observacao: string | null;
+};
+
+const CONFIANCA_LABEL: Record<string, { texto: string; cor: string }> = {
+  alta: { texto: "Confiança alta", cor: "bg-ok-bg text-ok" },
+  media: { texto: "Confiança média - confere antes", cor: "bg-amb-bg text-amb" },
+  baixa: { texto: "Não identificado - escolhe manual", cor: "bg-alerr-bg text-alerr" },
+};
+
+export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { itens: Item[]; lojas: { id: string; codigo: string }[] }) {
+  const supabase = createClient();
+  const [itens, setItens] = useState(itensIniciais);
+  const [processando, setProcessando] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  async function importar() {
+    setProcessando("__importar__");
+    try {
+      const resp = await fetch("/api/importar-caixa-entrada/testar", { method: "POST" });
+      const json = await resp.json();
+      if (!resp.ok) { setToast(json.error ?? "Erro ao importar."); }
+      else if (json.novos > 0) { setToast(`${json.novos} arquivo(s) novo(s) importado(s).`); setTimeout(() => window.location.reload(), 1200); }
+      else { setToast(json.mensagem ?? "Nada novo na pasta."); }
+    } catch {
+      setToast("Não foi possível importar agora.");
+    }
+    setProcessando(null);
+    setTimeout(() => setToast(null), 3500);
+  }
+
+  async function confirmar(item: Item, lojaId: string, tipo: string) {
+    setProcessando(item.id);
+    try {
+      const { data: conta } = await supabase.from("contas").select("id").eq("loja_id", lojaId).eq("tipo", tipo).eq("status", "ativo").maybeSingle();
+      if (!conta) {
+        setToast("Não existe conta ativa desse tipo pra essa loja. Cadastra a conta primeiro em Contas.");
+        setProcessando(null);
+        return;
+      }
+
+      const agora = new Date();
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: lancamento, error } = await supabase.from("lancamentos").upsert({
+        conta_id: conta.id, ano: agora.getFullYear(), mes: agora.getMonth() + 1,
+        valor: item.valor_detectado, situacao: "lancado", lancado_em: agora.toISOString(),
+        codigo_barras: item.codigo_barras_detectado, comprovante_drive_url: item.drive_web_view_link,
+      }, { onConflict: "conta_id,ano,mes" }).select("id").single();
+
+      if (error || !lancamento) { setToast("Não foi possível lançar."); setProcessando(null); return; }
+
+      await supabase.from("caixa_entrada_boletos").update({
+        status: "confirmado", revisado_por: user?.id ?? null, revisado_em: agora.toISOString(), lancamento_criado_id: lancamento.id,
+      }).eq("id", item.id);
+
+      setItens((lista) => lista.filter((i) => i.id !== item.id));
+      setToast("Lançado com sucesso! Já está na fila de Aprovações.");
+    } catch {
+      setToast("Erro ao confirmar.");
+    }
+    setProcessando(null);
+    setTimeout(() => setToast(null), 3000);
+  }
+
+  async function rejeitar(item: Item) {
+    setProcessando(item.id);
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from("caixa_entrada_boletos").update({ status: "rejeitado", revisado_por: user?.id ?? null, revisado_em: new Date().toISOString() }).eq("id", item.id);
+    setItens((lista) => lista.filter((i) => i.id !== item.id));
+    setProcessando(null);
+  }
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-5">
+        <span className="text-[13px] text-[#6c757d]">{itens.length} pendente{itens.length !== 1 ? "s" : ""} de revisão</span>
+        <button onClick={importar} disabled={processando === "__importar__"} className="btn-primario disabled:opacity-50">
+          {processando === "__importar__" ? "Verificando pasta..." : "Verificar pasta agora"}
+        </button>
+      </div>
+
+      {itens.length === 0 ? (
+        <div className="card text-center py-16 text-[#adb5bd]">
+          Nada esperando revisão. Clica em "Verificar pasta agora" pra checar se chegou algo novo.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {itens.map((item) => (
+            <ItemCard key={item.id} item={item} lojas={lojas} processando={processando === item.id}
+              onConfirmar={confirmar} onRejeitar={rejeitar} />
+          ))}
+        </div>
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-ebano text-white px-5 py-3 rounded-lg text-[13px] shadow-forte z-50">
+          {toast}
+        </div>
+      )}
+    </>
+  );
+}
+
+function ItemCard({ item, lojas, processando, onConfirmar, onRejeitar }: {
+  item: Item; lojas: { id: string; codigo: string }[]; processando: boolean;
+  onConfirmar: (item: Item, lojaId: string, tipo: string) => void; onRejeitar: (item: Item) => void;
+}) {
+  const [lojaId, setLojaId] = useState(item.loja_sugerida_id ?? "");
+  const [tipo, setTipo] = useState(item.tipo_detectado ?? "");
+  const conf = CONFIANCA_LABEL[item.confianca];
+
+  return (
+    <div className="card p-4">
+      <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
+        <div className="min-w-0">
+          <b className="text-[13.5px] font-semibold block truncate">{item.nome_arquivo}</b>
+          {item.drive_web_view_link && (
+            <a href={item.drive_web_view_link} target="_blank" rel="noreferrer" className="text-[11.5px] text-info hover:underline">Ver no Drive</a>
+          )}
+        </div>
+        <span className={`badge ${conf.cor} shrink-0`}>{conf.texto}</span>
+      </div>
+
+      {item.observacao && <div className="text-[11.5px] text-alerr bg-alerr-bg rounded-md px-3 py-2 mb-3">{item.observacao}</div>}
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+        <div>
+          <div className="text-[10.5px] font-semibold text-[#adb5bd] uppercase mb-1">Valor</div>
+          <div className="text-[14px] font-bold font-mono">{item.valor_detectado != null ? money(item.valor_detectado) : "—"}</div>
+        </div>
+        <div>
+          <div className="text-[10.5px] font-semibold text-[#adb5bd] uppercase mb-1">Loja</div>
+          <select value={lojaId} onChange={(e) => setLojaId(e.target.value)} className="border border-linha rounded-md px-2 py-1 text-[12px] w-full">
+            <option value="">Escolher...</option>
+            {lojas.map((l) => <option key={l.id} value={l.id}>{l.codigo}</option>)}
+          </select>
+        </div>
+        <div>
+          <div className="text-[10.5px] font-semibold text-[#adb5bd] uppercase mb-1">Tipo</div>
+          <select value={tipo} onChange={(e) => setTipo(e.target.value)} className="border border-linha rounded-md px-2 py-1 text-[12px] w-full">
+            <option value="">Escolher...</option>
+            {Object.entries(TIPOS).map(([k, v]) => <option key={k} value={k}>{v.n}</option>)}
+          </select>
+        </div>
+        <div>
+          <div className="text-[10.5px] font-semibold text-[#adb5bd] uppercase mb-1">Código de barras</div>
+          <div className="text-[10.5px] font-mono text-[#6c757d] truncate">{item.codigo_barras_detectado ?? "—"}</div>
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <button onClick={() => onConfirmar(item, lojaId, tipo)} disabled={!lojaId || !tipo || processando}
+          className="btn-primario flex-1 disabled:opacity-40">
+          {processando ? "Lançando..." : "Confirmar e lançar"}
+        </button>
+        <button onClick={() => onRejeitar(item)} disabled={processando} className="btn-secundario">Descartar</button>
+      </div>
+    </div>
+  );
+}
