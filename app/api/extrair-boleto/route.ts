@@ -5,14 +5,15 @@ import { createClient } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const PROMPT = `Esse arquivo é um boleto bancário brasileiro. Extraia:
+const PROMPT = `Esse arquivo deveria ser um boleto bancário ou fatura de consumo brasileira (água, energia, telefone, IPTU etc). Extraia:
 1. "valor": o valor total a pagar, em reais, como número (ex: 118.95). Se não conseguir ler com confiança, use null.
 2. "codigo_barras": a linha digitável (o código numérico longo, geralmente com espaços entre grupos de dígitos, tipo "34191.79001 01043.510047 91020.150008 1 96380000011895"). Se não achar, use null.
+3. "parece_documento_valido": true se o arquivo realmente parece ser um boleto/fatura de verdade (tem estrutura de banco, valor, vencimento, linha digitável). false se for outra coisa (foto qualquer, documento em branco, print de conversa, arquivo corrompido, ou qualquer coisa que não seja claramente uma fatura).
 
 Responda SOMENTE com um JSON válido, sem nenhum texto antes ou depois, nesse formato exato:
-{"valor": 118.95, "codigo_barras": "34191.79001 01043.510047 91020.150008 1 96380000011895"}
+{"valor": 118.95, "codigo_barras": "34191.79001 01043.510047 91020.150008 1 96380000011895", "parece_documento_valido": true}
 
-Se não for possível ler o documento com confiança, responda {"valor": null, "codigo_barras": null}. Nunca invente número.`;
+Se não for possível ler o documento com confiança, responda {"valor": null, "codigo_barras": null, "parece_documento_valido": false}. Nunca invente número.`;
 
 export async function POST(req: NextRequest) {
   const supabase = createClient();
@@ -52,7 +53,18 @@ export async function POST(req: NextRequest) {
     const texto = bloco && "text" in bloco ? bloco.text.trim() : "{}";
     const json = JSON.parse(texto.replace(/^```json\s*|\s*```$/g, ""));
 
-    return NextResponse.json({ valor: typeof json.valor === "number" ? json.valor : null, codigo_barras: json.codigo_barras || null });
+    const codigoBarras: string | null = json.codigo_barras || null;
+    const digitos = codigoBarras ? codigoBarras.replace(/\D/g, "") : "";
+    // boleto bancário tem 47 dígitos na linha digitável; conta de consumo/convênio tem 48.
+    // Fora disso, quase certamente a leitura veio errada (ou o campo foi preenchido a mão errado).
+    const formatoValido = codigoBarras ? (digitos.length === 47 || digitos.length === 48) : true;
+
+    return NextResponse.json({
+      valor: typeof json.valor === "number" ? json.valor : null,
+      codigo_barras: codigoBarras,
+      parece_documento_valido: json.parece_documento_valido !== false,
+      formato_codigo_valido: formatoValido,
+    });
   } catch (err: any) {
     console.error("Erro ao extrair dados do boleto:", err);
     return NextResponse.json({ error: "Não foi possível ler o boleto automaticamente." }, { status: 500 });

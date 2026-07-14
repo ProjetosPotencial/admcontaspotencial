@@ -236,6 +236,9 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
   const [codigoBarras, setCodigoBarras] = useState("");
   const [extraindo, setExtraindo] = useState(false);
   const [avisoExtracao, setAvisoExtracao] = useState<string | null>(null);
+  const [alertas, setAlertas] = useState<string[]>([]);
+  const [confirmarMesmoAssim, setConfirmarMesmoAssim] = useState(false);
+  const [verificando, setVerificando] = useState(false);
   const [salvandoLancamento, setSalvandoLancamento] = useState(false);
   const [erroLancamento, setErroLancamento] = useState<string | null>(null);
 
@@ -291,20 +294,30 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
   async function selecionarArquivo(arquivo: File | null) {
     setArquivoBoleto(arquivo);
     setAvisoExtracao(null);
+    setAlertas([]);
+    setConfirmarMesmoAssim(false);
     if (!arquivo) return;
 
     setExtraindo(true);
+    let valorExtraido: number | null = null;
+    let codigoExtraido: string | null = null;
+    let documentoSuspeito = false;
+    let formatoInvalido = false;
     try {
       const form = new FormData();
       form.append("arquivo", arquivo);
       const resp = await fetch("/api/extrair-boleto", { method: "POST", body: form });
       const json = await resp.json();
       if (resp.ok) {
+        valorExtraido = json.valor;
+        codigoExtraido = json.codigo_barras;
+        documentoSuspeito = json.parece_documento_valido === false;
+        formatoInvalido = json.codigo_barras && json.formato_codigo_valido === false;
         // só preenche sozinho se a pessoa ainda não tinha digitado nada -
         // nunca sobrescreve um valor que já foi digitado na mão.
-        if (json.valor != null && !valorLancar.trim()) setValorLancar(String(json.valor).replace(".", ","));
-        if (json.codigo_barras) setCodigoBarras(json.codigo_barras);
-        if (json.valor == null && !json.codigo_barras) setAvisoExtracao("Não consegui ler o valor nem o código de barras automaticamente - confere e preenche na mão.");
+        if (valorExtraido != null && !valorLancar.trim()) setValorLancar(String(valorExtraido).replace(".", ","));
+        if (codigoExtraido) setCodigoBarras(codigoExtraido);
+        if (valorExtraido == null && !codigoExtraido) setAvisoExtracao("Não consegui ler o valor nem o código de barras automaticamente - confere e preenche na mão.");
       } else {
         setAvisoExtracao("Não foi possível ler o boleto automaticamente. Confere e preenche na mão.");
       }
@@ -312,6 +325,52 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
       setAvisoExtracao("Não foi possível ler o boleto automaticamente. Confere e preenche na mão.");
     }
     setExtraindo(false);
+
+    await rodarVerificacoes({
+      codigo: codigoExtraido ?? codigoBarras,
+      valor: valorExtraido ?? Number(valorLancar.replace(",", ".")) ?? null,
+      documentoSuspeito, formatoInvalido,
+    });
+  }
+
+  async function rodarVerificacoes(params: { codigo: string | null; valor: number | null; documentoSuspeito?: boolean; formatoInvalido?: boolean }) {
+    setVerificando(true);
+    const novosAlertas: string[] = [];
+
+    if (params.documentoSuspeito) {
+      novosAlertas.push("O arquivo enviado não parece um boleto ou fatura de verdade - confere se é o documento certo.");
+    }
+    if (params.formatoInvalido) {
+      novosAlertas.push("O código de barras não tem o formato esperado (47 ou 48 dígitos) - pode ter vindo errado na leitura.");
+    }
+
+    // regra 1: mesmo código de barras já lançado em outro lugar (duplicidade real)
+    const codigoLimpo = params.codigo?.replace(/\D/g, "") ?? "";
+    if (codigoLimpo.length >= 40) {
+      const { data: duplicados } = await supabase
+        .from("lancamentos")
+        .select("id, mes, ano, contas!inner ( lojas ( codigo ) )")
+        .eq("codigo_barras", params.codigo)
+        .neq("id", lancamentoAtual?.id ?? "00000000-0000-0000-0000-000000000000");
+      const outro = (duplicados ?? [])[0] as any;
+      if (outro) {
+        novosAlertas.push(`Esse código de barras já foi lançado antes: ${outro.contas?.lojas?.codigo ?? "outra conta"} (${outro.mes}/${outro.ano}). Confere se não é o mesmo boleto duplicado.`);
+      }
+    }
+
+    // regra 2: valor muito fora do padrão histórico dessa conta
+    if (params.valor != null && params.valor > 0) {
+      const historico = lancs.filter((l) => l.valor != null && l.valor > 0 && l.id !== lancamentoAtual?.id).map((l) => l.valor!);
+      if (historico.length >= 2) {
+        const media = historico.reduce((s, v) => s + v, 0) / historico.length;
+        if (media > 0 && (params.valor > media * 2.5 || params.valor < media * 0.3)) {
+          novosAlertas.push(`Esse valor está bem diferente do que essa conta costuma ter (média de ${money(media)} nos últimos lançamentos).`);
+        }
+      }
+    }
+
+    setAlertas(novosAlertas);
+    setVerificando(false);
   }
 
   async function lancarComBoleto() {
@@ -498,13 +557,13 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
                     {(lancamentoAtual as any).aprovado_em && ` em ${new Date((lancamentoAtual as any).aprovado_em).toLocaleString("pt-br", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}`}
                   </div>
                 )}
-                <button onClick={() => { setValorLancar(String(lancamentoAtual.valor ?? "")); setLancando(true); }}
+                <button onClick={() => { setValorLancar(String(lancamentoAtual.valor ?? "")); setAlertas([]); setConfirmarMesmoAssim(false); setCodigoBarras(""); setLancando(true); }}
                   className="w-full mt-3 pt-3 border-t border-linha2 text-[12px] font-semibold text-[#6c757d] hover:text-amb transition text-center">
                   Boleto errado? Substituir
                 </button>
               </div>
             ) : !lancando ? (
-              <button onClick={() => { setValorLancar(lancamentoAtual ? String(lancamentoAtual.valor ?? "") : ""); setLancando(true); }}
+              <button onClick={() => { setValorLancar(lancamentoAtual ? String(lancamentoAtual.valor ?? "") : ""); setAlertas([]); setConfirmarMesmoAssim(false); setCodigoBarras(""); setLancando(true); }}
                 className="w-full text-[12.5px] font-semibold text-amb border border-amarelo/40 bg-amb-bg rounded-md py-2.5 hover:bg-amarelo/10 transition">
                 {lancamentoAtual ? `Lançar fatura de ${formatarPeriodo(MES_ATUAL, ANO_ATUAL).toLowerCase()}` : `Lançar fatura de ${formatarPeriodo(MES_ATUAL, ANO_ATUAL).toLowerCase()} (sem lançamento pendente ainda)`}
               </button>
@@ -512,8 +571,9 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
               <div className="card p-4">
                 <label className="block mb-3">
                   <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Valor da fatura</div>
-                  <input value={valorLancar} onChange={(e) => setValorLancar(e.target.value)} placeholder="0,00"
-                    className="input-padrao w-full font-mono" />
+                  <input value={valorLancar} onChange={(e) => setValorLancar(e.target.value)}
+                    onBlur={() => rodarVerificacoes({ codigo: codigoBarras, valor: Number(valorLancar.replace(",", ".")) || null })}
+                    placeholder="0,00" className="input-padrao w-full font-mono" />
                 </label>
                 <label className="block mb-3">
                   <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Boleto (PDF ou imagem)</div>
@@ -530,7 +590,9 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
                 <label className="block mb-3">
                   <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Código de barras (linha digitável)</div>
                   <div className="flex gap-1.5">
-                    <input value={codigoBarras} onChange={(e) => setCodigoBarras(e.target.value)} placeholder="Preenche sozinho se conseguir ler do boleto"
+                    <input value={codigoBarras} onChange={(e) => setCodigoBarras(e.target.value)}
+                      onBlur={() => rodarVerificacoes({ codigo: codigoBarras, valor: Number(valorLancar.replace(",", ".")) || null })}
+                      placeholder="Preenche sozinho se conseguir ler do boleto"
                       className="input-padrao w-full font-mono text-[11.5px]" />
                     {codigoBarras && (
                       <button type="button" onClick={() => navigator.clipboard.writeText(codigoBarras)}
@@ -548,9 +610,29 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
                 <div className="text-[10.5px] text-[#adb5bd] mb-3 leading-snug">
                   Baixado do portal do fornecedor. Depois de lançar, a conta entra na fila de Aprovações.
                 </div>
+
+                {verificando && <div className="text-[11px] text-[#adb5bd] mb-3">Verificando duplicidade e histórico...</div>}
+
+                {alertas.length > 0 && (
+                  <div className="bg-amb-bg border border-amarelo/40 rounded-md px-3 py-2.5 mb-3">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="#B8860B" strokeWidth="1.8"><path d="M10.9 3.6l7.6 13a1 1 0 01-.9 1.5H2.4a1 1 0 01-.9-1.5l7.6-13a1 1 0 011.8 0z" /><path d="M10 8.5v4" /></svg>
+                      <b className="text-[11.5px] font-semibold text-[#7a5c00]">Antes de lançar, confere isso:</b>
+                    </div>
+                    <ul className="text-[11.5px] text-[#7a5c00] space-y-1 mb-2.5 list-disc list-inside">
+                      {alertas.map((a, i) => <li key={i}>{a}</li>)}
+                    </ul>
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" checked={confirmarMesmoAssim} onChange={(e) => setConfirmarMesmoAssim(e.target.checked)} className="w-4 h-4" />
+                      <span className="text-[11.5px] font-semibold text-[#7a5c00]">Já conferi, quero lançar mesmo assim</span>
+                    </label>
+                  </div>
+                )}
+
                 {erroLancamento && <div className="text-[12px] text-alerr bg-alerr-bg rounded-md px-3 py-2 mb-3">{erroLancamento}</div>}
                 <div className="flex gap-2">
-                  <button onClick={lancarComBoleto} disabled={salvandoLancamento} className="btn-primario flex-1 disabled:opacity-50">
+                  <button onClick={lancarComBoleto} disabled={salvandoLancamento || (alertas.length > 0 && !confirmarMesmoAssim)}
+                    className="btn-primario flex-1 disabled:opacity-50">
                     {salvandoLancamento ? "Enviando..." : "Lançar"}
                   </button>
                   <button onClick={() => { setLancando(false); setErroLancamento(null); }} className="btn-secundario">Cancelar</button>
