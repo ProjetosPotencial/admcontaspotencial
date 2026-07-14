@@ -232,6 +232,7 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
   const [lancando, setLancando] = useState(false);
   const [valorLancar, setValorLancar] = useState("");
   const [arquivoBoleto, setArquivoBoleto] = useState<File | null>(null);
+  const [hashArquivo, setHashArquivo] = useState<string | null>(null);
   const [enviarDrive, setEnviarDrive] = useState(false);
   const [codigoBarras, setCodigoBarras] = useState("");
   const [extraindo, setExtraindo] = useState(false);
@@ -293,10 +294,20 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
 
   async function selecionarArquivo(arquivo: File | null) {
     setArquivoBoleto(arquivo);
+    setHashArquivo(null);
     setAvisoExtracao(null);
     setAlertas([]);
     setConfirmarMesmoAssim(false);
     if (!arquivo) return;
+
+    // hash dos bytes do arquivo - calculado no navegador, na hora, sem
+    // precisar mandar pra IA. Dois arquivos idênticos sempre dão o mesmo
+    // hash, então é a forma confiável de achar "esse arquivo já foi
+    // enviado antes", mesmo que a leitura do código de barras varie.
+    const bytes = await arquivo.arrayBuffer();
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    const hash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    setHashArquivo(hash);
 
     setExtraindo(true);
     let valorExtraido: number | null = null;
@@ -329,13 +340,29 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
     await rodarVerificacoes({
       codigo: codigoExtraido ?? codigoBarras,
       valor: valorExtraido ?? Number(valorLancar.replace(",", ".")) ?? null,
-      documentoSuspeito, formatoInvalido,
+      documentoSuspeito, formatoInvalido, hash,
     });
   }
 
-  async function rodarVerificacoes(params: { codigo: string | null; valor: number | null; documentoSuspeito?: boolean; formatoInvalido?: boolean }) {
+  async function rodarVerificacoes(params: { codigo: string | null; valor: number | null; documentoSuspeito?: boolean; formatoInvalido?: boolean; hash?: string | null }) {
     setVerificando(true);
     const novosAlertas: string[] = [];
+
+    // regra 0: mesmo arquivo (bytes idênticos) já enviado em qualquer lançamento
+    // - mais confiável que comparar código de barras, que pode ler diferente
+    // entre duas fotos/scans do mesmo boleto.
+    const hashParaChecar = params.hash ?? hashArquivo;
+    if (hashParaChecar) {
+      const { data: mesmoArquivo } = await supabase
+        .from("lancamentos")
+        .select("id, mes, ano, contas!inner ( lojas ( codigo ) )")
+        .eq("arquivo_hash", hashParaChecar)
+        .neq("id", lancamentoAtual?.id ?? "00000000-0000-0000-0000-000000000000");
+      const outroArquivo = (mesmoArquivo ?? [])[0] as any;
+      if (outroArquivo) {
+        novosAlertas.push(`Esse exato arquivo já foi enviado antes: ${outroArquivo.contas?.lojas?.codigo ?? "outra conta"} (${outroArquivo.mes}/${outroArquivo.ano}). Confere se não é o mesmo boleto por engano.`);
+      }
+    }
 
     if (params.documentoSuspeito) {
       novosAlertas.push("O arquivo enviado não parece um boleto ou fatura de verdade - confere se é o documento certo.");
@@ -417,6 +444,7 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
       situacao: "lancado", comprovante_url: caminhoBoleto,
       lancado_em: new Date().toISOString(),
       codigo_barras: codigoBarras.trim() || null,
+      arquivo_hash: hashArquivo,
     };
     if (linkDrive) payload.comprovante_drive_url = linkDrive;
     const { error } = await supabase.from("lancamentos").upsert(payload, { onConflict: "conta_id,ano,mes" });
@@ -557,13 +585,13 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
                     {(lancamentoAtual as any).aprovado_em && ` em ${new Date((lancamentoAtual as any).aprovado_em).toLocaleString("pt-br", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}`}
                   </div>
                 )}
-                <button onClick={() => { setValorLancar(String(lancamentoAtual.valor ?? "")); setAlertas([]); setConfirmarMesmoAssim(false); setCodigoBarras(""); setLancando(true); }}
+                <button onClick={() => { setValorLancar(String(lancamentoAtual.valor ?? "")); setAlertas([]); setConfirmarMesmoAssim(false); setCodigoBarras(""); setHashArquivo(null); setLancando(true); }}
                   className="w-full mt-3 pt-3 border-t border-linha2 text-[12px] font-semibold text-[#6c757d] hover:text-amb transition text-center">
                   Boleto errado? Substituir
                 </button>
               </div>
             ) : !lancando ? (
-              <button onClick={() => { setValorLancar(lancamentoAtual ? String(lancamentoAtual.valor ?? "") : ""); setAlertas([]); setConfirmarMesmoAssim(false); setCodigoBarras(""); setLancando(true); }}
+              <button onClick={() => { setValorLancar(lancamentoAtual ? String(lancamentoAtual.valor ?? "") : ""); setAlertas([]); setConfirmarMesmoAssim(false); setCodigoBarras(""); setHashArquivo(null); setLancando(true); }}
                 className="w-full text-[12.5px] font-semibold text-amb border border-amarelo/40 bg-amb-bg rounded-md py-2.5 hover:bg-amarelo/10 transition">
                 {lancamentoAtual ? `Lançar fatura de ${formatarPeriodo(MES_ATUAL, ANO_ATUAL).toLowerCase()}` : `Lançar fatura de ${formatarPeriodo(MES_ATUAL, ANO_ATUAL).toLowerCase()} (sem lançamento pendente ainda)`}
               </button>
