@@ -314,6 +314,7 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
     let codigoExtraido: string | null = null;
     let documentoSuspeito = false;
     let formatoInvalido = false;
+    let tipoDetectado: string | null = null;
     try {
       const form = new FormData();
       form.append("arquivo", arquivo);
@@ -324,6 +325,7 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
         codigoExtraido = json.codigo_barras;
         documentoSuspeito = json.parece_documento_valido === false;
         formatoInvalido = json.codigo_barras && json.formato_codigo_valido === false;
+        tipoDetectado = json.tipo_conta ?? null;
         // só preenche sozinho se a pessoa ainda não tinha digitado nada -
         // nunca sobrescreve um valor que já foi digitado na mão.
         if (valorExtraido != null && !valorLancar.trim()) setValorLancar(String(valorExtraido).replace(".", ","));
@@ -340,13 +342,22 @@ function ContaDrawer({ conta, onClose }: { conta: Conta; onClose: () => void }) 
     await rodarVerificacoes({
       codigo: codigoExtraido ?? codigoBarras,
       valor: valorExtraido ?? Number(valorLancar.replace(",", ".")) ?? null,
-      documentoSuspeito, formatoInvalido, hash,
+      documentoSuspeito, formatoInvalido, hash, tipoDetectado,
     });
   }
 
-  async function rodarVerificacoes(params: { codigo: string | null; valor: number | null; documentoSuspeito?: boolean; formatoInvalido?: boolean; hash?: string | null }) {
+  async function rodarVerificacoes(params: { codigo: string | null; valor: number | null; documentoSuspeito?: boolean; formatoInvalido?: boolean; hash?: string | null; tipoDetectado?: string | null }) {
     setVerificando(true);
     const novosAlertas: string[] = [];
+
+    // regra: o tipo de conta que a IA identificou no documento bate com o
+    // tipo dessa conta específica? Pega quem anexa conta de telefone numa
+    // ficha de água, por exemplo.
+    if (params.tipoDetectado && params.tipoDetectado !== conta.tipo) {
+      const nomeDetectado = TIPOS[params.tipoDetectado]?.n ?? params.tipoDetectado;
+      const nomeConta = TIPOS[conta.tipo]?.n ?? conta.tipo;
+      novosAlertas.push(`Esse documento parece ser uma conta de ${nomeDetectado}, mas você está lançando numa conta de ${nomeConta}. Confere se é o arquivo certo.`);
+    }
 
     // regra 0: mesmo arquivo (bytes idênticos) já enviado em qualquer lançamento
     // - mais confiável que comparar código de barras, que pode ler diferente
