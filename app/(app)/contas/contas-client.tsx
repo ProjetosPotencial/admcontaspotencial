@@ -377,6 +377,12 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
   const [novoLogin, setNovoLogin] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [salvandoCred, setSalvandoCred] = useState(false);
+  const [portalLink, setPortalLink] = useState<string | null>(conta.portal_link ?? null);
+  const [portalPadraoFornecedor, setPortalPadraoFornecedor] = useState<string | null>(null);
+  const [editandoPortal, setEditandoPortal] = useState(false);
+  const [novoPortalLink, setNovoPortalLink] = useState(conta.portal_link ?? "");
+  const [salvarComoPadrao, setSalvarComoPadrao] = useState(false);
+  const [salvandoPortal, setSalvandoPortal] = useState(false);
   const [lancando, setLancando] = useState(false);
   const [valorLancar, setValorLancar] = useState("");
   const [arquivoBoleto, setArquivoBoleto] = useState<File | null>(null);
@@ -407,6 +413,12 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
     carregarLancamentos();
     supabase.from("credenciais_login").select("login").eq("conta_id", conta.id).maybeSingle()
       .then(({ data }) => setLogin((data as any)?.login ?? null));
+    setPortalLink(conta.portal_link ?? null);
+    setNovoPortalLink(conta.portal_link ?? "");
+    if (conta.fornecedor_nome) {
+      supabase.from("fornecedores").select("portal_padrao").ilike("nome", conta.fornecedor_nome).maybeSingle()
+        .then(({ data }) => setPortalPadraoFornecedor((data as any)?.portal_padrao ?? null));
+    }
   }, [conta.id]);
 
   const lancamentoAtual = lancs.find((l) => l.mes === MES_ATUAL);
@@ -417,6 +429,21 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
     supabase.from("perfis").select("nome").eq("id", idAprovador).maybeSingle()
       .then(({ data }) => setAprovadorNome(data?.nome ?? null));
   }, [(lancamentoAtual as any)?.aprovado_por]);
+
+  async function salvarPortal() {
+    const link = novoPortalLink.trim();
+    if (!link) return;
+    setSalvandoPortal(true);
+    const { error } = await supabase.from("contas").update({ portal_link: link }).eq("id", conta.id);
+    if (!error && salvarComoPadrao && conta.fornecedor_nome) {
+      // aplica esse link como padrão do fornecedor, pra próxima conta desse
+      // mesmo fornecedor já vir sugerida sozinha, sem digitar de novo.
+      await supabase.from("fornecedores").update({ portal_padrao: link }).ilike("nome", conta.fornecedor_nome);
+      setPortalPadraoFornecedor(link);
+    }
+    setSalvandoPortal(false);
+    if (!error) { setPortalLink(link); setEditandoPortal(false); router.refresh(); }
+  }
 
   async function revelar() {
     setRevelando(true);
@@ -705,6 +732,54 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
             <Campo label="Vencimento" valor={conta.dia_vencimento ? `dia ${conta.dia_vencimento}` : "—"} />
             <Campo label={CAMPOS_TIPO[conta.tipo]?.labelIdentificador ?? "Código da conta"} valor={conta.identificador ?? "—"} mono />
             <Campo label="Origem" valor={ORIGENS[conta.origem]} />
+          </div>
+
+          <div className="pb-5 mb-5 border-b border-linha">
+            <div className="text-[11px] text-[#adb5bd] font-medium mb-2">Portal do fornecedor</div>
+            {!editandoPortal ? (
+              portalLink ? (
+                <div className="flex items-center gap-2">
+                  <a href={portalLink} target="_blank" rel="noreferrer"
+                    className="flex-1 flex items-center justify-center gap-2 bg-ebano text-white rounded-md py-2 text-[12.5px] font-semibold hover:opacity-90 transition">
+                    <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M8 12l7-7M11 3h6v6M17 11v5a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2h5" /></svg>
+                    Abrir site do fornecedor
+                  </a>
+                  <button onClick={() => setEditandoPortal(true)} className="text-[11.5px] text-[#adb5bd] hover:text-[#1a1a1a] shrink-0">editar</button>
+                </div>
+              ) : portalPadraoFornecedor ? (
+                <div>
+                  <div className="text-[11.5px] text-[#6c757d] mb-1.5">Essa conta não tem link próprio, mas {conta.fornecedor_nome} já tem um padrão salvo.</div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => { setNovoPortalLink(portalPadraoFornecedor); salvarPortal(); }}
+                      className="flex-1 bg-ebano text-white rounded-md py-2 text-[12.5px] font-semibold hover:opacity-90 transition">
+                      Usar {portalPadraoFornecedor.replace(/^https?:\/\//, "").split("/")[0]}
+                    </button>
+                    <button onClick={() => setEditandoPortal(true)} className="text-[11.5px] text-[#adb5bd] hover:text-[#1a1a1a] shrink-0">outro link</button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => setEditandoPortal(true)} className="text-[12.5px] text-info font-semibold hover:underline">
+                  + adicionar link do portal
+                </button>
+              )
+            ) : (
+              <div>
+                <input autoFocus value={novoPortalLink} onChange={(e) => setNovoPortalLink(e.target.value)}
+                  placeholder="https://..." className="input-padrao w-full mb-2 text-[12.5px]" />
+                {conta.fornecedor_nome && (
+                  <label className="flex items-center gap-2 mb-2.5">
+                    <input type="checkbox" checked={salvarComoPadrao} onChange={(e) => setSalvarComoPadrao(e.target.checked)} className="w-3.5 h-3.5" />
+                    <span className="text-[11.5px] text-[#6c757d]">Usar esse link pra todas as contas de {conta.fornecedor_nome}</span>
+                  </label>
+                )}
+                <div className="flex gap-2">
+                  <button onClick={salvarPortal} disabled={salvandoPortal || !novoPortalLink.trim()} className="btn-primario flex-1 disabled:opacity-50">
+                    {salvandoPortal ? "Salvando..." : "Salvar"}
+                  </button>
+                  <button onClick={() => { setEditandoPortal(false); setNovoPortalLink(portalLink ?? ""); }} className="btn-secundario">Cancelar</button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="pt-5 border-t border-linha">
