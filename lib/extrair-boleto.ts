@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { codigoBarrasFechaMatematicamente } from "@/lib/validar-codigo-barras";
 
 const PROMPT = `Esse arquivo deveria ser um boleto bancário ou fatura de consumo brasileira (água, energia, telefone, IPTU etc). Extraia:
 1. "valor": o valor total a pagar, em reais, como número (ex: 118.95). Se não conseguir ler com confiança, use null.
@@ -6,19 +7,22 @@ const PROMPT = `Esse arquivo deveria ser um boleto bancário ou fatura de consum
 3. "parece_documento_valido": true se o arquivo realmente parece ser um boleto/fatura de verdade (tem estrutura de banco, valor, vencimento, linha digitável). false se for outra coisa (foto qualquer, documento em branco, print de conversa, arquivo corrompido, ou qualquer coisa que não seja claramente uma fatura).
 4. "tipo_conta": que tipo de conta é essa fatura, baseado no fornecedor/serviço. Use exatamente um destes valores: "agua" (companhia de água/saneamento), "energia" (companhia elétrica), "telefone" (telefonia, internet, celular, dados), "iptu" (imposto predial), "condominio", "aluguel", "custo_geral" (qualquer outra coisa que não se encaixe acima). Se não conseguir identificar com confiança, use null.
 5. "loja_mencionada": se o documento ou nome do cliente/endereço no boleto mencionar claramente qual loja/unidade é, tente extrair esse texto (ex: nome da rua, cidade, ou identificador). Se não conseguir, use null.
+6. "dia_vencimento": o dia do mês (1 a 31) em que o boleto vence, como número (ex: se vence 15/07/2026, retorne 15). Se não conseguir ler com confiança, use null.
 
 Responda SOMENTE com um JSON válido, sem nenhum texto antes ou depois, nesse formato exato:
-{"valor": 118.95, "codigo_barras": "34191.79001 01043.510047 91020.150008 1 96380000011895", "parece_documento_valido": true, "tipo_conta": "agua", "loja_mencionada": null}
+{"valor": 118.95, "codigo_barras": "34191.79001 01043.510047 91020.150008 1 96380000011895", "parece_documento_valido": true, "tipo_conta": "agua", "loja_mencionada": null, "dia_vencimento": 15}
 
-Se não for possível ler o documento com confiança, responda {"valor": null, "codigo_barras": null, "parece_documento_valido": false, "tipo_conta": null, "loja_mencionada": null}. Nunca invente número.`;
+Se não for possível ler o documento com confiança, responda {"valor": null, "codigo_barras": null, "parece_documento_valido": false, "tipo_conta": null, "loja_mencionada": null, "dia_vencimento": null}. Nunca invente número.`;
 
 export type ExtracaoBoleto = {
   valor: number | null;
   codigo_barras: string | null;
   parece_documento_valido: boolean;
   formato_codigo_valido: boolean;
+  codigo_barras_fecha_matematicamente: boolean;
   tipo_conta: string | null;
   loja_mencionada: string | null;
+  dia_vencimento: number | null;
 };
 
 export async function extrairDadosBoleto(buffer: Buffer, nomeArquivo: string, mimeType: string): Promise<ExtracaoBoleto> {
@@ -46,13 +50,16 @@ export async function extrairDadosBoleto(buffer: Buffer, nomeArquivo: string, mi
   const codigoBarras: string | null = json.codigo_barras || null;
   const digitos = codigoBarras ? codigoBarras.replace(/\D/g, "") : "";
   const formatoValido = codigoBarras ? (digitos.length === 47 || digitos.length === 48) : true;
+  const fechaMatematicamente = codigoBarras ? codigoBarrasFechaMatematicamente(codigoBarras) : true;
 
   return {
     valor: typeof json.valor === "number" ? json.valor : null,
     codigo_barras: codigoBarras,
     parece_documento_valido: json.parece_documento_valido !== false,
     formato_codigo_valido: formatoValido,
+    codigo_barras_fecha_matematicamente: fechaMatematicamente,
     tipo_conta: json.tipo_conta || null,
     loja_mencionada: json.loja_mencionada || null,
+    dia_vencimento: typeof json.dia_vencimento === "number" ? json.dia_vencimento : null,
   };
 }

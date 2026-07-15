@@ -311,33 +311,49 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
     const hash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
     setHashArquivo(hash);
 
+    // checagens rápidas, sem gastar chamada de IA: tamanho fora do normal
+    // pra um boleto, e assinatura do arquivo (os primeiros bytes) batendo
+    // com o formato esperado - pega arquivo corrompido ou trocado na hora.
+    const tamanhoForaDoNormal = arquivo.size < 3000 || arquivo.size > 10 * 1024 * 1024;
+    const cabecalho = new Uint8Array(bytes.slice(0, 4));
+    const ehPdfValido = cabecalho[0] === 0x25 && cabecalho[1] === 0x50 && cabecalho[2] === 0x44 && cabecalho[3] === 0x46; // %PDF
+    const ehJpegValido = cabecalho[0] === 0xff && cabecalho[1] === 0xd8;
+    const ehPngValido = cabecalho[0] === 0x89 && cabecalho[1] === 0x50 && cabecalho[2] === 0x4e && cabecalho[3] === 0x47;
+    const arquivoCorrompido = !ehPdfValido && !ehJpegValido && !ehPngValido;
+
     setExtraindo(true);
     let valorExtraido: number | null = null;
     let codigoExtraido: string | null = null;
     let documentoSuspeito = false;
     let formatoInvalido = false;
+    let codigoNaoFechaMatematicamente = false;
     let tipoDetectado: string | null = null;
-    try {
-      const form = new FormData();
-      form.append("arquivo", arquivo);
-      const resp = await fetch("/api/extrair-boleto", { method: "POST", body: form });
-      const json = await resp.json();
-      if (resp.ok) {
-        valorExtraido = json.valor;
-        codigoExtraido = json.codigo_barras;
-        documentoSuspeito = json.parece_documento_valido === false;
-        formatoInvalido = json.codigo_barras && json.formato_codigo_valido === false;
-        tipoDetectado = json.tipo_conta ?? null;
-        // só preenche sozinho se a pessoa ainda não tinha digitado nada -
-        // nunca sobrescreve um valor que já foi digitado na mão.
-        if (valorExtraido != null && !valorLancar.trim()) setValorLancar(String(valorExtraido).replace(".", ","));
-        if (codigoExtraido) setCodigoBarras(codigoExtraido);
-        if (valorExtraido == null && !codigoExtraido) setAvisoExtracao("Não consegui ler o valor nem o código de barras automaticamente - confere e preenche na mão.");
-      } else {
+    let diaVencimentoDetectado: number | null = null;
+    if (!arquivoCorrompido) {
+      try {
+        const form = new FormData();
+        form.append("arquivo", arquivo);
+        const resp = await fetch("/api/extrair-boleto", { method: "POST", body: form });
+        const json = await resp.json();
+        if (resp.ok) {
+          valorExtraido = json.valor;
+          codigoExtraido = json.codigo_barras;
+          documentoSuspeito = json.parece_documento_valido === false;
+          formatoInvalido = json.codigo_barras && json.formato_codigo_valido === false;
+          codigoNaoFechaMatematicamente = json.codigo_barras && json.codigo_barras_fecha_matematicamente === false;
+          tipoDetectado = json.tipo_conta ?? null;
+          diaVencimentoDetectado = json.dia_vencimento ?? null;
+          // só preenche sozinho se a pessoa ainda não tinha digitado nada -
+          // nunca sobrescreve um valor que já foi digitado na mão.
+          if (valorExtraido != null && !valorLancar.trim()) setValorLancar(String(valorExtraido).replace(".", ","));
+          if (codigoExtraido) setCodigoBarras(codigoExtraido);
+          if (valorExtraido == null && !codigoExtraido) setAvisoExtracao("Não consegui ler o valor nem o código de barras automaticamente - confere e preenche na mão.");
+        } else {
+          setAvisoExtracao("Não foi possível ler o boleto automaticamente. Confere e preenche na mão.");
+        }
+      } catch {
         setAvisoExtracao("Não foi possível ler o boleto automaticamente. Confere e preenche na mão.");
       }
-    } catch {
-      setAvisoExtracao("Não foi possível ler o boleto automaticamente. Confere e preenche na mão.");
     }
     setExtraindo(false);
 
@@ -345,10 +361,15 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
       codigo: codigoExtraido ?? codigoBarras,
       valor: valorExtraido ?? Number(valorLancar.replace(",", ".")) ?? null,
       documentoSuspeito, formatoInvalido, hash, tipoDetectado,
+      codigoNaoFechaMatematicamente, diaVencimentoDetectado,
+      arquivoCorrompido, tamanhoForaDoNormal,
     });
   }
 
-  async function rodarVerificacoes(params: { codigo: string | null; valor: number | null; documentoSuspeito?: boolean; formatoInvalido?: boolean; hash?: string | null; tipoDetectado?: string | null }) {
+  async function rodarVerificacoes(params: {
+    codigo: string | null; valor: number | null; documentoSuspeito?: boolean; formatoInvalido?: boolean; hash?: string | null; tipoDetectado?: string | null;
+    codigoNaoFechaMatematicamente?: boolean; diaVencimentoDetectado?: number | null; arquivoCorrompido?: boolean; tamanhoForaDoNormal?: boolean;
+  }) {
     setVerificando(true);
     const novosAlertas: string[] = [];
 
@@ -377,11 +398,26 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
       }
     }
 
+    if (params.arquivoCorrompido) {
+      novosAlertas.push("Esse arquivo não parece um PDF ou imagem válido - pode estar corrompido ou ter vindo errado no envio.");
+    }
+    if (params.tamanhoForaDoNormal) {
+      novosAlertas.push("O tamanho desse arquivo está fora do normal pra um boleto - confere se é o arquivo certo antes de lançar.");
+    }
     if (params.documentoSuspeito) {
       novosAlertas.push("O arquivo enviado não parece um boleto ou fatura de verdade - confere se é o documento certo.");
     }
     if (params.formatoInvalido) {
       novosAlertas.push("O código de barras não tem o formato esperado (47 ou 48 dígitos) - pode ter vindo errado na leitura.");
+    }
+    if (params.codigoNaoFechaMatematicamente) {
+      novosAlertas.push("O código de barras lido não fecha matematicamente (dígito verificador não bate) - bem provável que a leitura veio errada. Confere na mão.");
+    }
+    if (params.diaVencimentoDetectado != null && conta.dia_vencimento != null) {
+      const diff = Math.abs(params.diaVencimentoDetectado - conta.dia_vencimento);
+      if (diff > 3) {
+        novosAlertas.push(`O vencimento lido no documento (dia ${params.diaVencimentoDetectado}) está bem diferente do cadastrado nessa conta (dia ${conta.dia_vencimento}). Confere se é o boleto certo.`);
+      }
     }
 
     // regra 1: mesmo código de barras já lançado em outro lugar (duplicidade real)
