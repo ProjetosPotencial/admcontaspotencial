@@ -85,6 +85,111 @@ function VencimentoCell({ contaId, dia, ano, mes }: { contaId: string; dia: numb
   );
 }
 
+function OrigemCell({ contaId, origem }: { contaId: string; origem: string }) {
+  const supabase = createClient();
+  const router = useRouter();
+  const [editando, setEditando] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+
+  async function salvar(novaOrigem: string) {
+    setSalvando(true);
+    const { error } = await supabase.from("contas").update({ origem: novaOrigem }).eq("id", contaId);
+    setSalvando(false);
+    if (!error) { setEditando(false); router.refresh(); }
+  }
+
+  if (editando) {
+    return (
+      <select autoFocus disabled={salvando} defaultValue={origem} onClick={(e) => e.stopPropagation()}
+        onChange={(e) => salvar(e.target.value)} onBlur={() => setEditando(false)}
+        className="border border-amarelo rounded-md px-1.5 py-1 text-[12px]">
+        {Object.entries(ORIGENS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+      </select>
+    );
+  }
+  return (
+    <button onClick={(e) => { e.stopPropagation(); setEditando(true); }} className="hover:opacity-70 transition">
+      <span className="badge bg-info-bg text-info">{ORIGENS[origem] ?? origem}</span>
+    </button>
+  );
+}
+
+function LojaCell({ contaId, lojaAtual, lojas }: { contaId: string; lojaAtual: { codigo: string; coban: string } | null; lojas: { id: string; codigo: string }[] }) {
+  const supabase = createClient();
+  const router = useRouter();
+  const [editando, setEditando] = useState(false);
+  const [busca, setBusca] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  const filtradas = busca.trim() ? lojas.filter((l) => l.codigo.toLowerCase().includes(busca.toLowerCase())).slice(0, 30) : lojas.slice(0, 30);
+
+  async function salvar(lojaId: string) {
+    setSalvando(true);
+    const { error } = await supabase.from("contas").update({ loja_id: lojaId }).eq("id", contaId);
+    setSalvando(false);
+    if (!error) { setEditando(false); router.refresh(); }
+  }
+
+  if (editando) {
+    return (
+      <div className="relative" onClick={(e) => e.stopPropagation()}>
+        <input autoFocus value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar loja..."
+          onKeyDown={(e) => e.key === "Escape" && setEditando(false)}
+          className="w-40 border border-amarelo rounded-md px-1.5 py-1 text-[12px]" />
+        <div className="absolute z-30 top-full left-0 mt-1 w-56 max-h-48 overflow-y-auto bg-white border border-linha rounded-md shadow-media">
+          {filtradas.map((l) => (
+            <button key={l.id} disabled={salvando} onClick={() => salvar(l.id)}
+              className="block w-full text-left px-2.5 py-1.5 text-[12px] hover:bg-off disabled:opacity-40">
+              {l.codigo}
+            </button>
+          ))}
+          {filtradas.length === 0 && <div className="px-2.5 py-1.5 text-[12px] text-[#adb5bd]">Nenhuma loja encontrada.</div>}
+          <button onClick={() => setEditando(false)} className="block w-full text-left px-2.5 py-1.5 text-[11.5px] text-[#adb5bd] border-t border-linha2 hover:bg-off">Cancelar</button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <button onClick={(e) => { e.stopPropagation(); setEditando(true); setBusca(""); }} className="text-left hover:opacity-70 transition">
+      {lojaAtual?.codigo ?? "—"}
+      <small className="block text-[#adb5bd] text-[11px] font-mono">{lojaAtual?.coban}</small>
+    </button>
+  );
+}
+
+function FornecedorCell({ contaId, nome }: { contaId: string; nome: string | null }) {
+  const supabase = createClient();
+  const router = useRouter();
+  const [editando, setEditando] = useState(false);
+  const [valor, setValor] = useState(nome ?? "");
+  const [salvando, setSalvando] = useState(false);
+
+  async function salvar() {
+    setSalvando(true);
+    const { error } = await supabase.from("contas").update({ fornecedor_nome: valor.trim() || null }).eq("id", contaId);
+    setSalvando(false);
+    if (!error) { setEditando(false); router.refresh(); }
+  }
+
+  if (editando) {
+    return (
+      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+        <input autoFocus value={valor} onChange={(e) => setValor(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") salvar(); if (e.key === "Escape") setEditando(false); }}
+          className="w-32 border border-amarelo rounded-md px-1.5 py-1 text-[12px]" />
+        <button onClick={salvar} disabled={salvando} className="text-ok hover:text-ok-dark disabled:opacity-40">
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 10.5l3.5 3.5L16 5.5" /></svg>
+        </button>
+      </div>
+    );
+  }
+  return (
+    <button onClick={(e) => { e.stopPropagation(); setEditando(true); }} className="text-left hover:opacity-70 transition">
+      {nome ?? "—"}
+    </button>
+  );
+}
+
 export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes }: {
   contas: Conta[]; situacaoPorConta: Record<string, string>; lojas: { id: string; codigo: string }[]; ano: number; mes: number;
 }) {
@@ -205,8 +310,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
               <tr key={c.id} onClick={() => setAberta(c)} className="h-14 cursor-pointer border-b border-[#f1f3f5] last:border-0 hover:bg-[#f8f9fa] transition group relative">
                 <td className="px-4 text-[13px] font-medium relative">
                   <span className="absolute left-0 top-0 bottom-0 w-1 bg-amarelo opacity-0 group-hover:opacity-100 transition" />
-                  {c.lojas?.codigo ?? "—"}
-                  <small className="block text-[#adb5bd] text-[11px] font-mono">{c.lojas?.coban}</small>
+                  <LojaCell contaId={c.id} lojaAtual={c.lojas} lojas={lojas} />
                 </td>
                 <td className="px-4 text-[13px] font-medium">
                   <span className="inline-flex items-center gap-1.5">
@@ -215,11 +319,11 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
                   </span>
                 </td>
                 <td className="px-4 text-[13px] font-medium">
-                  {c.fornecedor_nome ?? "—"}
+                  <FornecedorCell contaId={c.id} nome={c.fornecedor_nome} />
                   {c.eh_rateio && <span className="text-[10px] font-mono text-amb border border-amarelo rounded px-1 ml-1.5">RATEIO</span>}
                 </td>
                 <td className="px-4"><VencimentoCell contaId={c.id} dia={c.dia_vencimento} ano={ano} mes={mes} /></td>
-                <td className="px-4 text-[13px]"><span className="badge bg-info-bg text-info">{ORIGENS[c.origem]}</span></td>
+                <td className="px-4 text-[13px]"><OrigemCell contaId={c.id} origem={c.origem} /></td>
                 <td className="px-4 text-[13px]"><StatusBadge status={c.status} /></td>
                 <td className="px-4 text-right">
                   <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#adb5bd" strokeWidth="1.6" className="inline group-hover:stroke-amarelo"><path d="M7.5 4.5l6 5.5-6 5.5" /></svg>
