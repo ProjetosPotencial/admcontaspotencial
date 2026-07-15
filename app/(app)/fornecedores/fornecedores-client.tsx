@@ -1,10 +1,81 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { TIPOS } from "@/lib/types";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 
 type Fornecedor = { id: string; nome: string; tipo_padrao: string | null; portal_padrao: string | null };
+
+function TipoCell({ fornecedorId, tipoAtual }: { fornecedorId: string; tipoAtual: string | null }) {
+  const supabase = createClient();
+  const router = useRouter();
+  const [editando, setEditando] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const T = tipoAtual ? TIPOS[tipoAtual] : null;
+
+  async function salvar(novoTipo: string) {
+    setSalvando(true);
+    const { error } = await supabase.from("fornecedores").update({ tipo_padrao: novoTipo || null }).eq("id", fornecedorId);
+    setSalvando(false);
+    if (!error) { setEditando(false); router.refresh(); }
+  }
+
+  if (editando) {
+    return (
+      <select autoFocus disabled={salvando} defaultValue={tipoAtual ?? ""} onChange={(e) => salvar(e.target.value)} onBlur={() => setEditando(false)}
+        className="border border-amarelo rounded-md px-2 py-1 text-[12px]">
+        <option value="">Sem tipo</option>
+        {Object.entries(TIPOS).map(([k, v]) => <option key={k} value={k}>{v.n}</option>)}
+      </select>
+    );
+  }
+  return (
+    <button onClick={() => setEditando(true)} className="hover:opacity-70 transition">
+      {T ? <span className="badge" style={{ background: T.bg, color: T.c }}>{T.n}</span> : <span className="text-[12px] text-info font-semibold">+ definir</span>}
+    </button>
+  );
+}
+
+function PortalCell({ fornecedorId, portalAtual }: { fornecedorId: string; portalAtual: string | null }) {
+  const supabase = createClient();
+  const router = useRouter();
+  const [editando, setEditando] = useState(false);
+  const [valor, setValor] = useState(portalAtual ?? "");
+  const [salvando, setSalvando] = useState(false);
+
+  async function salvar() {
+    setSalvando(true);
+    const { error } = await supabase.from("fornecedores").update({ portal_padrao: valor.trim() || null }).eq("id", fornecedorId);
+    setSalvando(false);
+    if (!error) { setEditando(false); router.refresh(); }
+  }
+
+  if (editando) {
+    return (
+      <div className="flex items-center gap-1">
+        <input autoFocus value={valor} onChange={(e) => setValor(e.target.value)} placeholder="https://..."
+          onKeyDown={(e) => { if (e.key === "Enter") salvar(); if (e.key === "Escape") setEditando(false); }}
+          className="w-44 border border-amarelo rounded-md px-2 py-1 text-[12px]" />
+        <button onClick={salvar} disabled={salvando} className="text-ok hover:text-ok-dark disabled:opacity-40 shrink-0">
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 10.5l3.5 3.5L16 5.5" /></svg>
+        </button>
+      </div>
+    );
+  }
+  if (portalAtual) {
+    return (
+      <div className="flex items-center gap-2">
+        <a href={portalAtual} target="_blank" rel="noreferrer" className="text-[12px] text-info hover:underline truncate max-w-[160px]">{portalAtual.replace(/^https?:\/\//, "")}</a>
+        <button onClick={() => setEditando(true)} className="text-[10.5px] text-[#adb5bd] hover:text-[#1a1a1a] shrink-0">editar</button>
+      </div>
+    );
+  }
+  return (
+    <button onClick={() => setEditando(true)} className="text-[12px] text-info font-semibold hover:underline">+ adicionar link</button>
+  );
+}
 
 export default function FornecedoresClient({ fornecedores, nomesAtivos }: { fornecedores: Fornecedor[]; nomesAtivos: string[] }) {
   const ativosSet = useMemo(() => new Set(nomesAtivos), [nomesAtivos]);
@@ -62,15 +133,12 @@ export default function FornecedoresClient({ fornecedores, nomesAtivos }: { forn
           </thead>
           <tbody>
             {visiveis.map((f) => {
-              const T = f.tipo_padrao ? TIPOS[f.tipo_padrao] : null;
               const ativo = ativosSet.has(f.nome);
               return (
                 <tr key={f.id} className="h-12 border-b border-[#f1f3f5] last:border-0 hover:bg-[#f8f9fa]">
                   <td className="px-4 text-[13px] font-medium">{f.nome}</td>
-                  <td className="px-4 text-[13px]">
-                    {T ? <span className="badge" style={{ background: T.bg, color: T.c }}>{T.n}</span> : "—"}
-                  </td>
-                  <td className="px-4 text-[12px] text-[#adb5bd] font-mono truncate max-w-[220px]">{f.portal_padrao ?? "—"}</td>
+                  <td className="px-4 text-[13px]"><TipoCell fornecedorId={f.id} tipoAtual={f.tipo_padrao} /></td>
+                  <td className="px-4 text-[12px]"><PortalCell fornecedorId={f.id} portalAtual={f.portal_padrao} /></td>
                   <td className="px-4"><span className={`badge ${ativo ? "bg-ok-bg text-ok" : "bg-[#f1f3f5] text-[#adb5bd]"}`}>{ativo ? "Ativo" : "Inativo"}</span></td>
                 </tr>
               );

@@ -6,6 +6,19 @@ import { obterPeriodoAtual, estaAtrasada } from "@/lib/date-utils";
 
 export const dynamic = "force-dynamic";
 
+function agruparPorTipo(itens: any[]): [string, any[]][] {
+  const grupos = new Map<string, any[]>();
+  for (const item of itens) {
+    const tipo = (item as any).contas?.tipo ?? (item as any).tipo ?? "custo_geral";
+    if (!grupos.has(tipo)) grupos.set(tipo, []);
+    grupos.get(tipo)!.push(item);
+  }
+  // ordena pela ordem natural dos tipos (mesma ordem do TIPOS), não alfabética
+  return Object.keys(TIPOS)
+    .filter((t) => grupos.has(t))
+    .map((t) => [t, grupos.get(t)!] as [string, any[]]);
+}
+
 export default async function AlertasPage() {
   const supabase = createClient();
   const { ano, mes } = obterPeriodoAtual();
@@ -25,6 +38,8 @@ export default async function AlertasPage() {
   const atrasadas = (lancMes ?? []).filter((l: any) =>
     estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano)
   );
+  const atrasadasPorTipo = agruparPorTipo(atrasadas);
+  const mapearPorTipo = agruparPorTipo(mapear ?? []);
 
   return (
     <>
@@ -37,33 +52,59 @@ export default async function AlertasPage() {
           <h2 className="text-[16px] font-semibold text-[#1a1a1a] mb-3 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-alerr" /> Contas atrasadas ({atrasadas.length})
           </h2>
-          <div className="card divide-y divide-[#f1f3f5]">
-            {atrasadas.slice(0, 20).map((l: any) => (
-              <Link key={l.id} href={`/contas?conta=${l.contas.id}`} className="flex items-center gap-3 px-5 py-3 text-[13px] hover:bg-[#f8f9fa]">
-                <TipoIcon tipo={l.contas.tipo} size={15} color={TIPOS[l.contas.tipo]?.c} />
-                <b className="font-semibold">{l.contas.lojas?.codigo}</b>
-                <span className="text-[#6c757d]">{TIPOS[l.contas.tipo]?.n} · {l.contas.fornecedor_nome ?? "—"}</span>
-                <span className="ml-auto text-[11px] text-[#adb5bd] font-mono">dia {l.contas.dia_vencimento ?? "—"}</span>
-              </Link>
-            ))}
-            {atrasadas.length === 0 && <div className="text-center py-10 text-[#adb5bd] text-[13px]">Nenhuma conta atrasada.</div>}
-          </div>
+          {atrasadas.length === 0 ? (
+            <div className="card text-center py-10 text-[#adb5bd] text-[13px]">Nenhuma conta atrasada.</div>
+          ) : (
+            <div className="space-y-5">
+              {atrasadasPorTipo.map(([tipo, itens]) => (
+                <div key={tipo}>
+                  <div className="flex items-center gap-2 mb-2 text-[12.5px] font-semibold text-[#6c757d]">
+                    <TipoIcon tipo={tipo} size={14} color={TIPOS[tipo]?.c} />
+                    {TIPOS[tipo]?.n}
+                    <span className="badge bg-[#f1f3f5] text-[#6c757d]">{itens.length}</span>
+                  </div>
+                  <div className="card divide-y divide-[#f1f3f5]">
+                    {(itens as any[]).map((l) => (
+                      <Link key={l.id} href={`/contas?conta=${l.contas.id}`} className="flex items-center gap-3 px-5 py-3 text-[13px] hover:bg-[#f8f9fa]">
+                        <b className="font-semibold">{l.contas.lojas?.codigo}</b>
+                        <span className="text-[#6c757d]">{l.contas.fornecedor_nome ?? "—"}</span>
+                        <span className="ml-auto text-[11px] text-[#adb5bd] font-mono">dia {l.contas.dia_vencimento ?? "—"}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <section>
           <h2 className="text-[16px] font-semibold text-[#1a1a1a] mb-3 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-amb" /> Origem a mapear ({(mapear ?? []).length})
           </h2>
-          <div className="card divide-y divide-[#f1f3f5]">
-            {(mapear ?? []).slice(0, 20).map((c: any) => (
-              <Link key={c.id} href={`/contas?conta=${c.id}`} className="flex items-center gap-3 px-5 py-3 text-[13px] hover:bg-[#f8f9fa]">
-                <TipoIcon tipo={c.tipo} size={15} color={TIPOS[c.tipo]?.c} />
-                <b className="font-semibold">{c.lojas?.codigo}</b>
-                <span className="text-[#6c757d]">{TIPOS[c.tipo]?.n} · {c.fornecedor_nome ?? "—"}</span>
-              </Link>
-            ))}
-            {(mapear ?? []).length === 0 && <div className="text-center py-10 text-[#adb5bd] text-[13px]">Nenhuma conta sem origem.</div>}
-          </div>
+          {(mapear ?? []).length === 0 ? (
+            <div className="card text-center py-10 text-[#adb5bd] text-[13px]">Nenhuma conta sem origem.</div>
+          ) : (
+            <div className="space-y-5">
+              {mapearPorTipo.map(([tipo, itens]) => (
+                <div key={tipo}>
+                  <div className="flex items-center gap-2 mb-2 text-[12.5px] font-semibold text-[#6c757d]">
+                    <TipoIcon tipo={tipo} size={14} color={TIPOS[tipo]?.c} />
+                    {TIPOS[tipo]?.n}
+                    <span className="badge bg-[#f1f3f5] text-[#6c757d]">{itens.length}</span>
+                  </div>
+                  <div className="card divide-y divide-[#f1f3f5]">
+                    {(itens as any[]).map((c) => (
+                      <Link key={c.id} href={`/contas?conta=${c.id}`} className="flex items-center gap-3 px-5 py-3 text-[13px] hover:bg-[#f8f9fa]">
+                        <b className="font-semibold">{c.lojas?.codigo}</b>
+                        <span className="text-[#6c757d]">{c.fornecedor_nome ?? "—"}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </>

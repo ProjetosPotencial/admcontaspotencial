@@ -117,7 +117,13 @@ function ItemCard({ item, lojas, processando, onConfirmar, onRejeitar }: {
 }) {
   const [lojaId, setLojaId] = useState(item.loja_sugerida_id ?? "");
   const [tipo, setTipo] = useState(item.tipo_detectado ?? "");
+  const [buscaLoja, setBuscaLoja] = useState("");
+  const [buscandoLoja, setBuscandoLoja] = useState(false);
   const conf = CONFIANCA_LABEL[item.confianca];
+  const lojaSelecionada = lojas.find((l) => l.id === lojaId);
+  const lojasFiltradas = buscaLoja.trim()
+    ? lojas.filter((l) => l.codigo.toLowerCase().includes(buscaLoja.toLowerCase())).slice(0, 30)
+    : lojas.slice(0, 30);
 
   return (
     <div className="card p-4">
@@ -138,12 +144,27 @@ function ItemCard({ item, lojas, processando, onConfirmar, onRejeitar }: {
           <div className="text-[10.5px] font-semibold text-[#adb5bd] uppercase mb-1">Valor</div>
           <div className="text-[14px] font-bold font-mono">{item.valor_detectado != null ? money(item.valor_detectado) : "—"}</div>
         </div>
-        <div>
+        <div className="relative">
           <div className="text-[10.5px] font-semibold text-[#adb5bd] uppercase mb-1">Loja</div>
-          <select value={lojaId} onChange={(e) => setLojaId(e.target.value)} className="border border-linha rounded-md px-2 py-1 text-[12px] w-full">
-            <option value="">Escolher...</option>
-            {lojas.map((l) => <option key={l.id} value={l.id}>{l.codigo}</option>)}
-          </select>
+          <input
+            value={buscandoLoja ? buscaLoja : (lojaSelecionada?.codigo ?? "")}
+            onFocus={() => { setBuscandoLoja(true); setBuscaLoja(""); }}
+            onChange={(e) => setBuscaLoja(e.target.value)}
+            placeholder="Buscar loja..."
+            className="border border-linha rounded-md px-2 py-1 text-[12px] w-full"
+          />
+          {buscandoLoja && (
+            <div className="absolute z-30 top-full left-0 mt-1 w-56 max-h-48 overflow-y-auto bg-white border border-linha rounded-md shadow-media">
+              {lojasFiltradas.map((l) => (
+                <button key={l.id} onClick={() => { setLojaId(l.id); setBuscandoLoja(false); }}
+                  className="block w-full text-left px-2.5 py-1.5 text-[12px] hover:bg-off">
+                  {l.codigo}
+                </button>
+              ))}
+              {lojasFiltradas.length === 0 && <div className="px-2.5 py-1.5 text-[12px] text-[#adb5bd]">Nenhuma loja encontrada.</div>}
+              <button onClick={() => setBuscandoLoja(false)} className="block w-full text-left px-2.5 py-1.5 text-[11px] text-[#adb5bd] border-t border-linha2 hover:bg-off">Fechar</button>
+            </div>
+          )}
         </div>
         <div>
           <div className="text-[10.5px] font-semibold text-[#adb5bd] uppercase mb-1">Tipo</div>
