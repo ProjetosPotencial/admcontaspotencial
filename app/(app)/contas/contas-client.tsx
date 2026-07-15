@@ -17,8 +17,49 @@ function StatusBadge({ status }: { status: string }) {
   return <span className="badge bg-ok-bg text-ok">Ativa</span>;
 }
 
-function VencimentoCell({ dia, ano, mes }: { dia: number | null; ano: number; mes: number }) {
-  if (!dia) return <span className="text-[13px] text-[#adb5bd]">—</span>;
+function VencimentoCell({ contaId, dia, ano, mes }: { contaId: string; dia: number | null; ano: number; mes: number }) {
+  const supabase = createClient();
+  const router = useRouter();
+  const [editando, setEditando] = useState(false);
+  const [valor, setValor] = useState(String(dia ?? ""));
+  const [salvando, setSalvando] = useState(false);
+
+  async function salvar() {
+    const novoDia = Number(valor);
+    if (!Number.isInteger(novoDia) || novoDia < 1 || novoDia > 31) return;
+    setSalvando(true);
+    const { error } = await supabase.from("contas").update({ dia_vencimento: novoDia }).eq("id", contaId);
+    setSalvando(false);
+    if (!error) { setEditando(false); router.refresh(); }
+  }
+
+  if (editando) {
+    return (
+      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+        <input
+          type="number" min={1} max={31} autoFocus value={valor}
+          onChange={(e) => setValor(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") salvar(); if (e.key === "Escape") setEditando(false); }}
+          className="w-14 border border-amarelo rounded-md px-1.5 py-1 text-[12.5px] font-mono focus:outline-none"
+        />
+        <button onClick={salvar} disabled={salvando} className="text-ok hover:text-ok-dark disabled:opacity-40" title="Salvar">
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 10.5l3.5 3.5L16 5.5" /></svg>
+        </button>
+        <button onClick={() => setEditando(false)} className="text-[#adb5bd] hover:text-[#1a1a1a]" title="Cancelar">
+          <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 5l10 10M15 5L5 15" /></svg>
+        </button>
+      </div>
+    );
+  }
+
+  if (!dia) {
+    return (
+      <button onClick={(e) => { e.stopPropagation(); setEditando(true); }} className="text-[12.5px] text-info font-semibold hover:underline">
+        + definir vencimento
+      </button>
+    );
+  }
+
   const diaAtual = new Date().getDate();
   const diff = dia - diaAtual;
   const dataFormatada = new Date(ano, mes - 1, dia).toLocaleDateString("pt-br");
@@ -31,13 +72,16 @@ function VencimentoCell({ dia, ano, mes }: { dia: number | null; ano: number; me
   else { label = `${diff} dias`; cor = "text-ok"; }
 
   return (
-    <div className="flex items-center gap-2">
+    <button onClick={(e) => { e.stopPropagation(); setEditando(true); }} className="flex items-center gap-2 group/venc text-left">
       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${diff < 0 || diff === 0 ? "bg-alerr" : diff <= 7 ? "bg-amb" : "bg-ok"}`} />
       <div>
-        <div className={`text-[12.5px] font-semibold ${cor}`}>{label}</div>
+        <div className={`text-[12.5px] font-semibold ${cor} flex items-center gap-1`}>
+          {label}
+          <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="opacity-0 group-hover/venc:opacity-50 transition"><path d="M13.5 3.5l3 3-10 10H3.5v-3l10-10z" /></svg>
+        </div>
         <div className="text-[11px] text-[#adb5bd] font-mono">{dataFormatada}</div>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -174,7 +218,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
                   {c.fornecedor_nome ?? "—"}
                   {c.eh_rateio && <span className="text-[10px] font-mono text-amb border border-amarelo rounded px-1 ml-1.5">RATEIO</span>}
                 </td>
-                <td className="px-4"><VencimentoCell dia={c.dia_vencimento} ano={ano} mes={mes} /></td>
+                <td className="px-4"><VencimentoCell contaId={c.id} dia={c.dia_vencimento} ano={ano} mes={mes} /></td>
                 <td className="px-4 text-[13px]"><span className="badge bg-info-bg text-info">{ORIGENS[c.origem]}</span></td>
                 <td className="px-4 text-[13px]"><StatusBadge status={c.status} /></td>
                 <td className="px-4 text-right">
