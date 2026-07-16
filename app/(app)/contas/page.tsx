@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import ContasClient from "./contas-client";
 import type { Conta } from "@/lib/types";
 import { TIPOS } from "@/lib/types";
-import { formatarPeriodo, estaAtrasada, variacaoPct } from "@/lib/date-utils";
+import { formatarPeriodo, estaAtrasada, variacaoPct, contaValidaNoPeriodo } from "@/lib/date-utils";
 import { obterPeriodoSelecionado } from "@/lib/periodo";
 import { money, MES } from "@/lib/format";
 import Link from "next/link";
@@ -24,7 +24,7 @@ export default async function ContasPage() {
   ] = await Promise.all([
     supabase
       .from("contas")
-      .select("id, tipo, fornecedor_nome, identificador, dia_vencimento, origem, cnpj_cpf, insc_cod_mat, portal_link, eh_rateio, rateio_divisor, observacoes, status, loja_id, lojas ( codigo, coban, empresas ( nome ) )")
+      .select("id, tipo, fornecedor_nome, identificador, dia_vencimento, origem, cnpj_cpf, insc_cod_mat, portal_link, eh_rateio, rateio_divisor, observacoes, status, data_encerramento, motivo_encerramento, loja_id, lojas ( codigo, coban, empresas ( nome ) )")
       .eq("situacao_cadastro", "aprovada")
       .order("tipo"),
     supabase.from("lancamentos").select("conta_id, situacao").eq("ano", ano).eq("mes", mes),
@@ -40,7 +40,7 @@ export default async function ContasPage() {
   const situacaoPorConta: Record<string, string> = {};
   (lancAtual ?? []).forEach((l: any) => { situacaoPorConta[l.conta_id] = l.situacao; });
 
-  const totalCadastradas = contas.filter((c) => c.status === "ativo").length;
+  const totalCadastradas = contas.filter((c) => c.status === "ativo" || (c.status === "encerrado" && contaValidaNoPeriodo(c.status, c.data_encerramento, ano, mes))).length;
 
   const pendentes = (lancDetalhado ?? []).filter((l: any) => l.situacao === "pendente" || l.situacao === "lancado");
   const venceHoje = ehPeriodoAtual ? pendentes.filter((l: any) => l.contas?.dia_vencimento === diaAtual) : [];

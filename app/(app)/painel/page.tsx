@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import TipoIcon from "@/components/tipo-icon";
 import { TIPOS } from "@/lib/types";
-import { formatarPeriodo, estaAtrasada, variacaoPct } from "@/lib/date-utils";
+import { formatarPeriodo, estaAtrasada, variacaoPct, contaValidaNoPeriodo } from "@/lib/date-utils";
 import { obterPeriodoSelecionado } from "@/lib/periodo";
 import { money, MES } from "@/lib/format";
 import VencimentosProximosClient from "./vencimentos-proximos-client";
@@ -33,7 +33,7 @@ export default async function PainelPage() {
     { data: metricaAnterior },
   ] = await Promise.all([
     supabase.from("perfis").select("nome").eq("id", session?.user.id ?? "").maybeSingle(),
-    supabase.from("contas").select("id, tipo, status, origem, dia_vencimento").eq("situacao_cadastro", "aprovada"),
+    supabase.from("contas").select("id, tipo, status, origem, dia_vencimento, data_encerramento").eq("situacao_cadastro", "aprovada"),
     supabase.from("lancamentos").select("conta_id, situacao, contas!inner(tipo, dia_vencimento)").eq("ano", ano).eq("mes", mes),
     supabase.from("lancamentos")
       .select("id, valor, situacao, contas!inner ( id, tipo, dia_vencimento, fornecedor_nome, lojas ( codigo ) )")
@@ -52,7 +52,7 @@ export default async function PainelPage() {
   // --- métricas por tipo (cards de baixo) ---
   const tipos = Object.keys(TIPOS);
   const porTipo = tipos.map((t) => {
-    const doTipo = (contas ?? []).filter((c) => c.tipo === t && c.status === "ativo");
+    const doTipo = (contas ?? []).filter((c) => c.tipo === t && c.status !== "inativo" && contaValidaNoPeriodo(c.status, c.data_encerramento, ano, mes));
     const ativas = doTipo.length;
     const mapear = doTipo.filter((c) => c.origem === "a_definir").length;
     const lanc = (lancamentos ?? []).filter((l: any) => l.contas?.tipo === t);

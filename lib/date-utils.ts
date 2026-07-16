@@ -28,6 +28,35 @@ export function obterPeriodoAtual(dataOverride?: Date): PeriodoAtual {
 }
 
 /**
+ * Verifica se uma conta ainda "vale" pra um período específico. Uma conta
+ * encerrada continua contando normalmente ATÉ o mês do encerramento
+ * (inclusive) - só deixa de contar a partir do mês seguinte. Isso evita
+ * que uma conta encerrada no meio do mês suma de relatórios daquele mês
+ * mesmo tendo sido cobrada normalmente até lá.
+ *
+ * @param status - status da conta ("ativo", "inativo", "encerrado")
+ * @param dataEncerramento - data em que foi encerrada (string YYYY-MM-DD ou null)
+ * @param ano - ano do período sendo visualizado
+ * @param mes - mês do período sendo visualizado
+ */
+export function contaValidaNoPeriodo(
+  status: string,
+  dataEncerramento: string | null | undefined,
+  ano: number,
+  mes: number
+): boolean {
+  if (status !== "encerrado") return true;
+  if (!dataEncerramento) return true; // encerrada sem data - não temos como saber o corte, mantém visível
+  const dt = new Date(dataEncerramento);
+  const anoEncerramento = dt.getFullYear();
+  const mesEncerramento = dt.getMonth() + 1;
+  // válida se o período visto é igual ou anterior ao mês do encerramento
+  if (ano < anoEncerramento) return true;
+  if (ano === anoEncerramento) return mes <= mesEncerramento;
+  return false;
+}
+
+/**
  * Formata um período (mês/ano) em formato legível
  * @example formatarPeriodo(7, 2026) => "Julho/2026"
  */

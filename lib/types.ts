@@ -35,6 +35,8 @@ export type Conta = {
   cnpj_cpf: string | null;
   insc_cod_mat: string | null;
   portal_link: string | null;
+  data_encerramento: string | null;
+  motivo_encerramento: string | null;
   eh_rateio: boolean;
   rateio_divisor: number | null;
   observacoes: string | null;

@@ -7,7 +7,7 @@ import { TIPOS, ORIGENS, SITUACAO, type Conta, type Lancamento } from "@/lib/typ
 import { CAMPOS_TIPO } from "@/lib/campos-tipo";
 import { useContaForm } from "@/lib/hooks/useContaForm";
 import { useDebounce } from "@/lib/hooks/useDebounce";
-import { formatarPeriodo } from "@/lib/date-utils";
+import { formatarPeriodo, contaValidaNoPeriodo } from "@/lib/date-utils";
 import TipoIcon from "@/components/tipo-icon";
 import { money, MES, nomeArquivoSeguro } from "@/lib/format";
 
@@ -383,6 +383,50 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
   const [novoPortalLink, setNovoPortalLink] = useState(conta.portal_link ?? "");
   const [salvarComoPadrao, setSalvarComoPadrao] = useState(false);
   const [salvandoPortal, setSalvandoPortal] = useState(false);
+  const [encerrando, setEncerrando] = useState(false);
+  const [dataEncerrar, setDataEncerrar] = useState("");
+  const [motivoEncerrar, setMotivoEncerrar] = useState("");
+  const [encerrarFornecedorTodo, setEncerrarFornecedorTodo] = useState(false);
+  const [qtdContasFornecedor, setQtdContasFornecedor] = useState<number | null>(null);
+  const [salvandoEncerramento, setSalvandoEncerramento] = useState(false);
+  const [erroEncerramento, setErroEncerramento] = useState<string | null>(null);
+
+  async function abrirEncerramento() {
+    setEncerrando(true);
+    setDataEncerrar(new Date().toISOString().slice(0, 10));
+    setMotivoEncerrar("");
+    setEncerrarFornecedorTodo(false);
+    setErroEncerramento(null);
+    if (conta.fornecedor_nome) {
+      const { count } = await supabase.from("contas").select("id", { count: "exact", head: true })
+        .ilike("fornecedor_nome", conta.fornecedor_nome).eq("status", "ativo");
+      setQtdContasFornecedor(count ?? null);
+    }
+  }
+
+  async function confirmarEncerramento() {
+    if (!dataEncerrar) { setErroEncerramento("Informe a data de encerramento."); return; }
+    setSalvandoEncerramento(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const payload = {
+      status: "encerrado",
+      data_encerramento: dataEncerrar,
+      motivo_encerramento: motivoEncerrar.trim() || null,
+      encerrada_por: user?.id ?? null,
+    };
+
+    if (encerrarFornecedorTodo && conta.fornecedor_nome) {
+      const { error } = await supabase.from("contas").update(payload).ilike("fornecedor_nome", conta.fornecedor_nome).eq("status", "ativo");
+      setSalvandoEncerramento(false);
+      if (error) { setErroEncerramento("Não foi possível encerrar as contas desse fornecedor."); return; }
+    } else {
+      const { error } = await supabase.from("contas").update(payload).eq("id", conta.id);
+      setSalvandoEncerramento(false);
+      if (error) { setErroEncerramento("Não foi possível encerrar a conta."); return; }
+    }
+    onClose();
+    router.refresh();
+  }
   const [lancando, setLancando] = useState(false);
   const [valorLancar, setValorLancar] = useState("");
   const [arquivoBoleto, setArquivoBoleto] = useState<File | null>(null);
@@ -782,6 +826,50 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
             )}
           </div>
 
+          <div className="pb-5 mb-5 border-b border-linha">
+            {conta.status === "encerrado" ? (
+              <div className="bg-alerr-bg rounded-md px-3 py-2.5">
+                <div className="text-[12.5px] font-semibold text-alerr">Conta encerrada</div>
+                <div className="text-[11.5px] text-[#7a3838] mt-0.5">
+                  {conta.data_encerramento && `Válida até ${new Date(conta.data_encerramento).toLocaleDateString("pt-br")}. `}
+                  {conta.motivo_encerramento && `Motivo: ${conta.motivo_encerramento}`}
+                </div>
+              </div>
+            ) : !encerrando ? (
+              <button onClick={abrirEncerramento} className="text-[12px] text-alerr font-semibold hover:underline">
+                Encerrar essa conta
+              </button>
+            ) : (
+              <div className="bg-off rounded-md p-3.5">
+                <div className="text-[12.5px] font-semibold text-[#1a1a1a] mb-3">Encerrar conta</div>
+                <label className="block mb-3">
+                  <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Data de encerramento *</div>
+                  <input type="date" value={dataEncerrar} onChange={(e) => setDataEncerrar(e.target.value)} className="input-padrao w-full" />
+                </label>
+                <label className="block mb-3">
+                  <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Motivo (opcional)</div>
+                  <input value={motivoEncerrar} onChange={(e) => setMotivoEncerrar(e.target.value)} placeholder="Ex: contrato cancelado" className="input-padrao w-full text-[12.5px]" />
+                </label>
+                {conta.fornecedor_nome && qtdContasFornecedor != null && qtdContasFornecedor > 1 && (
+                  <label className="flex items-start gap-2 mb-3">
+                    <input type="checkbox" checked={encerrarFornecedorTodo} onChange={(e) => setEncerrarFornecedorTodo(e.target.checked)} className="w-3.5 h-3.5 mt-0.5" />
+                    <span className="text-[11.5px] text-[#6c757d]">
+                      Encerrar também as outras <b>{qtdContasFornecedor - 1}</b> conta(s) ativa(s) de {conta.fornecedor_nome}, em todas as lojas
+                    </span>
+                  </label>
+                )}
+                {erroEncerramento && <div className="text-[11.5px] text-alerr bg-alerr-bg rounded-md px-3 py-2 mb-3">{erroEncerramento}</div>}
+                <div className="flex gap-2">
+                  <button onClick={confirmarEncerramento} disabled={salvandoEncerramento}
+                    className="flex-1 bg-alerr hover:bg-alerr-dark text-white rounded-md py-2 text-[12.5px] font-semibold disabled:opacity-50 transition-colors">
+                    {salvandoEncerramento ? "Encerrando..." : encerrarFornecedorTodo ? `Encerrar ${qtdContasFornecedor} contas` : "Confirmar encerramento"}
+                  </button>
+                  <button onClick={() => setEncerrando(false)} className="btn-secundario">Cancelar</button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="pt-5 border-t border-linha">
             <div className="flex items-center justify-between mb-4">
               <div className="text-[14px] font-semibold text-[#1a1a1a]">Credenciais</div>
@@ -863,10 +951,16 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
                 </button>
               </div>
             ) : !lancando ? (
-              <button onClick={() => { setValorLancar(lancamentoAtual ? String(lancamentoAtual.valor ?? "") : ""); setAlertas([]); setConfirmarMesmoAssim(false); setCodigoBarras(""); setHashArquivo(null); setLancando(true); }}
-                className="w-full text-[12.5px] font-semibold text-amb border border-amarelo/40 bg-amb-bg rounded-md py-2.5 hover:bg-amarelo/10 transition">
-                {lancamentoAtual ? `Lançar fatura de ${formatarPeriodo(MES_ATUAL, ANO_ATUAL).toLowerCase()}` : `Lançar fatura de ${formatarPeriodo(MES_ATUAL, ANO_ATUAL).toLowerCase()} (sem lançamento pendente ainda)`}
-              </button>
+              contaValidaNoPeriodo(conta.status, conta.data_encerramento, ANO_ATUAL, MES_ATUAL) ? (
+                <button onClick={() => { setValorLancar(lancamentoAtual ? String(lancamentoAtual.valor ?? "") : ""); setAlertas([]); setConfirmarMesmoAssim(false); setCodigoBarras(""); setHashArquivo(null); setLancando(true); }}
+                  className="w-full text-[12.5px] font-semibold text-amb border border-amarelo/40 bg-amb-bg rounded-md py-2.5 hover:bg-amarelo/10 transition">
+                  {lancamentoAtual ? `Lançar fatura de ${formatarPeriodo(MES_ATUAL, ANO_ATUAL).toLowerCase()}` : `Lançar fatura de ${formatarPeriodo(MES_ATUAL, ANO_ATUAL).toLowerCase()} (sem lançamento pendente ainda)`}
+                </button>
+              ) : (
+                <div className="text-center text-[12px] text-[#adb5bd] bg-off rounded-md py-2.5 px-3">
+                  Essa conta foi encerrada em {conta.data_encerramento && new Date(conta.data_encerramento).toLocaleDateString("pt-br")} - não é possível lançar depois desse período.
+                </div>
+              )
             ) : (
               <div className="card p-4">
                 <label className="block mb-3">
