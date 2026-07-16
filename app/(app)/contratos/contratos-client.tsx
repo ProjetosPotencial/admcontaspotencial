@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { money } from "@/lib/format";
+import { money, formatarDataSemFuso } from "@/lib/format";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 
 type ContratoRow = {
@@ -68,8 +68,8 @@ export default function ContratosClient({ contratos: iniciais, lojas, empresas, 
                 <td className="px-4 text-[13px]">{c.empresas?.nome ?? "—"}</td>
                 <td className="px-4 text-[13px] text-[#6c757d]">{c.tipo ? TIPO_LABEL[c.tipo] ?? c.tipo : "—"}</td>
                 <td className="px-4 text-[12px] text-[#6c757d] font-mono">
-                  {c.data_inicio ? new Date(c.data_inicio).toLocaleDateString("pt-br") : "—"}
-                  {c.data_fim ? ` – ${new Date(c.data_fim).toLocaleDateString("pt-br")}` : ""}
+                  {c.data_inicio ? formatarDataSemFuso(c.data_inicio) : "—"}
+                  {c.data_fim ? ` – ${formatarDataSemFuso(c.data_fim)}` : ""}
                 </td>
                 <td className="px-4 text-[13px] font-mono font-semibold">{money(c.valor)}</td>
                 <td className="px-4"><span className={`badge ${STATUS_CLS[c.status] ?? ""}`}>{c.status}</span></td>

@@ -3,7 +3,7 @@ import TipoIcon from "@/components/tipo-icon";
 import { TIPOS } from "@/lib/types";
 import { formatarPeriodo, estaAtrasada, variacaoPct, contaValidaNoPeriodo } from "@/lib/date-utils";
 import { obterPeriodoSelecionado } from "@/lib/periodo";
-import { money, MES } from "@/lib/format";
+import { money, MES, formatarDataSemFuso } from "@/lib/format";
 import VencimentosProximosClient from "./vencimentos-proximos-client";
 import RelogioAoVivo from "./relogio-ao-vivo";
 import Link from "next/link";
@@ -219,7 +219,7 @@ export default async function PainelPage() {
                     <div className="min-w-0 flex-1">
                       <b className="font-semibold block truncate">{l.codigo}</b>
                     </div>
-                    <span className="text-[10.5px] text-[#adb5bd] font-mono shrink-0">{l.encerrada_em ? new Date(l.encerrada_em).toLocaleDateString("pt-br") : "—"}</span>
+                    <span className="text-[10.5px] text-[#adb5bd] font-mono shrink-0">{l.encerrada_em ? formatarDataSemFuso(l.encerrada_em) : "—"}</span>
                   </li>
                 ))}
               </ul>

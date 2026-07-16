@@ -9,7 +9,7 @@ import { useContaForm } from "@/lib/hooks/useContaForm";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import { formatarPeriodo, contaValidaNoPeriodo } from "@/lib/date-utils";
 import TipoIcon from "@/components/tipo-icon";
-import { money, MES, nomeArquivoSeguro } from "@/lib/format";
+import { money, MES, nomeArquivoSeguro, formatarDataSemFuso } from "@/lib/format";
 
 function StatusBadge({ status }: { status: string }) {
   if (status === "encerrado") return <span className="badge bg-alerr-bg text-alerr">Encerrada</span>;
@@ -831,7 +831,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
               <div className="bg-alerr-bg rounded-md px-3 py-2.5">
                 <div className="text-[12.5px] font-semibold text-alerr">Conta encerrada</div>
                 <div className="text-[11.5px] text-[#7a3838] mt-0.5">
-                  {conta.data_encerramento && `Válida até ${new Date(conta.data_encerramento).toLocaleDateString("pt-br")}. `}
+                  {conta.data_encerramento && `Válida até ${formatarDataSemFuso(conta.data_encerramento)}. `}
                   {conta.motivo_encerramento && `Motivo: ${conta.motivo_encerramento}`}
                 </div>
               </div>
@@ -958,7 +958,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
                 </button>
               ) : (
                 <div className="text-center text-[12px] text-[#adb5bd] bg-off rounded-md py-2.5 px-3">
-                  Essa conta foi encerrada em {conta.data_encerramento && new Date(conta.data_encerramento).toLocaleDateString("pt-br")} - não é possível lançar depois desse período.
+                  Essa conta foi encerrada em {conta.data_encerramento && formatarDataSemFuso(conta.data_encerramento)} - não é possível lançar depois desse período.
                 </div>
               )
             ) : (
