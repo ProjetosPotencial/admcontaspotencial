@@ -23,6 +23,8 @@ export default async function AlertasPage() {
   const supabase = createClient();
   const { ano, mes } = obterPeriodoAtual();
 
+  await supabase.rpc("garantir_lancamentos_pendentes", { p_ano: ano, p_mes: mes });
+
   const [{ data: lancMes }, { data: mapear }] = await Promise.all([
     supabase
       .from("lancamentos")

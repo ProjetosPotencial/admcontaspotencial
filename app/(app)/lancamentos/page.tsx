@@ -12,6 +12,8 @@ export default async function LancamentosPage() {
   const { ano, mes, ehPeriodoAtual } = obterPeriodoSelecionado();
   const diaAtual = new Date().getDate();
 
+  await supabase.rpc("garantir_lancamentos_pendentes", { p_ano: ano, p_mes: mes });
+
   const [{ data }, { data: mesAtualDetalhado }] = await Promise.all([
     supabase
       .from("lancamentos")

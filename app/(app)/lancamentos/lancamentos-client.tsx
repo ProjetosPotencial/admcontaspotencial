@@ -20,6 +20,18 @@ type Resumo = {
   venceHojeQtd: number; venceHojeValor: number;
 };
 
+function rotuloVencimento(dia: number | null, situacao: string): { texto: string; cor: string } {
+  if (!dia) return { texto: "—", cor: "text-[#999]" };
+  if (situacao !== "pendente") return { texto: `dia ${dia}`, cor: "text-[#666]" };
+  const diaAtual = new Date().getDate();
+  const diff = dia - diaAtual;
+  if (diff < 0) return { texto: "Atrasada", cor: "text-alerr font-semibold" };
+  if (diff === 0) return { texto: "Hoje", cor: "text-alerr font-semibold" };
+  if (diff === 1) return { texto: "Amanhã", cor: "text-amb font-semibold" };
+  if (diff <= 7) return { texto: `${diff} dias`, cor: "text-amb font-semibold" };
+  return { texto: `dia ${dia}`, cor: "text-[#666]" };
+}
+
 export default function LancamentosClient({ itens, ano, resumo }: { itens: Item[]; ano: number; resumo: Resumo }) {
   const [fMes, setFMes] = useState("todos");
   const [fTipo, setFTipo] = useState("todos");
@@ -142,7 +154,7 @@ export default function LancamentosClient({ itens, ano, resumo }: { itens: Item[
                   <td className="px-4 text-[13px] text-[#666]">{l.contas.fornecedor_nome ?? "—"}</td>
                   <td className="px-4 text-[13px] font-mono font-semibold">{money(l.valor)}</td>
                   <td className="px-4"><span className={`badge ${s.cls}`}>{s.label}</span></td>
-                  <td className="px-4 text-[12.5px] font-mono text-[#666]">{l.contas.dia_vencimento ? `dia ${l.contas.dia_vencimento}` : "—"}</td>
+                  <td className={`px-4 text-[12.5px] font-mono ${rotuloVencimento(l.contas.dia_vencimento, l.situacao).cor}`}>{rotuloVencimento(l.contas.dia_vencimento, l.situacao).texto}</td>
                 </tr>
               );
             })}

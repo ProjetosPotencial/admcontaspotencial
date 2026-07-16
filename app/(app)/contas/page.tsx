@@ -14,6 +14,8 @@ export default async function ContasPage() {
   const { ano, mes, mesAnterior, anoAnterior, ehPeriodoAtual } = obterPeriodoSelecionado();
   const diaAtual = new Date().getDate();
 
+  await supabase.rpc("garantir_lancamentos_pendentes", { p_ano: ano, p_mes: mes });
+
   const [
     { data },
     { data: lancAtual },

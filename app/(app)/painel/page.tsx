@@ -5,20 +5,33 @@ import { formatarPeriodo, estaAtrasada, variacaoPct, contaValidaNoPeriodo } from
 import { obterPeriodoSelecionado } from "@/lib/periodo";
 import { money, MES } from "@/lib/format";
 import VencimentosProximosClient from "./vencimentos-proximos-client";
+import RelogioAoVivo from "./relogio-ao-vivo";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
 function saudacao(): string {
-  const h = new Date().getHours();
-  if (h < 12) return "Bom dia";
-  if (h < 18) return "Boa tarde";
+  // new Date().getHours() usa o fuso do SERVIDOR (a Vercel roda em UTC),
+  // não o horário real do Brasil - isso fazia a saudação vir errada (ex:
+  // "boa tarde" de manhã, porque no servidor já passava do meio-dia em
+  // UTC). Calculando direto no fuso de São Paulo em vez de confiar no
+  // fuso local da máquina.
+  const horaBrasil = Number(
+    new Intl.DateTimeFormat("pt-BR", { hour: "numeric", hour12: false, timeZone: "America/Sao_Paulo" }).format(new Date())
+  );
+  if (horaBrasil < 12) return "Bom dia";
+  if (horaBrasil < 18) return "Boa tarde";
   return "Boa noite";
 }
 
 export default async function PainelPage() {
   const supabase = createClient();
   const { ano, mes, mesAnterior, anoAnterior, ehPeriodoAtual } = obterPeriodoSelecionado();
+
+  // garante que toda conta ativa tenha uma linha "pendente" pro período
+  // sendo visto, antes de qualquer coisa - sem isso, contas sem lançamento
+  // ainda ficam invisíveis pras telas de vencimento/atrasada.
+  await supabase.rpc("garantir_lancamentos_pendentes", { p_ano: ano, p_mes: mes });
 
   const { data: { session } } = await supabase.auth.getSession();
 
@@ -46,7 +59,11 @@ export default async function PainelPage() {
     supabase.from("metricas_mensais").select("contas_ativas, a_lancar, aguardando_pagamento, origem_a_mapear").eq("ano", anoAnterior).eq("mes", mesAnterior).maybeSingle(),
   ]);
 
-  const nome = perfil?.nome?.split(" ")[0] ?? "";
+  const nomeCru = perfil?.nome?.trim() ?? "";
+  // se o perfil não tem nome de verdade cadastrado, às vezes fica salvo o
+  // próprio e-mail como valor padrão - não faz sentido mostrar isso na
+  // saudação, então nesse caso não mostra nome nenhum.
+  const nome = nomeCru && !nomeCru.includes("@") ? nomeCru.split(" ")[0] : "";
   const diaAtual = new Date().getDate();
 
   // --- métricas por tipo (cards de baixo) ---
@@ -108,6 +125,7 @@ export default async function PainelPage() {
         <p className="text-[14px] text-[#6c757d] mt-1">
           {ehPeriodoAtual ? "Aqui está o resumo da sua gestão financeira." : `Você está vendo o histórico de ${formatarPeriodo(mes, ano)}.`}
         </p>
+        <div className="mt-2"><RelogioAoVivo /></div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
