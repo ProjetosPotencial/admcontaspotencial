@@ -491,23 +491,47 @@ function LojaDrawer({ loja, onClose, onSalvar, empresas }: { loja: Loja; onClose
 /* ---------------- contas vinculadas (listar + adicionar) ---------------- */
 type ContaResumo = {
   id: string; tipo: string; fornecedor_nome: string | null; dia_vencimento: number | null;
-  origem: string; status: string;
+  origem: string; status: string; nLanc: number;
 };
 
 function ContasVinculadas({ loja }: { loja: Loja }) {
   const supabase = createClient();
   const [contas, setContas] = useState<ContaResumo[] | null>(null);
   const [addAberto, setAddAberto] = useState(false);
+  const [confirmar, setConfirmar] = useState<string | null>(null);
+  const [excluindo, setExcluindo] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
 
   async function carregar() {
     const { data } = await supabase.from("contas")
       .select("id, tipo, fornecedor_nome, dia_vencimento, origem, status")
       .eq("loja_id", loja.id)
       .order("tipo");
-    setContas((data ?? []) as ContaResumo[]);
+    const lista = (data ?? []) as Omit<ContaResumo, "nLanc">[];
+    // conta quantos lançamentos cada conta tem, pra saber qual duplicata está vazia
+    const counts: Record<string, number> = {};
+    if (lista.length) {
+      const { data: lancs } = await supabase.from("lancamentos")
+        .select("conta_id").in("conta_id", lista.map((c) => c.id));
+      (lancs ?? []).forEach((l: { conta_id: string }) => {
+        counts[l.conta_id] = (counts[l.conta_id] ?? 0) + 1;
+      });
+    }
+    setContas(lista.map((c) => ({ ...c, nLanc: counts[c.id] ?? 0 })));
   }
 
   useEffect(() => { carregar(); }, [loja.id]);
+
+  async function excluirConta(id: string) {
+    setExcluindo(id); setErro(null);
+    // remove os lançamentos primeiro (FK), depois a conta
+    const del1 = await supabase.from("lancamentos").delete().eq("conta_id", id);
+    if (del1.error) { setExcluindo(null); setErro("Não consegui remover os lançamentos da conta."); return; }
+    const del2 = await supabase.from("contas").delete().eq("id", id);
+    if (del2.error) { setExcluindo(null); setErro("Não consegui remover a conta (verifique suas permissões)."); return; }
+    setExcluindo(null); setConfirmar(null);
+    carregar();
+  }
 
   return (
     <div className="card p-4">
@@ -522,14 +546,35 @@ function ContasVinculadas({ loja }: { loja: Loja }) {
         <div className="text-[12.5px] text-txt-3 mb-3">Nenhuma conta vinculada ainda.</div>
       )}
 
+      {erro && <div className="mb-2.5 text-[12px] text-alerr bg-alerr-bg rounded-lg px-3 py-2">{erro}</div>}
+
       {contas && contas.map((c) => {
         const T = TIPOS[c.tipo];
+        const emConfirmacao = confirmar === c.id;
         return (
           <div key={c.id} className="flex items-center gap-2.5 py-2 border-b border-linha2 last:border-0 text-[13px]">
             <span className="w-[7px] h-[7px] rounded-full shrink-0" style={{ background: T?.c }} />
             <b className="font-medium">{T?.n ?? c.tipo}</b>
-            <span className="text-txt-3">{c.fornecedor_nome ?? "sem fornecedor"}</span>
-            <span className="ml-auto text-[11px] text-txt-3 font-mono">{c.dia_vencimento ? `dia ${c.dia_vencimento}` : "—"}</span>
+            <span className="text-txt-3 truncate">{c.fornecedor_nome ?? "sem fornecedor"}</span>
+            <span className="ml-auto text-[11px] text-txt-3 font-mono shrink-0">{c.dia_vencimento ? `dia ${c.dia_vencimento}` : "—"}</span>
+            {emConfirmacao ? (
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-[10.5px] text-txt-3">{c.nLanc > 0 ? `apaga ${c.nLanc} lanç.` : "Excluir?"}</span>
+                <button onClick={() => excluirConta(c.id)} disabled={excluindo === c.id}
+                  className="text-[11px] font-semibold text-alerr px-1.5 py-0.5 rounded hover:bg-alerr-bg disabled:opacity-50">
+                  {excluindo === c.id ? "..." : "Sim"}
+                </button>
+                <button onClick={() => setConfirmar(null)}
+                  className="text-[11px] text-txt-3 px-1.5 py-0.5 rounded hover:bg-linha2">Não</button>
+              </div>
+            ) : (
+              <button onClick={() => { setConfirmar(c.id); setErro(null); }} title="Remover conta"
+                className="shrink-0 text-txt-3 hover:text-alerr transition p-1 -mr-1 rounded">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6">
+                  <path d="M4 6h12M8 6V4.5A1.5 1.5 0 019.5 3h1A1.5 1.5 0 0112 4.5V6m2 0v10.5A1.5 1.5 0 0112.5 18h-5A1.5 1.5 0 016 16.5V6" />
+                </svg>
+              </button>
+            )}
           </div>
         );
       })}
