@@ -369,7 +369,6 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
   const router = useRouter();
   const T = TIPOS[conta.tipo];
   const [lancs, setLancs] = useState<Lancamento[]>([]);
-  const [mesHover, setMesHover] = useState<number | null>(null);
   const [login, setLogin] = useState<string | null>(null);
   const [senha, setSenha] = useState<string | null>(null);
   const [revelando, setRevelando] = useState(false);
@@ -1041,38 +1040,21 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
               <div className="text-[14px] font-semibold text-[#1a1a1a]">Histórico mensal (R$)</div>
               <span className="text-[12px] text-[#6c757d]">Últimos 12 meses</span>
             </div>
-            {valores.length === 0 ? (
-              <div className="h-[140px] flex flex-col items-center justify-center text-center gap-1 rounded-md bg-[#f8f9fa] border border-dashed border-linha">
-                <span className="text-[12.5px] font-semibold text-[#6c757d]">Sem histórico ainda</span>
-                <span className="text-[11px] text-[#adb5bd]">Os lançamentos desta conta aparecem aqui.</span>
-              </div>
-            ) : (
-              <div className="flex items-stretch gap-1 h-[140px]">
-                {Array.from({ length: 12 }).map((_, mi) => {
-                  const l = lancs.find((x) => x.mes === mi + 1);
-                  const v = l?.valor != null ? Number(l.valor) : null;
-                  const h = v != null ? Math.max((v / maxv) * 100, 3) : 3;
-                  const ativo = mesHover === mi;
-                  return (
-                    <div key={mi} className="flex-1 flex flex-col relative"
-                      onMouseEnter={() => setMesHover(mi)} onMouseLeave={() => setMesHover(null)}>
-                      {ativo && (
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-10 whitespace-nowrap rounded-md bg-white border border-linha shadow-lg px-2.5 py-1.5 pointer-events-none">
-                          <div className="text-[10px] text-[#adb5bd]">{MES[mi]}/{ANO_ATUAL}</div>
-                          <div className="text-[12px] font-semibold" style={{ color: v != null ? "#B8860B" : "#adb5bd" }}>
-                            {v != null ? money(v) : "Sem lançamento"}
-                          </div>
-                        </div>
-                      )}
-                      <div className="flex-1 flex items-end">
-                        <div className="w-full rounded-t-sm transition-all" style={{ height: `${h}%`, background: v == null ? "#f1f3f5" : ativo ? "#E0A800" : "#FFC107" }} />
-                      </div>
-                      <span className="text-[9px] font-mono text-center mt-1.5" style={{ color: ativo ? "#B8860B" : "#adb5bd" }}>{MES[mi][0]}</span>
+            <div className="flex items-stretch gap-1 h-[140px]">
+              {Array.from({ length: 12 }).map((_, mi) => {
+                const l = lancs.find((x) => x.mes === mi + 1);
+                const v = l?.valor != null ? Number(l.valor) : null;
+                const h = v != null ? Math.max((v / maxv) * 100, 3) : 3;
+                return (
+                  <div key={mi} className="flex-1 flex flex-col" title={`${MES[mi]}: ${money(v)}`}>
+                    <div className="flex-1 flex items-end">
+                      <div className="w-full rounded-t-sm" style={{ height: `${h}%`, background: v == null ? "#f1f3f5" : "#FFC107" }} />
                     </div>
-                  );
-                })}
-              </div>
-            )}
+                    <span className="text-[9px] text-[#adb5bd] font-mono text-center mt-1.5">{MES[mi][0]}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           <button onClick={baixarExtrato} className="btn-secundario w-full mt-6 flex items-center justify-center gap-2">
