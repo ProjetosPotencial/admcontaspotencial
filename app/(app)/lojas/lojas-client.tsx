@@ -524,11 +524,24 @@ function ContasVinculadas({ loja }: { loja: Loja }) {
 
   async function excluirConta(id: string) {
     setExcluindo(id); setErro(null);
-    // remove os lançamentos primeiro (FK), depois a conta
-    const del1 = await supabase.from("lancamentos").delete().eq("conta_id", id);
-    if (del1.error) { setExcluindo(null); setErro("Não consegui remover os lançamentos da conta."); return; }
-    const del2 = await supabase.from("contas").delete().eq("id", id);
-    if (del2.error) { setExcluindo(null); setErro("Não consegui remover a conta (verifique suas permissões)."); return; }
+    // usa RPC SECURITY DEFINER (checa papel e apaga lançamentos + conta com segurança).
+    // Delete direto falha em silêncio quando o RLS não libera DELETE pro seu papel.
+    const { data, error } = await supabase.rpc("excluir_conta", { p_conta_id: id });
+    if (error) {
+      setExcluindo(null);
+      setErro(
+        /permiss|42501/i.test(error.message ?? "")
+          ? "Você não tem permissão para excluir contas (só admin ou gestor)."
+          : "Não foi possível excluir a conta."
+      );
+      return;
+    }
+    if (!data || Number(data) === 0) {
+      setExcluindo(null);
+      setErro("A conta não foi removida (pode já ter sido apagada).");
+      carregar();
+      return;
+    }
     setExcluindo(null); setConfirmar(null);
     carregar();
   }
