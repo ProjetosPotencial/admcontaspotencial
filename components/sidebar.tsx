@@ -58,7 +58,7 @@ export default function Sidebar({ nome, email, itens }: { nome: string; email: s
       }`}>
         <div className="px-5 py-5 flex items-center gap-2.5 border-b border-white/10">
           <svg width="30" height="30" viewBox="0 0 72 72" fill="none" className="shrink-0">
-            <path d="M18 8h20c11 0 18 7 18 17s-7 17-18 17H30v22H18V8z" fill="#FFC107" />
+            <path d="M18 8h20c11 0 18 7 18 17s-7 17-18 17H30v22H18V8z" fill="#FFB800" />
             <path d="M30 20h7c4.5 0 7 2.2 7 5.5S41.5 31 37 31h-7V20z" fill="#1a1c1e" />
           </svg>
           <div>

@@ -6,10 +6,10 @@ html, body { height: 100%; }
 body { background: #f8f9fa; color: #1a1a1a; -webkit-font-smoothing: antialiased; }
 
 @layer components {
-  .badge { @apply inline-flex items-center text-[11px] px-2 py-1 rounded-xl font-semibold; }
+  .badge { @apply inline-flex items-center text-[11px] px-2.5 py-1 rounded-full font-semibold; }
   .card { @apply bg-white border border-linha rounded-xl shadow-leve; }
-  .btn-primario { @apply bg-amarelo text-ebano font-semibold rounded-md px-4 py-2.5 text-[13px] transition hover:bg-amarelo-dark; }
-  .btn-secundario { @apply bg-white border border-linha text-ebano font-semibold rounded-md px-4 py-2.5 text-[13px] transition hover:bg-off; }
+  .btn-primario { @apply bg-amarelo text-ebano font-semibold rounded-full px-5 py-2.5 text-[13px] transition-all duration-150 hover:bg-amarelo-dark hover:-translate-y-px hover:shadow-media; }
+  .btn-secundario { @apply bg-white border border-linha text-ebano font-semibold rounded-full px-5 py-2.5 text-[13px] transition hover:bg-off; }
   .btn-sucesso { @apply bg-ok text-white font-semibold rounded-md px-4 py-2.5 text-[13px] transition hover:bg-ok-dark; }
   .btn-perigo { @apply bg-alerr text-white font-semibold rounded-md px-4 py-2.5 text-[13px] transition hover:bg-alerr-dark; }
   .input-padrao { @apply bg-off border border-linha rounded-md px-4 h-10 text-[13px] text-txt placeholder:text-txt-3 focus:outline-none focus:border-amarelo focus:ring-[3px] focus:ring-amarelo/10; }

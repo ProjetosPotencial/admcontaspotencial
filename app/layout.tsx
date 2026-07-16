@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Poppins, Inter, IBM_Plex_Mono } from "next/font/google";
+import { Bricolage_Grotesque, Hanken_Grotesk, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import RegistrarServiceWorker from "@/components/registrar-service-worker";
 
-const poppins = Poppins({ subsets: ["latin"], weight: ["500","600","700"], variable: "--font-poppins" });
-const inter = Inter({ subsets: ["latin"], weight: ["400","500","600"], variable: "--font-inter" });
+const bricolage = Bricolage_Grotesque({ subsets: ["latin"], weight: ["400","500","700","800"], variable: "--font-bricolage" });
+const hanken = Hanken_Grotesk({ subsets: ["latin"], weight: ["400","500","600","700"], variable: "--font-hanken" });
 const mono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400","500","600"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport = {
-  themeColor: "#FFC107",
+  themeColor: "#FFB800",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -31,7 +31,7 @@ export const viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-br" className={`${poppins.variable} ${inter.variable} ${mono.variable}`}>
+    <html lang="pt-br" className={`${bricolage.variable} ${hanken.variable} ${mono.variable}`}>
       <body className="font-body">
         {children}
         <RegistrarServiceWorker />

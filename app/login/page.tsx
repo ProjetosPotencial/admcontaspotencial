@@ -76,7 +76,7 @@ function LoginForm() {
         <div className="flex flex-col items-center mb-6">
           <div className="w-14 h-14 rounded-xl bg-ebano border border-white/10 grid place-items-center mb-4 shrink-0">
             <svg width="30" height="30" viewBox="0 0 72 72" fill="none">
-              <path d="M18 8h20c11 0 18 7 18 17s-7 17-18 17H30v22H18V8z" fill="#FFC107" />
+              <path d="M18 8h20c11 0 18 7 18 17s-7 17-18 17H30v22H18V8z" fill="#FFB800" />
               <path d="M30 20h7c4.5 0 7 2.2 7 5.5S41.5 31 37 31h-7V20z" fill="#1a1c1e" />
             </svg>
           </div>
@@ -168,7 +168,7 @@ function CircuitoFundo() {
         <path d="M0 680h200l35 35h180" /><path d="M0 800h160l25-25h240" />
         <path d="M1600 680h-200l-35 35h-180" /><path d="M1600 800h-160l-25-25h-240" />
       </g>
-      <g fill="#FFC107">
+      <g fill="#FFB800">
         <circle cx="180" cy="120" r="3" /><circle cx="1420" cy="120" r="3" />
         <circle cx="220" cy="800" r="3" /><circle cx="1380" cy="800" r="3" />
       </g>
