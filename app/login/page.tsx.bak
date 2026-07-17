@@ -74,7 +74,15 @@ function LoginForm() {
 
       <div className="relative z-10 w-full max-w-[420px] bg-[#141416] border border-white/10 rounded-2xl p-8 shadow-forte">
         <div className="flex flex-col items-center mb-6">
-          {modoRecuperar && (
+          <div className="w-14 h-14 rounded-xl bg-ebano border border-white/10 grid place-items-center mb-4 shrink-0">
+            <svg width="30" height="30" viewBox="0 0 72 72" fill="none">
+              <path d="M18 8h20c11 0 18 7 18 17s-7 17-18 17H30v22H18V8z" fill="#FFB800" />
+              <path d="M30 20h7c4.5 0 7 2.2 7 5.5S41.5 31 37 31h-7V20z" fill="#1a1c1e" />
+            </svg>
+          </div>
+          {!modoRecuperar ? (
+            <p className="text-white/40 text-[13px] mt-1">Acesse sua conta para continuar</p>
+          ) : (
             <>
               <h1 className="text-white font-disp font-bold text-[19px]">Recuperar senha</h1>
               <p className="text-white/40 text-[13px] mt-1">Manda um link de recuperação pro seu e-mail</p>

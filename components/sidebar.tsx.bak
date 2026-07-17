@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -58,7 +57,14 @@ export default function Sidebar({ nome, email, itens }: { nome: string; email: s
         aberto ? "translate-x-0" : "-translate-x-full md:translate-x-0"
       }`}>
         <div className="px-5 py-5 flex items-center gap-2.5 border-b border-white/10">
-          <Image src="/logo-grupo-potencial.png" alt="Grupo Potencial" width={150} height={35} priority className="h-8 w-auto" />
+          <svg width="30" height="30" viewBox="0 0 72 72" fill="none" className="shrink-0">
+            <path d="M18 8h20c11 0 18 7 18 17s-7 17-18 17H30v22H18V8z" fill="#FFB800" />
+            <path d="M30 20h7c4.5 0 7 2.2 7 5.5S41.5 31 37 31h-7V20z" fill="#1a1c1e" />
+          </svg>
+          <div>
+            <div className="text-white font-disp font-bold text-[15px] leading-none">POTENCIAL</div>
+            <div className="text-amarelo font-disp font-semibold text-[10px] tracking-[2px] mt-0.5">CONTAS</div>
+          </div>
           <button onClick={() => setAberto(false)} className="ml-auto text-white/60 hover:text-white md:hidden">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 5l10 10M15 5L5 15" /></svg>
           </button>

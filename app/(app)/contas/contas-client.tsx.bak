@@ -1103,6 +1103,12 @@ function Campo({ label, valor, mono }: { label: string; valor: string; mono?: bo
 function NovaContaDrawer({ lojas, onClose }: { lojas: { id: string; codigo: string }[]; onClose: () => void }) {
   const router = useRouter();
   const { state, updateField, isLoading, error, salvar } = useContaForm(lojas[0]?.id ?? "");
+  const [buscaLoja, setBuscaLoja] = useState("");
+  const [abertoLoja, setAbertoLoja] = useState(false);
+  const lojaSel = lojas.find((l) => l.id === state.lojaId);
+  const lojasFiltradas = (buscaLoja.trim()
+    ? lojas.filter((l) => l.codigo.toLowerCase().includes(buscaLoja.toLowerCase()))
+    : lojas).slice(0, 50);
 
   async function handleSalvar() {
     const resultado = await salvar();
@@ -1125,12 +1131,26 @@ function NovaContaDrawer({ lojas, onClose }: { lojas: { id: string; codigo: stri
           <h3 className="text-[20px] font-bold text-[#1a1a1a]">Nova conta</h3>
         </div>
         <div className="p-5 space-y-3.5">
-          <label>
+          <div className="relative">
             <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Loja</div>
-            <select value={state.lojaId} onChange={(e) => updateField("lojaId", e.target.value)} className="input-padrao w-full">
-              {lojas.map((l) => <option key={l.id} value={l.id}>{l.codigo}</option>)}
-            </select>
-          </label>
+            <input
+              value={abertoLoja ? buscaLoja : (lojaSel?.codigo ?? "")}
+              onFocus={() => { setAbertoLoja(true); setBuscaLoja(""); }}
+              onChange={(e) => setBuscaLoja(e.target.value)}
+              placeholder="Buscar loja..."
+              className="input-padrao w-full"
+            />
+            {abertoLoja && (
+              <div className="absolute z-30 top-full left-0 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-linha rounded-md shadow-media">
+                {lojasFiltradas.map((l) => (
+                  <button key={l.id} type="button" onClick={() => { updateField("lojaId", l.id); setAbertoLoja(false); }}
+                    className="block w-full text-left px-3 py-1.5 text-[13px] hover:bg-off">{l.codigo}</button>
+                ))}
+                {lojasFiltradas.length === 0 && <div className="px-3 py-1.5 text-[12px] text-[#adb5bd]">Nenhuma loja encontrada.</div>}
+                <button type="button" onClick={() => setAbertoLoja(false)} className="block w-full text-left px-3 py-1.5 text-[11px] text-[#adb5bd] border-t border-linha2 hover:bg-off">Fechar</button>
+              </div>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <label>
               <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Tipo</div>
