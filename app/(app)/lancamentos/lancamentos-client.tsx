@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TIPOS, SITUACAO } from "@/lib/types";
 import TipoIcon from "@/components/tipo-icon";
@@ -220,10 +221,28 @@ function paginasVisiveis(atual: number, total: number): (number | "...")[] {
 
 function DetalheDrawer({ item, onClose }: { item: Item; onClose: () => void }) {
   const supabase = createClient();
+  const router = useRouter();
   const T = TIPOS[item.contas.tipo];
   const s = SITUACAO[item.situacao] ?? { label: item.situacao, cls: "bg-[#f5f5f5] text-[#999]" };
   const [aviso, setAviso] = useState<string | null>(null);
   const [aprovadorNome, setAprovadorNome] = useState<string | null>(null);
+  const [confirmarExcluir, setConfirmarExcluir] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
+
+  async function excluirLancamento() {
+    setExcluindo(true); setAviso(null);
+    const { data, error } = await supabase.rpc("excluir_lancamento", { p_id: item.id });
+    setExcluindo(false);
+    if (error) {
+      setAviso(/permiss|42501/i.test(error.message ?? "")
+        ? "Você não tem permissão para excluir lançamentos (só admin ou gestor)."
+        : "Não foi possível excluir o lançamento.");
+      return;
+    }
+    if (!data || Number(data) === 0) { setAviso("O lançamento não foi removido."); return; }
+    onClose();
+    router.refresh();
+  }
 
   useEffect(() => {
     if (!item.aprovado_por) { setAprovadorNome(null); return; }
@@ -293,6 +312,29 @@ function DetalheDrawer({ item, onClose }: { item: Item; onClose: () => void }) {
           <a href={`/contas?tipo=${item.contas.tipo}`} className="btn-secundario w-full flex items-center justify-center">
             Ver contas desse tipo
           </a>
+
+          <div className="pt-4 border-t border-linha2">
+            {!confirmarExcluir ? (
+              <button onClick={() => { setConfirmarExcluir(true); setAviso(null); }}
+                className="text-[12.5px] font-semibold text-alerr hover:underline">
+                Excluir lançamento
+              </button>
+            ) : (
+              <div className="bg-alerr-bg rounded-md p-3">
+                <div className="text-[12px] text-[#7a3838] mb-2.5">Excluir este lançamento? Não dá pra desfazer.</div>
+                <div className="flex gap-2">
+                  <button onClick={excluirLancamento} disabled={excluindo}
+                    className="flex-1 bg-alerr text-white rounded-md py-2 text-[12.5px] font-semibold disabled:opacity-50">
+                    {excluindo ? "Excluindo..." : "Sim, excluir"}
+                  </button>
+                  <button onClick={() => setConfirmarExcluir(false)}
+                    className="bg-white border border-linha text-[#666] rounded-md px-4 py-2 text-[12.5px] font-semibold">
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </aside>
     </>

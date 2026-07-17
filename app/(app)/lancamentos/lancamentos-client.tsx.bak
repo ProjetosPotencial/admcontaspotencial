@@ -8,7 +8,7 @@ import { money, MES } from "@/lib/format";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 
 type Item = {
-  id: string; ano: number; mes: number; valor: number | null; situacao: string;
+  id: string; ano: number; mes: number; valor: number | null; situacao: string; lancado_em?: string | null;
   comprovante_url?: string | null; comprovante_drive_url?: string | null;
   codigo_barras?: string | null; aprovado_por?: string | null; aprovado_em?: string | null;
   contas: { tipo: string; dia_vencimento: number | null; fornecedor_nome: string | null; lojas: { codigo: string; coban: string } | null };
@@ -57,6 +57,14 @@ export default function LancamentosClient({ itens, ano, resumo }: { itens: Item[
         const da = a.contas.dia_vencimento ?? 99;
         const db = b.contas.dia_vencimento ?? 99;
         return ordemVenc === "asc" ? da - db : db - da;
+      });
+    } else {
+      // ordem padrão: cronológica pela data de lançamento (mais recente primeiro)
+      lista = [...lista].sort((a, b) => {
+        const ta = a.lancado_em ? Date.parse(a.lancado_em) : 0;
+        const tb = b.lancado_em ? Date.parse(b.lancado_em) : 0;
+        if (tb !== ta) return tb - ta;
+        return (b.mes - a.mes) || ((a.contas.dia_vencimento ?? 99) - (b.contas.dia_vencimento ?? 99));
       });
     }
     return lista;
