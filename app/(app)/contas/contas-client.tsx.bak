@@ -734,7 +734,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
     const payload: any = {
       conta_id: conta.id, ano: ANO_ATUAL, mes: MES_ATUAL,
       valor: Number(valorLancar.replace(",", ".")),
-      situacao: "lancado", comprovante_url: caminhoBoleto,
+      situacao: "aprovado", comprovante_url: caminhoBoleto,
       lancado_em: new Date().toISOString(),
       codigo_barras: codigoBarras.trim() || null,
       arquivo_hash: hashArquivo,
