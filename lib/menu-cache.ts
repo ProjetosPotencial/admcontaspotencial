@@ -34,3 +34,24 @@ export async function getMenuParaPapel(papel: string) {
   const meuRank = RANK[papel] ?? 0;
   return todos.filter((item) => (RANK[item.papel_minimo] ?? 0) <= meuRank);
 }
+
+// Menu efetivo de um usuário: parte do padrão do papel e aplica as
+// exceções por usuário (tabela perfil_menu). Admin sempre vê tudo, pra
+// ninguém se trancar pra fora do próprio painel.
+export async function getMenuParaUsuario(userId: string, papel: string) {
+  const todos = await buscarTodosOsItens();
+  if (papel === "admin") return todos;
+
+  const meuRank = RANK[papel] ?? 0;
+  const supabase = createAdminClient();
+  const { data: overrides } = await supabase
+    .from("perfil_menu")
+    .select("menu_item_id, permitido")
+    .eq("perfil_id", userId);
+  const mapa = new Map((overrides ?? []).map((o: { menu_item_id: string; permitido: boolean }) => [o.menu_item_id, o.permitido]));
+
+  return todos.filter((item) => {
+    if (mapa.has(item.id)) return mapa.get(item.id) === true;      // exceção explícita
+    return (RANK[item.papel_minimo] ?? 0) <= meuRank;               // padrão do papel
+  });
+}

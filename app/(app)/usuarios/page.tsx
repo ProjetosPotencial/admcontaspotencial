@@ -10,6 +10,10 @@ export default async function UsuariosPage() {
   const ehAdmin = meuPerfil?.papel === "admin";
 
   const { data } = await supabase.from("perfis").select("id, nome, email, papel, ativo").order("nome");
+  const { data: menuItens } = await supabase.from("menu_itens").select("id, label, papel_minimo, ordem").eq("ativo", true).order("ordem");
+  const { data: overrides } = ehAdmin
+    ? await supabase.from("perfil_menu").select("perfil_id, menu_item_id, permitido")
+    : { data: [] };
 
   return (
     <>
@@ -23,7 +27,7 @@ export default async function UsuariosPage() {
             ? "Você é admin: pode mudar o papel de qualquer usuário direto nesta lista."
             : "A lista reflete o que o seu papel pode ver. Só administradores podem mudar o papel de alguém."}
         </div>
-        <UsuariosClient usuarios={(data ?? []) as any[]} ehAdmin={ehAdmin} meuId={session?.user.id ?? ""} />
+        <UsuariosClient usuarios={(data ?? []) as any[]} ehAdmin={ehAdmin} meuId={session?.user.id ?? ""} menuItens={(menuItens ?? []) as any[]} overrides={(overrides ?? []) as any[]} />
       </div>
     </>
   );
