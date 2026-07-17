@@ -734,7 +734,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
     const payload: any = {
       conta_id: conta.id, ano: ANO_ATUAL, mes: MES_ATUAL,
       valor: Number(valorLancar.replace(",", ".")),
-      situacao: "aprovado", comprovante_url: caminhoBoleto,
+      situacao: "lancado", comprovante_url: caminhoBoleto,
       lancado_em: new Date().toISOString(),
       codigo_barras: codigoBarras.trim() || null,
       arquivo_hash: hashArquivo,
@@ -746,10 +746,10 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
     setLancando(false);
     setValorLancar("");
     setArquivoBoleto(null);
-    // a conta acabou de sair de "a lançar" e entrou na fila de aprovação -
-    // faz sentido a tela já te levar pra lá, em vez de deixar preso em Contas.
-    onClose();
-    router.push("/aprovacoes");
+    setCodigoBarras("");
+    setErroLancamento(null);
+    setAviso("Boleto lançado e enviado para aprovação.");
+    router.refresh(); // atualiza os dados sem sair da página Contas
   }
 
   async function verBoleto(caminho: string) {
