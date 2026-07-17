@@ -31,7 +31,51 @@ export default function UsuariosClient({
   const [checks, setChecks] = useState<Record<string, boolean>>({});
   const [salvandoMenu, setSalvandoMenu] = useState(false);
 
+  // criar novo usuário
+  const [criando, setCriando] = useState(false);
+  const [novoNome, setNovoNome] = useState("");
+  const [novoEmail, setNovoEmail] = useState("");
+  const [novaSenha, setNovaSenha] = useState("");
+  const [novoPapel, setNovoPapel] = useState("leitura");
+  const [novoChecks, setNovoChecks] = useState<Record<string, boolean>>({});
+  const [salvandoNovo, setSalvandoNovo] = useState(false);
+  const [erroNovo, setErroNovo] = useState<string | null>(null);
+
   const padraoDoPapel = (item: MenuItem, papel: string) => (RANK[item.papel_minimo] ?? 0) <= (RANK[papel] ?? 0);
+
+  function defaultsPara(papel: string): Record<string, boolean> {
+    const c: Record<string, boolean> = {};
+    for (const it of menuItens) c[it.id] = padraoDoPapel(it, papel);
+    return c;
+  }
+
+  function abrirCriar() {
+    setNovoNome(""); setNovoEmail(""); setNovaSenha(""); setNovoPapel("leitura");
+    setNovoChecks(defaultsPara("leitura")); setErroNovo(null); setCriando(true);
+  }
+
+  function trocarPapelNovo(papel: string) {
+    setNovoPapel(papel);
+    setNovoChecks(defaultsPara(papel));
+  }
+
+  async function criarUsuario() {
+    setSalvandoNovo(true); setErroNovo(null);
+    const desvios = menuItens
+      .filter((it) => novoChecks[it.id] !== padraoDoPapel(it, novoPapel))
+      .map((it) => ({ menu_item_id: it.id, permitido: !!novoChecks[it.id] }));
+    const resp = await fetch("/api/usuarios/criar", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nome: novoNome, email: novoEmail, senha: novaSenha, papel: novoPapel, overrides: desvios }),
+    });
+    const json = await resp.json().catch(() => ({}));
+    setSalvandoNovo(false);
+    if (!resp.ok) { setErroNovo(json.error ?? "Não foi possível criar o usuário."); return; }
+    setUsuarios((prev) => [...prev, { id: json.id, nome: json.nome, email: json.email, papel: json.papel, ativo: true }]
+      .sort((a, b) => (a.nome ?? "").localeCompare(b.nome ?? "")));
+    setOverrides((prev) => [...prev, ...desvios.map((d) => ({ perfil_id: json.id, ...d }))]);
+    setCriando(false);
+  }
 
   async function mudarPapel(id: string, novoPapel: string) {
     if (id === meuId && novoPapel !== "admin") {
@@ -82,6 +126,11 @@ export default function UsuariosClient({
 
   return (
     <>
+      {ehAdmin && (
+        <div className="flex justify-end mb-3">
+          <button onClick={abrirCriar} className="btn-primario text-[13px] px-4 py-2">+ Novo usuário</button>
+        </div>
+      )}
       <div className="card overflow-hidden">
         <div className="overflow-x-auto"><table className="w-full border-collapse min-w-[720px]">
           <thead>
@@ -198,6 +247,70 @@ export default function UsuariosClient({
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+      {criando && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div onClick={() => setCriando(false)} className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-white rounded-2xl shadow-forte border border-linha w-full max-w-[460px] max-h-[88vh] flex flex-col">
+            <div className="px-5 py-4 border-b border-linha">
+              <div className="text-[15px] font-bold text-[#1a1a1a]">Novo usuário</div>
+              <div className="text-[12px] text-[#6c757d] mt-0.5">Cria o login, define o papel e os menus. A pessoa já entra com a senha que você definir.</div>
+            </div>
+            <div className="p-5 overflow-y-auto space-y-3">
+              <label className="block">
+                <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Nome</div>
+                <input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} className="input-padrao w-full" placeholder="Nome da pessoa" />
+              </label>
+              <label className="block">
+                <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">E-mail</div>
+                <input value={novoEmail} onChange={(e) => setNovoEmail(e.target.value)} type="email" className="input-padrao w-full" placeholder="pessoa@potencialgrupo.com.br" />
+              </label>
+              <label className="block">
+                <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Senha inicial</div>
+                <input value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} type="text" className="input-padrao w-full font-mono" placeholder="mínimo 6 caracteres" />
+                <div className="text-[10.5px] text-[#adb5bd] mt-1">A pessoa pode trocar depois em Configurações.</div>
+              </label>
+              <label className="block">
+                <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Papel</div>
+                <select value={novoPapel} onChange={(e) => trocarPapelNovo(e.target.value)} className="input-padrao w-full capitalize">
+                  {PAPEIS.map((papel) => <option key={papel} value={papel}>{papel}</option>)}
+                </select>
+              </label>
+
+              <div>
+                <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1.5">Menus que essa pessoa vê</div>
+                <div className="border border-linha rounded-lg p-2 space-y-0.5 max-h-[210px] overflow-y-auto">
+                  {menuItens.map((item) => {
+                    const padrao = padraoDoPapel(item, novoPapel);
+                    const marcado = novoChecks[item.id];
+                    const ehExcecao = marcado !== padrao;
+                    return (
+                      <label key={item.id} className="flex items-center gap-3 py-1 px-1.5 rounded-md hover:bg-off cursor-pointer">
+                        <input type="checkbox" checked={!!marcado} className="w-4 h-4"
+                          onChange={(e) => setNovoChecks((c) => ({ ...c, [item.id]: e.target.checked }))} />
+                        <span className="text-[13px] font-medium flex-1">{item.label}</span>
+                        {ehExcecao && <span className="text-[10px] text-amarelo-dark bg-amarelo/15 rounded px-1.5 py-0.5">exceção</span>}
+                      </label>
+                    );
+                  })}
+                  {menuItens.length === 0 && <div className="text-[12px] text-[#adb5bd] px-1.5 py-1">Nenhum item de menu cadastrado.</div>}
+                </div>
+                {novoPapel === "admin" && (
+                  <div className="text-[10.5px] text-[#adb5bd] mt-1">Admin vê todos os menus de qualquer forma.</div>
+                )}
+              </div>
+
+              {erroNovo && <div className="text-[12px] text-alerr bg-alerr-bg rounded-md px-3 py-2">{erroNovo}</div>}
+            </div>
+            <div className="px-5 py-4 border-t border-linha flex gap-2">
+              <button onClick={criarUsuario} disabled={salvandoNovo || !novoEmail || novaSenha.length < 6}
+                className="btn-primario flex-1 disabled:opacity-50">
+                {salvandoNovo ? "Criando..." : "Criar usuário"}
+              </button>
+              <button onClick={() => setCriando(false)} className="btn-secundario">Cancelar</button>
+            </div>
           </div>
         </div>
       )}
