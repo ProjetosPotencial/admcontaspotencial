@@ -384,6 +384,13 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
   const [novoPortalLink, setNovoPortalLink] = useState(conta.portal_link ?? "");
   const [salvarComoPadrao, setSalvarComoPadrao] = useState(false);
   const [salvandoPortal, setSalvandoPortal] = useState(false);
+  const [editandoDetalhes, setEditandoDetalhes] = useState(false);
+  const [salvandoDetalhes, setSalvandoDetalhes] = useState(false);
+  const [detFornecedor, setDetFornecedor] = useState(conta.fornecedor_nome ?? "");
+  const [detVenc, setDetVenc] = useState(conta.dia_vencimento != null ? String(conta.dia_vencimento) : "");
+  const [detIdent, setDetIdent] = useState(conta.identificador ?? "");
+  const [detOrigem, setDetOrigem] = useState<string>(conta.origem);
+  const [erroDetalhes, setErroDetalhes] = useState<string | null>(null);
   const [encerrando, setEncerrando] = useState(false);
   const [dataEncerrar, setDataEncerrar] = useState("");
   const [motivoEncerrar, setMotivoEncerrar] = useState("");
@@ -474,6 +481,23 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
     supabase.from("perfis").select("nome").eq("id", idAprovador).maybeSingle()
       .then(({ data }) => setAprovadorNome(data?.nome ?? null));
   }, [(lancamentoAtual as any)?.aprovado_por]);
+
+  async function salvarDetalhes() {
+    setSalvandoDetalhes(true); setErroDetalhes(null);
+    const diaNum = detVenc.trim() === "" ? null : parseInt(detVenc, 10);
+    if (diaNum !== null && (isNaN(diaNum) || diaNum < 1 || diaNum > 31)) {
+      setSalvandoDetalhes(false); setErroDetalhes("O vencimento deve ser um dia entre 1 e 31."); return;
+    }
+    const { error } = await supabase.from("contas").update({
+      fornecedor_nome: detFornecedor.trim() || null,
+      dia_vencimento: diaNum,
+      identificador: detIdent.trim() || null,
+      origem: detOrigem,
+    }).eq("id", conta.id);
+    setSalvandoDetalhes(false);
+    if (error) { setErroDetalhes("Não foi possível salvar as alterações."); return; }
+    setEditandoDetalhes(false);
+  }
 
   async function salvarPortal() {
     const link = novoPortalLink.trim();
@@ -710,7 +734,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
     const payload: any = {
       conta_id: conta.id, ano: ANO_ATUAL, mes: MES_ATUAL,
       valor: Number(valorLancar.replace(",", ".")),
-      situacao: "lancado", comprovante_url: caminhoBoleto,
+      situacao: "aprovado", comprovante_url: caminhoBoleto,
       lancado_em: new Date().toISOString(),
       codigo_barras: codigoBarras.trim() || null,
       arquivo_hash: hashArquivo,
@@ -771,13 +795,57 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
         </div>
 
         <div className="p-5">
-          <div className="text-[14px] font-semibold text-[#1a1a1a] mb-4">Detalhes da conta</div>
-          <div className="grid grid-cols-2 gap-y-3.5 mb-6">
-            <Campo label="Fornecedor" valor={conta.fornecedor_nome ?? "—"} />
-            <Campo label="Vencimento" valor={conta.dia_vencimento ? `dia ${conta.dia_vencimento}` : "—"} />
-            <Campo label={CAMPOS_TIPO[conta.tipo]?.labelIdentificador ?? "Código da conta"} valor={conta.identificador ?? "—"} mono />
-            <Campo label="Origem" valor={ORIGENS[conta.origem]} />
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-[14px] font-semibold text-[#1a1a1a]">Detalhes da conta</div>
+            {!editandoDetalhes && (
+              <button onClick={() => { setEditandoDetalhes(true); setErroDetalhes(null); }}
+                className="text-[11.5px] text-[#adb5bd] hover:text-[#1a1a1a]">editar</button>
+            )}
           </div>
+          {!editandoDetalhes ? (
+            <div className="grid grid-cols-2 gap-y-3.5 mb-6">
+              <Campo label="Fornecedor" valor={detFornecedor || "—"} />
+              <Campo label="Vencimento" valor={detVenc ? `dia ${detVenc}` : "—"} />
+              <Campo label={CAMPOS_TIPO[conta.tipo]?.labelIdentificador ?? "Código da conta"} valor={detIdent || "—"} mono />
+              <Campo label="Origem" valor={ORIGENS[detOrigem]} />
+            </div>
+          ) : (
+            <div className="mb-6 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <label>
+                  <div className="text-[11px] text-[#adb5bd] font-medium mb-1">Fornecedor</div>
+                  <input value={detFornecedor} onChange={(e) => setDetFornecedor(e.target.value)} className="input-padrao w-full" />
+                </label>
+                <label>
+                  <div className="text-[11px] text-[#adb5bd] font-medium mb-1">Vencimento (dia)</div>
+                  <input value={detVenc} onChange={(e) => setDetVenc(e.target.value.replace(/[^0-9]/g, ""))} placeholder="1-31" className="input-padrao w-full" />
+                </label>
+                <label>
+                  <div className="text-[11px] text-[#adb5bd] font-medium mb-1">{CAMPOS_TIPO[conta.tipo]?.labelIdentificador ?? "Código da conta"}</div>
+                  <input value={detIdent} onChange={(e) => setDetIdent(e.target.value)} className="input-padrao w-full font-mono" />
+                </label>
+                <label>
+                  <div className="text-[11px] text-[#adb5bd] font-medium mb-1">Origem</div>
+                  <select value={detOrigem} onChange={(e) => setDetOrigem(e.target.value)} className="input-padrao w-full">
+                    {Object.entries(ORIGENS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </select>
+                </label>
+              </div>
+              {erroDetalhes && <div className="text-[12px] text-alerr bg-alerr-bg rounded-md px-3 py-2">{erroDetalhes}</div>}
+              <div className="flex gap-2">
+                <button onClick={salvarDetalhes} disabled={salvandoDetalhes} className="btn-primario flex-1 disabled:opacity-50">
+                  {salvandoDetalhes ? "Salvando..." : "Salvar detalhes"}
+                </button>
+                <button onClick={() => {
+                  setEditandoDetalhes(false); setErroDetalhes(null);
+                  setDetFornecedor(conta.fornecedor_nome ?? "");
+                  setDetVenc(conta.dia_vencimento != null ? String(conta.dia_vencimento) : "");
+                  setDetIdent(conta.identificador ?? "");
+                  setDetOrigem(conta.origem);
+                }} className="btn-secundario">Cancelar</button>
+              </div>
+            </div>
+          )}
 
           <div className="pb-5 mb-5 border-b border-linha">
             <div className="text-[11px] text-[#adb5bd] font-medium mb-2">Portal do fornecedor</div>
@@ -1103,6 +1171,12 @@ function Campo({ label, valor, mono }: { label: string; valor: string; mono?: bo
 function NovaContaDrawer({ lojas, onClose }: { lojas: { id: string; codigo: string }[]; onClose: () => void }) {
   const router = useRouter();
   const { state, updateField, isLoading, error, salvar } = useContaForm(lojas[0]?.id ?? "");
+  const [buscaLoja, setBuscaLoja] = useState("");
+  const [abertoLoja, setAbertoLoja] = useState(false);
+  const lojaSel = lojas.find((l) => l.id === state.lojaId);
+  const lojasFiltradas = (buscaLoja.trim()
+    ? lojas.filter((l) => l.codigo.toLowerCase().includes(buscaLoja.toLowerCase()))
+    : lojas).slice(0, 50);
 
   async function handleSalvar() {
     const resultado = await salvar();
@@ -1125,12 +1199,26 @@ function NovaContaDrawer({ lojas, onClose }: { lojas: { id: string; codigo: stri
           <h3 className="text-[20px] font-bold text-[#1a1a1a]">Nova conta</h3>
         </div>
         <div className="p-5 space-y-3.5">
-          <label>
+          <div className="relative">
             <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Loja</div>
-            <select value={state.lojaId} onChange={(e) => updateField("lojaId", e.target.value)} className="input-padrao w-full">
-              {lojas.map((l) => <option key={l.id} value={l.id}>{l.codigo}</option>)}
-            </select>
-          </label>
+            <input
+              value={abertoLoja ? buscaLoja : (lojaSel?.codigo ?? "")}
+              onFocus={() => { setAbertoLoja(true); setBuscaLoja(""); }}
+              onChange={(e) => setBuscaLoja(e.target.value)}
+              placeholder="Buscar loja..."
+              className="input-padrao w-full"
+            />
+            {abertoLoja && (
+              <div className="absolute z-30 top-full left-0 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-linha rounded-md shadow-media">
+                {lojasFiltradas.map((l) => (
+                  <button key={l.id} type="button" onClick={() => { updateField("lojaId", l.id); setAbertoLoja(false); }}
+                    className="block w-full text-left px-3 py-1.5 text-[13px] hover:bg-off">{l.codigo}</button>
+                ))}
+                {lojasFiltradas.length === 0 && <div className="px-3 py-1.5 text-[12px] text-[#adb5bd]">Nenhuma loja encontrada.</div>}
+                <button type="button" onClick={() => setAbertoLoja(false)} className="block w-full text-left px-3 py-1.5 text-[11px] text-[#adb5bd] border-t border-linha2 hover:bg-off">Fechar</button>
+              </div>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <label>
               <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Tipo</div>

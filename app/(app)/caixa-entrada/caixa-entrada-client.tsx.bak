@@ -39,7 +39,7 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
     setTimeout(() => setToast(null), 3500);
   }
 
-  async function confirmar(item: Item, lojaId: string, tipo: string) {
+  async function confirmar(item: Item, lojaId: string, tipo: string, ano: number, mes: number) {
     setProcessando(item.id);
     try {
       const { data: conta } = await supabase.from("contas").select("id").eq("loja_id", lojaId).eq("tipo", tipo).eq("status", "ativo").maybeSingle();
@@ -52,7 +52,7 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
       const agora = new Date();
       const { data: { user } } = await supabase.auth.getUser();
       const { data: lancamento, error } = await supabase.from("lancamentos").upsert({
-        conta_id: conta.id, ano: agora.getFullYear(), mes: agora.getMonth() + 1,
+        conta_id: conta.id, ano, mes,
         valor: item.valor_detectado, situacao: "lancado", lancado_em: agora.toISOString(),
         codigo_barras: item.codigo_barras_detectado, comprovante_drive_url: item.drive_web_view_link,
       }, { onConflict: "conta_id,ano,mes" }).select("id").single();
@@ -113,10 +113,14 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
 
 function ItemCard({ item, lojas, processando, onConfirmar, onRejeitar }: {
   item: Item; lojas: { id: string; codigo: string }[]; processando: boolean;
-  onConfirmar: (item: Item, lojaId: string, tipo: string) => void; onRejeitar: (item: Item) => void;
+  onConfirmar: (item: Item, lojaId: string, tipo: string, ano: number, mes: number) => void; onRejeitar: (item: Item) => void;
 }) {
   const [lojaId, setLojaId] = useState(item.loja_sugerida_id ?? "");
   const [tipo, setTipo] = useState(item.tipo_detectado ?? "");
+  const [comp, setComp] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
   const [buscaLoja, setBuscaLoja] = useState("");
   const [buscandoLoja, setBuscandoLoja] = useState(false);
   const conf = CONFIANCA_LABEL[item.confianca];
@@ -139,10 +143,15 @@ function ItemCard({ item, lojas, processando, onConfirmar, onRejeitar }: {
 
       {item.observacao && <div className="text-[11.5px] text-alerr bg-alerr-bg rounded-md px-3 py-2 mb-3">{item.observacao}</div>}
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-3">
         <div>
           <div className="text-[10.5px] font-semibold text-[#adb5bd] uppercase mb-1">Valor</div>
           <div className="text-[14px] font-bold font-mono">{item.valor_detectado != null ? money(item.valor_detectado) : "—"}</div>
+        </div>
+        <div>
+          <div className="text-[10.5px] font-semibold text-[#adb5bd] uppercase mb-1">Competência</div>
+          <input type="month" value={comp} onChange={(e) => setComp(e.target.value)}
+            className="border border-linha rounded-md px-2 py-1 text-[12px] w-full" />
         </div>
         <div className="relative">
           <div className="text-[10.5px] font-semibold text-[#adb5bd] uppercase mb-1">Loja</div>
@@ -180,7 +189,7 @@ function ItemCard({ item, lojas, processando, onConfirmar, onRejeitar }: {
       </div>
 
       <div className="flex gap-2">
-        <button onClick={() => onConfirmar(item, lojaId, tipo)} disabled={!lojaId || !tipo || processando}
+        <button onClick={() => { const [a, m] = comp.split("-").map(Number); onConfirmar(item, lojaId, tipo, a, m); }} disabled={!lojaId || !tipo || !comp || processando}
           className="btn-primario flex-1 disabled:opacity-40">
           {processando ? "Lançando..." : "Confirmar e lançar"}
         </button>

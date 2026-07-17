@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { TIPOS } from "@/lib/types";
+import { TIPOS, ORIGENS } from "@/lib/types";
 import { money } from "@/lib/format";
 
 type Item = {
@@ -39,21 +39,26 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
     setTimeout(() => setToast(null), 3500);
   }
 
-  async function confirmar(item: Item, lojaId: string, tipo: string, ano: number, mes: number) {
+  async function confirmar(item: Item, lojaId: string, tipo: string, ano: number, mes: number, origem: string) {
     setProcessando(item.id);
     try {
       const { data: conta } = await supabase.from("contas").select("id").eq("loja_id", lojaId).eq("tipo", tipo).eq("status", "ativo").maybeSingle();
-      if (!conta) {
-        setToast("Não existe conta ativa desse tipo pra essa loja. Cadastra a conta primeiro em Contas.");
-        setProcessando(null);
-        return;
+      let contaId = conta?.id as string | undefined;
+
+      // se não existe conta ativa desse tipo, cria uma na hora (loja + tipo + origem)
+      if (!contaId) {
+        const { data: novaConta, error: errConta } = await supabase.from("contas").insert({
+          loja_id: lojaId, tipo, origem, status: "ativo", situacao_cadastro: "aprovada",
+        }).select("id").single();
+        if (errConta || !novaConta) { setToast("Não foi possível criar a conta."); setProcessando(null); return; }
+        contaId = novaConta.id;
       }
 
       const agora = new Date();
       const { data: { user } } = await supabase.auth.getUser();
       const { data: lancamento, error } = await supabase.from("lancamentos").upsert({
-        conta_id: conta.id, ano, mes,
-        valor: item.valor_detectado, situacao: "lancado", lancado_em: agora.toISOString(),
+        conta_id: contaId, ano, mes,
+        valor: item.valor_detectado, situacao: "aprovado", lancado_em: agora.toISOString(),
         codigo_barras: item.codigo_barras_detectado, comprovante_drive_url: item.drive_web_view_link,
       }, { onConflict: "conta_id,ano,mes" }).select("id").single();
 
@@ -113,10 +118,11 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
 
 function ItemCard({ item, lojas, processando, onConfirmar, onRejeitar }: {
   item: Item; lojas: { id: string; codigo: string }[]; processando: boolean;
-  onConfirmar: (item: Item, lojaId: string, tipo: string, ano: number, mes: number) => void; onRejeitar: (item: Item) => void;
+  onConfirmar: (item: Item, lojaId: string, tipo: string, ano: number, mes: number, origem: string) => void; onRejeitar: (item: Item) => void;
 }) {
   const [lojaId, setLojaId] = useState(item.loja_sugerida_id ?? "");
   const [tipo, setTipo] = useState(item.tipo_detectado ?? "");
+  const [origem, setOrigem] = useState("boleto_reembolso");
   const [comp, setComp] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -143,7 +149,7 @@ function ItemCard({ item, lojas, processando, onConfirmar, onRejeitar }: {
 
       {item.observacao && <div className="text-[11.5px] text-alerr bg-alerr-bg rounded-md px-3 py-2 mb-3">{item.observacao}</div>}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-3">
         <div>
           <div className="text-[10.5px] font-semibold text-[#adb5bd] uppercase mb-1">Valor</div>
           <div className="text-[14px] font-bold font-mono">{item.valor_detectado != null ? money(item.valor_detectado) : "—"}</div>
@@ -183,13 +189,19 @@ function ItemCard({ item, lojas, processando, onConfirmar, onRejeitar }: {
           </select>
         </div>
         <div>
+          <div className="text-[10.5px] font-semibold text-[#adb5bd] uppercase mb-1">Origem</div>
+          <select value={origem} onChange={(e) => setOrigem(e.target.value)} className="border border-linha rounded-md px-2 py-1 text-[12px] w-full">
+            {Object.entries(ORIGENS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+        </div>
+        <div>
           <div className="text-[10.5px] font-semibold text-[#adb5bd] uppercase mb-1">Código de barras</div>
           <div className="text-[10.5px] font-mono text-[#6c757d] truncate">{item.codigo_barras_detectado ?? "—"}</div>
         </div>
       </div>
 
       <div className="flex gap-2">
-        <button onClick={() => { const [a, m] = comp.split("-").map(Number); onConfirmar(item, lojaId, tipo, a, m); }} disabled={!lojaId || !tipo || !comp || processando}
+        <button onClick={() => { const [a, m] = comp.split("-").map(Number); onConfirmar(item, lojaId, tipo, a, m, origem); }} disabled={!lojaId || !tipo || !comp || processando}
           className="btn-primario flex-1 disabled:opacity-40">
           {processando ? "Lançando..." : "Confirmar e lançar"}
         </button>
