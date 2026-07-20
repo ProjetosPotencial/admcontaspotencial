@@ -398,6 +398,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
   const [qtdContasFornecedor, setQtdContasFornecedor] = useState<number | null>(null);
   const [salvandoEncerramento, setSalvandoEncerramento] = useState(false);
   const [erroEncerramento, setErroEncerramento] = useState<string | null>(null);
+  const [reativando, setReativando] = useState(false);
 
   async function abrirEncerramento() {
     setEncerrando(true);
@@ -410,6 +411,21 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
         .ilike("fornecedor_nome", conta.fornecedor_nome).eq("status", "ativo");
       setQtdContasFornecedor(count ?? null);
     }
+  }
+
+  async function reativarConta() {
+    setReativando(true); setAviso(null);
+    const { error } = await supabase.from("contas").update({
+      status: "ativo",
+      data_encerramento: null,
+      encerrada_em: null,
+      motivo_encerramento: null,
+      encerrada_por: null,
+    }).eq("id", conta.id);
+    setReativando(false);
+    if (error) { setAviso("Não foi possível reativar a conta."); return; }
+    setAviso("Conta reativada.");
+    router.refresh();
   }
 
   async function confirmarEncerramento() {
@@ -903,6 +919,10 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
                   {conta.data_encerramento && `Válida até ${formatarDataSemFuso(conta.data_encerramento)}. `}
                   {conta.motivo_encerramento && `Motivo: ${conta.motivo_encerramento}`}
                 </div>
+                <button onClick={reativarConta} disabled={reativando}
+                  className="mt-2.5 text-[12px] font-semibold text-ok border border-ok/30 bg-ok-bg rounded-md px-3 py-1.5 hover:bg-ok/10 transition disabled:opacity-50">
+                  {reativando ? "Reativando..." : "Reativar conta"}
+                </button>
               </div>
             ) : !encerrando ? (
               <button onClick={abrirEncerramento} className="text-[12px] text-alerr font-semibold hover:underline">
