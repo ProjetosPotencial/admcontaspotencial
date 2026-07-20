@@ -17,7 +17,7 @@ function StatusBadge({ status }: { status: string }) {
   return <span className="badge bg-ok-bg text-ok">Ativa</span>;
 }
 
-function VencimentoCell({ contaId, dia, ano, mes }: { contaId: string; dia: number | null; ano: number; mes: number }) {
+function VencimentoCell({ contaId, dia, ano, mes, situacao }: { contaId: string; dia: number | null; ano: number; mes: number; situacao?: string }) {
   const supabase = createClient();
   const router = useRouter();
   const [editando, setEditando] = useState(false);
@@ -65,7 +65,10 @@ function VencimentoCell({ contaId, dia, ano, mes }: { contaId: string; dia: numb
   const dataFormatada = new Date(ano, mes - 1, dia).toLocaleDateString("pt-br");
 
   let label: string; let cor: string;
-  if (diff < 0) { label = "Atrasada"; cor = "text-alerr"; }
+  // conta que já teve boleto lançado não é mais "atrasada" - ela já foi processada
+  const jaLancada = situacao != null && situacao !== "pendente";
+  if (jaLancada) { label = "Lançada"; cor = "text-ok"; }
+  else if (diff < 0) { label = "Atrasada"; cor = "text-alerr"; }
   else if (diff === 0) { label = "Hoje"; cor = "text-alerr"; }
   else if (diff === 1) { label = "Amanhã"; cor = "text-amb"; }
   else if (diff <= 7) { label = `${diff} dias`; cor = "text-amb"; }
@@ -73,7 +76,7 @@ function VencimentoCell({ contaId, dia, ano, mes }: { contaId: string; dia: numb
 
   return (
     <button onClick={(e) => { e.stopPropagation(); setEditando(true); }} className="flex items-center gap-2 group/venc text-left">
-      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${diff < 0 || diff === 0 ? "bg-alerr" : diff <= 7 ? "bg-amb" : "bg-ok"}`} />
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${jaLancada ? "bg-ok" : diff < 0 || diff === 0 ? "bg-alerr" : diff <= 7 ? "bg-amb" : "bg-ok"}`} />
       <div>
         <div className={`text-[12.5px] font-semibold ${cor} flex items-center gap-1`}>
           {label}
@@ -322,7 +325,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
                   <FornecedorCell contaId={c.id} nome={c.fornecedor_nome} />
                   {c.eh_rateio && <span className="text-[10px] font-mono text-amb border border-amarelo rounded px-1 ml-1.5">RATEIO</span>}
                 </td>
-                <td className="px-4"><VencimentoCell contaId={c.id} dia={c.dia_vencimento} ano={ano} mes={mes} /></td>
+                <td className="px-4"><VencimentoCell contaId={c.id} dia={c.dia_vencimento} ano={ano} mes={mes} situacao={situacaoPorConta[c.id]} /></td>
                 <td className="px-4 text-[13px]"><OrigemCell contaId={c.id} origem={c.origem} /></td>
                 <td className="px-4 text-[13px]"><StatusBadge status={c.status} /></td>
                 <td className="px-4 text-right">

@@ -44,9 +44,7 @@ export default async function ContasPage() {
 
   const totalCadastradas = contas.filter((c) => c.status === "ativo" || (c.status === "encerrado" && contaValidaNoPeriodo(c.status, c.data_encerramento, ano, mes))).length;
 
-  // só conta como pendente o que ainda NÃO foi lançado. Assim que o boleto
-  // é lançado, a conta sai de "atrasadas"/"vence hoje" - ela já foi processada.
-  const pendentes = (lancDetalhado ?? []).filter((l: any) => l.situacao === "pendente");
+  const pendentes = (lancDetalhado ?? []).filter((l: any) => l.situacao === "pendente" || l.situacao === "lancado");
   const venceHoje = ehPeriodoAtual ? pendentes.filter((l: any) => l.contas?.dia_vencimento === diaAtual) : [];
   const proximos7 = ehPeriodoAtual ? pendentes.filter((l: any) => {
     const dv = l.contas?.dia_vencimento;

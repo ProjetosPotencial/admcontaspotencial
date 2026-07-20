@@ -452,6 +452,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
     router.refresh();
   }
   const [lancando, setLancando] = useState(false);
+  const [sucessoLancamento, setSucessoLancamento] = useState<string | null>(null);
   const [valorLancar, setValorLancar] = useState("");
   const [arquivoBoleto, setArquivoBoleto] = useState<File | null>(null);
   const [hashArquivo, setHashArquivo] = useState<string | null>(null);
@@ -759,13 +760,18 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
     const { error } = await supabase.from("lancamentos").upsert(payload, { onConflict: "conta_id,ano,mes" });
     setSalvandoLancamento(false);
     if (error) { setErroLancamento("Não foi possível salvar o lançamento."); return; }
+    // fecha o formulário, limpa os campos e confirma na própria área da fatura
     setLancando(false);
     setValorLancar("");
     setArquivoBoleto(null);
     setCodigoBarras("");
+    setHashArquivo(null);
+    setAlertas([]);
+    setConfirmarMesmoAssim(false);
     setErroLancamento(null);
-    setAviso("Boleto lançado e enviado para aprovação.");
-    router.refresh(); // atualiza os dados sem sair da página Contas
+    setSucessoLancamento("Lançamento realizado com sucesso.");
+    setTimeout(() => setSucessoLancamento(null), 6000);
+    router.refresh(); // atualiza a lista de contas sem sair da página
   }
 
   async function verBoleto(caminho: string) {
@@ -1003,6 +1009,15 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
 
           <div className="pt-5 mt-5 border-t border-linha">
             <div className="text-[14px] font-semibold text-[#1a1a1a] mb-3.5">Fatura de {formatarPeriodo(MES_ATUAL, ANO_ATUAL)}</div>
+
+            {sucessoLancamento && (
+              <div className="mb-3 flex items-center gap-2 text-[12.5px] font-semibold text-ok bg-ok-bg border border-ok/25 rounded-md px-3 py-2.5">
+                <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                  <path d="M4 10.5l4 4 8-9" />
+                </svg>
+                {sucessoLancamento}
+              </div>
+            )}
 
             {lancamentoAtual && lancamentoAtual.situacao !== "pendente" && !lancando ? (
               <div className="card p-4">
