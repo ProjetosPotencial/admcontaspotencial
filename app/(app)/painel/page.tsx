@@ -219,8 +219,8 @@ export default async function PainelPage() {
   const rejeitadasMes = (lancamentos ?? []).filter((l) => l.situacao === "contestado").length;
 
   return (
-    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-[1400px] w-full">
-      <div className="mb-6">
+    <div className="px-4 sm:px-8 py-5 sm:py-6 max-w-[1560px] w-full">
+      <div className="mb-4">
         <h1 className="text-[24px] font-bold text-[#1a1a1a]">👋 {saudacao()}{nome ? `, ${nome}` : ""}!</h1>
         <p className="text-[14px] text-[#6c757d] mt-1">
           {ehPeriodoAtual ? "Aqui está o resumo da sua gestão financeira." : `Você está vendo o histórico de ${formatarPeriodo(mes, ano)}.`}
@@ -245,7 +245,7 @@ export default async function PainelPage() {
       </div>
 
       {/* indicadores principais */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-3 mb-4">
         {[
           { icone: "📄", rot: "Contas ativas", val: totAtivas, sub: metricaAnterior?.contas_ativas != null ? `${totAtivas - metricaAnterior.contas_ativas >= 0 ? "+" : ""}${totAtivas - metricaAnterior.contas_ativas} este mês` : "sem dado anterior", href: "/contas", cor: "#2A74C4" },
           { icone: "💰", rot: "Valor do mês", val: totalAPagar, money: true, sub: `${(lancamentosDetalhados ?? []).length} lançamentos`, href: "/lancamentos", cor: "#2E7D32" },
@@ -254,7 +254,7 @@ export default async function PainelPage() {
           { icone: "🏪", rot: "Lojas ativas", val: lojasAtivas, sub: `${totalLojasFechadas ?? 0} encerradas`, href: "/lojas", cor: "#7B4FC4" },
         ].map((k) => (
           <Link key={k.rot} href={k.href}
-            className="card p-4 sm:p-5 hover:shadow-media hover:-translate-y-px transition-all duration-150">
+            className="card p-4 hover:shadow-media hover:-translate-y-px transition-all duration-150">
             <div className="flex items-center justify-between mb-2.5">
               <span className="text-[11.5px] font-semibold text-[#6c757d]">{k.rot}</span>
               <span className="w-7 h-7 rounded-lg grid place-items-center text-[13px]" style={{ background: `${k.cor}15` }}>{k.icone}</span>
@@ -269,7 +269,7 @@ export default async function PainelPage() {
 
       {/* alertas em destaque */}
       {insightsIA.length > 0 && (
-        <div className="flex gap-2.5 overflow-x-auto pb-1 mb-6 -mx-1 px-1">
+        <div className="flex gap-2.5 overflow-x-auto pb-1 mb-4 -mx-1 px-1">
           {insightsIA.map((ins, i) => (
             <Link key={i} href={ins.href}
               className="shrink-0 flex items-center gap-2 bg-white border border-linha rounded-full pl-3 pr-3.5 py-2 text-[12px] text-[#495057] hover:border-amarelo hover:shadow-leve transition">
@@ -280,8 +280,8 @@ export default async function PainelPage() {
       )}
 
       {/* agenda em timeline */}
-      <div className="grid lg:grid-cols-3 gap-4 mb-6">
-        <div className="card p-5">
+      <div className="grid lg:grid-cols-3 gap-3 mb-4">
+        <div className="card p-4">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-disp text-[14px] font-semibold text-[#1a1a1a]">Agenda de vencimentos</h3>
             <Link href="/contas" className="text-[11.5px] font-semibold text-info hover:underline">Ver todas</Link>
@@ -311,14 +311,14 @@ export default async function PainelPage() {
           </div>
         </div>
 
-        <div className="lg:col-span-2 card p-5">
+        <div className="lg:col-span-2 card p-4">
           <h3 className="font-disp text-[14px] font-semibold text-[#1a1a1a] mb-4">Gastos por categoria <span className="text-[11.5px] font-normal text-[#adb5bd]">· {formatarPeriodo(mes, ano)}</span></h3>
           <DonutTipos fatias={fatiasTipo} total={totalDonut} />
         </div>
       </div>
 
       {/* calendário do mês + assistente financeiro */}
-      <div className="grid lg:grid-cols-3 gap-4 mb-6">
+      <div className="grid lg:grid-cols-3 gap-3 mb-4">
         <div className="lg:col-span-2">
           <CalendarioMes
             ano={ano} mes={mes} dias={diasCalendario}
@@ -326,7 +326,7 @@ export default async function PainelPage() {
           />
         </div>
 
-        <div className="card p-5 flex flex-col">
+        <div className="card p-4 flex flex-col">
           <div className="flex items-center gap-2 mb-1">
             <span className="w-7 h-7 rounded-lg bg-amarelo/15 grid place-items-center text-[14px]">🤖</span>
             <div>
@@ -361,85 +361,80 @@ export default async function PainelPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
-        <div className="min-w-0">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
-            <KpiCard icon="doc" cor="#c9922a" value={totAtivas} label="Contas ativas" variacao={variacaoPct(totAtivas, metricaAnterior?.contas_ativas ?? null)} />
-            <KpiCard icon="calendar" cor="#c9922a" value={totAberto} label={`A lançar em ${formatarPeriodo(mes, ano).split("/")[0].toLowerCase()}`} variacao={variacaoPct(totAberto, metricaAnterior?.a_lancar ?? null)} />
-            <KpiCard icon="hourglass" cor="#B23B3B" value={totLancado} label="Aguardando pagamento" variacao={variacaoPct(totLancado, metricaAnterior?.aguardando_pagamento ?? null)} />
-            <KpiCard icon="pin" cor="#2E7D57" value={totMapear} label="Origem a mapear" variacao={variacaoPct(totMapear, metricaAnterior?.origem_a_mapear ?? null)} />
+        {/* atividade recente + resumo do seu dia */}
+      <div className="grid lg:grid-cols-3 gap-3 mb-4">
+<div className="lg:col-span-2 card p-4">
+  <h3 className="font-disp text-[14px] font-semibold text-[#1a1a1a] mb-4">Atividade recente</h3>
+  <div className="relative pl-5">
+    <span className="absolute left-[5px] top-2 bottom-2 w-px bg-linha2" />
+    {(atividadeRecente ?? []).map((a: any) => {
+      const quando = a.lancado_em
+        ? new Date(a.lancado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+        : "";
+      const quem = nomePorId.get(a.lancado_por) ?? "Alguém";
+      const cor = a.situacao === "pago" ? "#2E7D32" : a.situacao === "contestado" ? "#D32F2F" : a.situacao === "aprovado" ? "#2A74C4" : "#E6A600";
+      const verbo = a.situacao === "pago" ? "pagou" : a.situacao === "aprovado" ? "aprovou" : a.situacao === "contestado" ? "recusou" : "lançou";
+      return (
+        <div key={a.id} className="relative pb-3.5 last:pb-0">
+          <span className="absolute -left-5 top-1.5 w-[11px] h-[11px] rounded-full border-2 border-white"
+            style={{ background: cor, boxShadow: "0 0 0 1.5px #e9ecef" }} />
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="text-[12.5px] text-[#1a1a1a]">
+              <b className="font-semibold">{quem}</b> {verbo} {TIPOS[a.contas?.tipo]?.n?.toLowerCase() ?? "conta"}
+              {a.contas?.lojas?.codigo ? <> · <span className="font-mono text-[11.5px]">{a.contas.lojas.codigo}</span></> : null}
+            </span>
+            {a.valor ? <span className="text-[11.5px] font-mono font-semibold text-[#495057]">{money(Number(a.valor))}</span> : null}
           </div>
+          <div className="text-[10.5px] text-[#adb5bd] font-mono mt-0.5">{quando}</div>
+        </div>
+      );
+    })}
+    {(atividadeRecente ?? []).length === 0 && (
+      <div className="text-[12px] text-[#adb5bd]">Nenhuma movimentação registrada ainda.</div>
+    )}
+  </div>
+</div>
+
+<div className="card p-4 flex flex-col">
+  <h3 className="font-disp text-[14px] font-semibold text-[#1a1a1a] mb-1">🤖 Bom trabalho!</h3>
+  <p className="text-[11.5px] text-[#6c757d] mb-3.5">Como está o mês até agora</p>
+  <div className="space-y-2 text-[12.5px] text-[#495057] flex-1">
+    <div className="flex items-center gap-2"><span className="text-ok">✔</span> {totLancado} {totLancado === 1 ? "conta lançada" : "contas lançadas"}</div>
+    <div className="flex items-center gap-2"><span className="text-ok">✔</span> {aprovadasMes} {aprovadasMes === 1 ? "conta aprovada" : "contas aprovadas"}</div>
+    <div className="flex items-center gap-2"><span className="text-ok">✔</span> {pctPago}% do valor do mês já pago</div>
+    {rejeitadasMes > 0 && <div className="flex items-center gap-2"><span className="text-alerr">✖</span> {rejeitadasMes} {rejeitadasMes === 1 ? "recusada" : "recusadas"}</div>}
+  </div>
+  <div className="mt-4 pt-3 border-t border-linha2 space-y-1.5 text-[11.5px] text-[#6c757d]">
+    <div>💧 Aproveite para beber um copo de água.</div>
+    <div>☕ Faça uma pausa em alguns minutos.</div>
+  </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_310px] gap-4">
+        <div className="min-w-0">
 
           {ehPeriodoAtual && (
-            <div className="mb-6">
+            <div className="mb-4">
               <VencimentosProximosClient itens={(lancamentosDetalhados ?? []) as any[]} diaAtual={diaAtual} />
             </div>
           )}
 
           <div className="flex items-end justify-between mb-4">
             <div>
-              <h2 className="text-[18px] font-bold text-[#1a1a1a]">Situação por tipo de conta</h2>
-              <p className="text-[13px] text-[#6c757d] mt-0.5">Visão geral do status das contas por categoria</p>
+              <h2 className="text-[15px] font-bold text-[#1a1a1a]">Situação por tipo de conta</h2>
+              <p className="text-[12px] text-[#6c757d] mt-0.5">Visão geral do status das contas por categoria</p>
             </div>
             <Link href="/contas" className="text-[12.5px] font-semibold text-info hover:underline">Ver todas as contas</Link>
-          </div>
-                {/* atividade recente + resumo do seu dia */}
-      <div className="grid lg:grid-cols-3 gap-4 mb-6">
-        <div className="lg:col-span-2 card p-5">
-          <h3 className="font-disp text-[14px] font-semibold text-[#1a1a1a] mb-4">Atividade recente</h3>
-          <div className="relative pl-5">
-            <span className="absolute left-[5px] top-2 bottom-2 w-px bg-linha2" />
-            {(atividadeRecente ?? []).map((a: any) => {
-              const quando = a.lancado_em
-                ? new Date(a.lancado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
-                : "";
-              const quem = nomePorId.get(a.lancado_por) ?? "Alguém";
-              const cor = a.situacao === "pago" ? "#2E7D32" : a.situacao === "contestado" ? "#D32F2F" : a.situacao === "aprovado" ? "#2A74C4" : "#E6A600";
-              const verbo = a.situacao === "pago" ? "pagou" : a.situacao === "aprovado" ? "aprovou" : a.situacao === "contestado" ? "recusou" : "lançou";
-              return (
-                <div key={a.id} className="relative pb-3.5 last:pb-0">
-                  <span className="absolute -left-5 top-1.5 w-[11px] h-[11px] rounded-full border-2 border-white"
-                    style={{ background: cor, boxShadow: "0 0 0 1.5px #e9ecef" }} />
-                  <div className="flex items-baseline gap-2 flex-wrap">
-                    <span className="text-[12.5px] text-[#1a1a1a]">
-                      <b className="font-semibold">{quem}</b> {verbo} {TIPOS[a.contas?.tipo]?.n?.toLowerCase() ?? "conta"}
-                      {a.contas?.lojas?.codigo ? <> · <span className="font-mono text-[11.5px]">{a.contas.lojas.codigo}</span></> : null}
-                    </span>
-                    {a.valor ? <span className="text-[11.5px] font-mono font-semibold text-[#495057]">{money(Number(a.valor))}</span> : null}
-                  </div>
-                  <div className="text-[10.5px] text-[#adb5bd] font-mono mt-0.5">{quando}</div>
-                </div>
-              );
-            })}
-            {(atividadeRecente ?? []).length === 0 && (
-              <div className="text-[12px] text-[#adb5bd]">Nenhuma movimentação registrada ainda.</div>
-            )}
-          </div>
-        </div>
-
-        <div className="card p-5 flex flex-col">
-          <h3 className="font-disp text-[14px] font-semibold text-[#1a1a1a] mb-1">🤖 Bom trabalho!</h3>
-          <p className="text-[11.5px] text-[#6c757d] mb-3.5">Como está o mês até agora</p>
-          <div className="space-y-2 text-[12.5px] text-[#495057] flex-1">
-            <div className="flex items-center gap-2"><span className="text-ok">✔</span> {totLancado} {totLancado === 1 ? "conta lançada" : "contas lançadas"}</div>
-            <div className="flex items-center gap-2"><span className="text-ok">✔</span> {aprovadasMes} {aprovadasMes === 1 ? "conta aprovada" : "contas aprovadas"}</div>
-            <div className="flex items-center gap-2"><span className="text-ok">✔</span> {pctPago}% do valor do mês já pago</div>
-            {rejeitadasMes > 0 && <div className="flex items-center gap-2"><span className="text-alerr">✖</span> {rejeitadasMes} {rejeitadasMes === 1 ? "recusada" : "recusadas"}</div>}
-          </div>
-          <div className="mt-4 pt-3 border-t border-linha2 space-y-1.5 text-[11.5px] text-[#6c757d]">
-            <div>💧 Aproveite para beber um copo de água.</div>
-            <div>☕ Faça uma pausa em alguns minutos.</div>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
             {porTipo.map(({ t, ativas, mapear, pagas, aguardando, aLancar, atrasadas }) => {
               const T = TIPOS[t];
               const base = ativas || 1;
               const pctPagas = Math.round((pagas / base) * 100);
               return (
-                <div key={t} className="bg-white border border-linha rounded-xl p-5 shadow-leve hover:shadow-media transition">
+                <div key={t} className="bg-white border border-linha rounded-xl p-4 shadow-leve hover:shadow-media transition">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-10 h-10 rounded-full grid place-items-center shrink-0" style={{ background: T.bg }}>
                       <TipoIcon tipo={t} size={18} color={T.c} />
@@ -488,7 +483,7 @@ export default async function PainelPage() {
             </Link>
           </div>
 
-          <div className="card p-5">
+          <div className="card p-4">
             <div className="flex items-center justify-between mb-1">
               <h3 className="text-[14px] font-bold text-[#1a1a1a]">Lojas fechadas</h3>
               <Link href="/lojas?status=encerrada" className="text-[11.5px] font-semibold text-info hover:underline">Ver todas</Link>
@@ -511,7 +506,7 @@ export default async function PainelPage() {
             )}
           </div>
 
-          <div className="card p-5">
+          <div className="card p-4">
             <h3 className="text-[14px] font-bold text-[#1a1a1a] mb-3.5">Evolução mensal</h3>
             <div className="text-[22px] font-bold text-[#1a1a1a] leading-none">{money(totalMesAtual)}</div>
             <div className="text-[11.5px] text-[#6c757d] mt-1 mb-4">
@@ -534,7 +529,7 @@ export default async function PainelPage() {
             </div>
           </div>
 
-          <div className="card p-5">
+          <div className="card p-4">
             <h3 className="text-[14px] font-bold text-[#1a1a1a] mb-1">Top 5 lojas</h3>
             <p className="text-[11.5px] text-[#6c757d] mb-3.5">maiores gastos do mês</p>
             <div className="space-y-2.5">
@@ -550,7 +545,7 @@ export default async function PainelPage() {
             <Link href="/lojas" className="block text-center mt-4 pt-3 border-t border-linha2 text-[12px] font-semibold text-info hover:underline">Ver ranking completo</Link>
           </div>
 
-          <div className="card p-5">
+          <div className="card p-4">
             <h3 className="text-[14px] font-bold text-[#1a1a1a] mb-3.5">Top fornecedores</h3>
             <div className="space-y-3">
               {topFornecedores.map(([nomeF, valor]) => (
@@ -567,7 +562,7 @@ export default async function PainelPage() {
             <Link href="/fornecedores" className="block text-center mt-4 pt-3 border-t border-linha2 text-[12px] font-semibold text-info hover:underline">Ver todos</Link>
           </div>
 
-          <div className="card p-5">
+          <div className="card p-4">
             <h3 className="text-[14px] font-bold text-[#1a1a1a] mb-1">Resumo financeiro</h3>
             <p className="text-[11.5px] text-[#6c757d] mb-4">{formatarPeriodo(mes, ano)}</p>
             <div className="flex items-center gap-4">
@@ -616,7 +611,7 @@ const KPI_ICONS: Record<string, React.ReactNode> = {
 
 function KpiCard({ icon, cor, value, label, variacao }: { icon: string; cor: string; value: number; label: string; variacao: number | null }) {
   return (
-    <div className="relative bg-white border border-linha rounded-xl p-5 shadow-leve overflow-hidden">
+    <div className="relative bg-white border border-linha rounded-xl p-4 shadow-leve overflow-hidden">
       <div className="flex items-start justify-between mb-3">
         <div className="w-11 h-11 rounded-full grid place-items-center" style={{ background: "#fdf3e3" }}>
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#c9922a" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{KPI_ICONS[icon]}</svg>
