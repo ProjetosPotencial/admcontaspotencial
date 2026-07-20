@@ -6,7 +6,6 @@ import { obterPeriodoSelecionado } from "@/lib/periodo";
 import { money, MES, formatarDataSemFuso } from "@/lib/format";
 import VencimentosProximosClient from "./vencimentos-proximos-client";
 import RelogioAoVivo from "./relogio-ao-vivo";
-import CalendarioMes, { type DiaCal } from "./calendario-mes";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -119,49 +118,6 @@ export default async function PainelPage() {
   const totalPendente = totalAPagar - totalPago;
   const pctPago = totalAPagar > 0 ? Math.round((totalPago / totalAPagar) * 1000) / 10 : 0;
 
-
-  // --- calendário do mês: agrupa lançamentos por dia de vencimento ---
-  const mapaDias = new Map<number, DiaCal>();
-  (lancamentosDetalhados ?? []).forEach((l: any) => {
-    const dia = l.contas?.dia_vencimento;
-    if (!dia) return;
-    const atual = mapaDias.get(dia) ?? { dia, pagas: 0, aVencer: 0, atrasadas: 0, aprovacoes: 0, total: 0, valor: 0 };
-    atual.total++;
-    atual.valor += Number(l.valor ?? 0);
-    if (l.situacao === "pago") atual.pagas++;
-    else if (l.situacao === "lancado") atual.aprovacoes++;
-    else if (estaAtrasada(l.situacao, dia, mes, ano)) atual.atrasadas++;
-    else atual.aVencer++;
-    mapaDias.set(dia, atual);
-  });
-  const diasCalendario = Array.from(mapaDias.values());
-
-  // --- top 5 lojas por valor no mês ---
-  const porLoja: Record<string, number> = {};
-  (lancamentosDetalhados ?? []).forEach((l: any) => {
-    const cod = l.contas?.lojas?.codigo;
-    if (!cod) return;
-    porLoja[cod] = (porLoja[cod] ?? 0) + Number(l.valor ?? 0);
-  });
-  const topLojas = Object.entries(porLoja).sort((a, b) => b[1] - a[1]).slice(0, 5);
-
-  // --- contas que vencem hoje ---
-  const vencemHoje = (lancamentosDetalhados ?? []).filter(
-    (l: any) => l.contas?.dia_vencimento === diaAtual && l.situacao !== "pago");
-  const valorVenceHoje = vencemHoje.reduce((s: number, l: any) => s + Number(l.valor ?? 0), 0);
-
-  // --- o que o assistente encontrou (leituras diretas dos dados) ---
-  const semValor = (lancamentosDetalhados ?? []).filter((l: any) => l.situacao !== "pendente" && !l.valor).length;
-  const insightsIA = [
-    totAtrasadas > 0 ? { icone: "🔴", texto: `${totAtrasadas} ${totAtrasadas === 1 ? "conta atrasada" : "contas atrasadas"}`, href: "/contas?situacao=atrasada" } : null,
-    aprovacoesPendentes > 0 ? { icone: "🟡", texto: `${aprovacoesPendentes} ${aprovacoesPendentes === 1 ? "conta precisa" : "contas precisam"} de aprovação`, href: "/aprovacoes" } : null,
-    totMapear > 0 ? { icone: "🔵", texto: `${totMapear} ${totMapear === 1 ? "conta sem origem definida" : "contas sem origem definida"}`, href: "/contas?origem=a_definir" } : null,
-    totAberto > 0 ? { icone: "🟣", texto: `${totAberto} ${totAberto === 1 ? "conta ainda não lançada" : "contas ainda não lançadas"}`, href: "/caixa-entrada" } : null,
-    semValor > 0 ? { icone: "⚪", texto: `${semValor} ${semValor === 1 ? "lançamento sem valor" : "lançamentos sem valor"} informado`, href: "/lancamentos" } : null,
-  ].filter(Boolean) as { icone: string; texto: string; href: string }[];
-
-  const totalAnalisado = (lancamentosDetalhados ?? []).length;
-
   return (
     <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-[1400px] w-full">
       <div className="mb-6">
@@ -170,66 +126,6 @@ export default async function PainelPage() {
           {ehPeriodoAtual ? "Aqui está o resumo da sua gestão financeira." : `Você está vendo o histórico de ${formatarPeriodo(mes, ano)}.`}
         </p>
         <div className="mt-2"><RelogioAoVivo /></div>
-
-        {/* faixa de alertas rápidos */}
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-3">
-          <Link href="/contas" className="flex items-center gap-1.5 text-[12.5px] text-[#495057] hover:text-[#1a1a1a]">
-            <span className="text-[13px]">⏰</span>
-            <b className="text-alerr">{vencemHoje.length}</b> {vencemHoje.length === 1 ? "conta vencendo hoje" : "contas vencendo hoje"}
-          </Link>
-          <Link href="/aprovacoes" className="flex items-center gap-1.5 text-[12.5px] text-[#495057] hover:text-[#1a1a1a]">
-            <span className="text-[13px]">🕐</span>
-            <b className="text-amb">{aprovacoesPendentes}</b> aguardando aprovação
-          </Link>
-          <Link href="/contas" className="flex items-center gap-1.5 text-[12.5px] text-[#495057] hover:text-[#1a1a1a]">
-            <span className="text-[13px]">⚠️</span>
-            <b className="text-alerr">{insightsIA.length}</b> {insightsIA.length === 1 ? "alerta importante" : "alertas importantes"}
-          </Link>
-        </div>
-      </div>
-
-      {/* calendário do mês + assistente financeiro */}
-      <div className="grid lg:grid-cols-3 gap-4 mb-6">
-        <div className="lg:col-span-2">
-          <CalendarioMes
-            ano={ano} mes={mes} dias={diasCalendario}
-            nomeMes={formatarPeriodo(mes, ano)} ehMesAtual={ehPeriodoAtual}
-          />
-        </div>
-
-        <div className="card p-5 flex flex-col">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="w-7 h-7 rounded-lg bg-amarelo/15 grid place-items-center text-[14px]">🤖</span>
-            <div>
-              <div className="font-disp text-[14px] font-semibold text-[#1a1a1a] leading-none">Assistente Financeiro</div>
-              <div className="text-[10.5px] text-ok mt-1 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-ok" /> Online
-              </div>
-            </div>
-          </div>
-
-          <p className="text-[12px] text-[#6c757d] mt-3 mb-2.5">
-            Analisei {totalAnalisado} {totalAnalisado === 1 ? "conta" : "contas"} deste mês:
-          </p>
-
-          <div className="space-y-1.5 flex-1">
-            {insightsIA.length === 0 && (
-              <div className="text-[12.5px] text-ok bg-ok-bg rounded-lg px-3 py-2.5">
-                ✅ Tudo em dia por aqui. Nenhuma pendência encontrada.
-              </div>
-            )}
-            {insightsIA.map((ins, i) => (
-              <Link key={i} href={ins.href}
-                className="flex items-center gap-2 text-[12.5px] text-[#495057] rounded-lg px-2 py-1.5 -mx-2 hover:bg-[#f8f9fa] transition">
-                <span className="text-[11px]">{ins.icone}</span>
-                <span className="flex-1">{ins.texto}</span>
-                <span className="text-[#adb5bd]">›</span>
-              </Link>
-            ))}
-          </div>
-
-          <Link href="/contas" className="btn-primario w-full text-center mt-4">Revisar agora</Link>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
@@ -353,22 +249,6 @@ export default async function PainelPage() {
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="card p-5">
-            <h3 className="text-[14px] font-bold text-[#1a1a1a] mb-1">Top 5 lojas</h3>
-            <p className="text-[11.5px] text-[#6c757d] mb-3.5">maiores gastos do mês</p>
-            <div className="space-y-2.5">
-              {topLojas.map(([cod, valor], i) => (
-                <div key={cod} className="flex items-center gap-2.5 text-[12.5px]">
-                  <span className="w-5 h-5 rounded-md bg-[#f1f3f5] grid place-items-center text-[10.5px] font-bold text-[#6c757d] shrink-0">{i + 1}</span>
-                  <span className="font-semibold text-[#1a1a1a] truncate flex-1">{cod}</span>
-                  <span className="font-mono font-semibold shrink-0">{money(valor)}</span>
-                </div>
-              ))}
-              {topLojas.length === 0 && <div className="text-[12.5px] text-[#adb5bd]">Sem lançamentos com valor este mês.</div>}
-            </div>
-            <Link href="/lojas" className="block text-center mt-4 pt-3 border-t border-linha2 text-[12px] font-semibold text-info hover:underline">Ver ranking completo</Link>
           </div>
 
           <div className="card p-5">
