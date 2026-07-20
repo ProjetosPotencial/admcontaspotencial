@@ -7,6 +7,8 @@ import { money, MES, formatarDataSemFuso } from "@/lib/format";
 import VencimentosProximosClient from "./vencimentos-proximos-client";
 import RelogioAoVivo from "./relogio-ao-vivo";
 import CalendarioMes, { type DiaCal } from "./calendario-mes";
+import DonutTipos, { type FatiaTipo } from "./donut-tipos";
+import ContadorAnimado from "@/components/contador-animado";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +46,8 @@ export default async function PainelPage() {
     { data: lancamentosAno },
     { data: lojasEncerradas },
     { count: totalLojasFechadas },
+    { count: totalLojasAtivas },
+    { data: atividadeRecente },
     { data: metricaAnterior },
   ] = await Promise.all([
     supabase.from("perfis").select("nome").eq("id", session?.user.id ?? "").maybeSingle(),
@@ -57,6 +61,10 @@ export default async function PainelPage() {
       .eq("ano", ano).not("valor", "is", null),
     supabase.from("lojas").select("codigo, coban, empresa, cidade, uf, encerrada_em").eq("status", "encerrada").order("encerrada_em", { ascending: false }).limit(5),
     supabase.from("lojas").select("id", { count: "exact", head: true }).eq("status", "encerrada"),
+    supabase.from("lojas").select("id", { count: "exact", head: true }).eq("status", "ativo"),
+    supabase.from("lancamentos")
+      .select("id, valor, lancado_em, situacao, lancado_por, contas!inner ( tipo, lojas ( codigo ) )")
+      .not("lancado_em", "is", null).order("lancado_em", { ascending: false }).limit(8),
     supabase.from("metricas_mensais").select("contas_ativas, a_lancar, aguardando_pagamento, origem_a_mapear").eq("ano", anoAnterior).eq("mes", mesAnterior).maybeSingle(),
   ]);
 
@@ -162,6 +170,54 @@ export default async function PainelPage() {
 
   const totalAnalisado = (lancamentosDetalhados ?? []).length;
 
+
+  // --- fatias do donut (gasto por categoria no mês) ---
+  const CORES_TIPO: Record<string, string> = {
+    agua: "#2A74C4", energia: "#E6A600", telefone: "#7B4FC4", aluguel: "#2E7D32",
+    iptu: "#C4682A", condominio: "#4AA3A3", custo_geral: "#8A8A8A",
+  };
+  const valorPorTipo: Record<string, number> = {};
+  (lancamentosDetalhados ?? []).forEach((l: any) => {
+    const t = l.contas?.tipo; if (!t) return;
+    valorPorTipo[t] = (valorPorTipo[t] ?? 0) + Number(l.valor ?? 0);
+  });
+  const fatiasTipo: FatiaTipo[] = Object.entries(valorPorTipo)
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => ({ chave: k, nome: TIPOS[k]?.n ?? k, valor: v, cor: CORES_TIPO[k] ?? "#adb5bd" }));
+  const totalDonut = fatiasTipo.reduce((s2, f) => s2 + f.valor, 0);
+
+  // --- nomes de quem lançou (para a timeline de atividade) ---
+  const idsAutores = Array.from(new Set((atividadeRecente ?? []).map((a: any) => a.lancado_por).filter(Boolean)));
+  const { data: autores } = idsAutores.length
+    ? await supabase.from("perfis").select("id, nome").in("id", idsAutores)
+    : { data: [] as { id: string; nome: string }[] };
+  const nomePorId = new Map((autores ?? []).map((a: any) => [a.id, (a.nome ?? "").split(" ")[0]]));
+
+  // --- agenda em timeline: próximos dias com vencimento ---
+  const ultimoDiaMes = new Date(ano, mes, 0).getDate();
+  const agenda = Array.from({ length: 5 }, (_, i) => diaAtual + i)
+    .filter((d) => d <= ultimoDiaMes)
+    .map((d) => {
+      const offset = d - diaAtual;
+      const doDia = (lancamentosDetalhados ?? []).filter(
+        (l: any) => l.contas?.dia_vencimento === d && l.situacao !== "pago");
+      const dt = new Date(ano, mes - 1, d);
+      const fds = dt.getDay() === 0 || dt.getDay() === 6;
+      return {
+        dia: d,
+        rotulo: offset === 0 ? "Hoje" : offset === 1 ? "Amanhã" : dt.toLocaleDateString("pt-BR", { weekday: "long" }),
+        qtd: doDia.length,
+        valor: doDia.reduce((s2: number, l: any) => s2 + Number(l.valor ?? 0), 0),
+        fds,
+      };
+    })
+    .filter((a) => a.qtd > 0 || a.fds);
+
+  const lojasAtivas = totalLojasAtivas ?? 0;
+  const aprovadasMes = (lancamentos ?? []).filter((l) => l.situacao === "aprovado" || l.situacao === "pago").length;
+  const rejeitadasMes = (lancamentos ?? []).filter((l) => l.situacao === "contestado").length;
+
   return (
     <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-[1400px] w-full">
       <div className="mb-6">
@@ -185,6 +241,81 @@ export default async function PainelPage() {
             <span className="text-[13px]">⚠️</span>
             <b className="text-alerr">{insightsIA.length}</b> {insightsIA.length === 1 ? "alerta importante" : "alertas importantes"}
           </Link>
+        </div>
+      </div>
+
+      {/* indicadores principais */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
+        {[
+          { icone: "📄", rot: "Contas ativas", val: totAtivas, sub: metricaAnterior?.contas_ativas != null ? `${totAtivas - metricaAnterior.contas_ativas >= 0 ? "+" : ""}${totAtivas - metricaAnterior.contas_ativas} este mês` : "sem dado anterior", href: "/contas", cor: "#2A74C4" },
+          { icone: "💰", rot: "Valor do mês", val: totalAPagar, money: true, sub: `${(lancamentosDetalhados ?? []).length} lançamentos`, href: "/lancamentos", cor: "#2E7D32" },
+          { icone: "⏰", rot: "Contas vencidas", val: totAtrasadas, sub: "precisam de atenção", href: "/contas", cor: "#D32F2F" },
+          { icone: "🟡", rot: "Aprovações", val: aprovacoesPendentes, sub: "aguardando", href: "/aprovacoes", cor: "#E6A600" },
+          { icone: "🏪", rot: "Lojas ativas", val: lojasAtivas, sub: `${totalLojasFechadas ?? 0} encerradas`, href: "/lojas", cor: "#7B4FC4" },
+        ].map((k) => (
+          <Link key={k.rot} href={k.href}
+            className="card p-4 sm:p-5 hover:shadow-media hover:-translate-y-px transition-all duration-150">
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="text-[11.5px] font-semibold text-[#6c757d]">{k.rot}</span>
+              <span className="w-7 h-7 rounded-lg grid place-items-center text-[13px]" style={{ background: `${k.cor}15` }}>{k.icone}</span>
+            </div>
+            <div className="font-disp font-bold text-[#1a1a1a] text-[26px] sm:text-[30px] leading-none tracking-tight">
+              {k.money
+                ? <ContadorAnimado valor={k.val} formatar={(n) => money(n)} />
+                : <ContadorAnimado valor={k.val} />}
+            </div>
+            <div className="text-[11px] text-[#adb5bd] mt-1.5">{k.sub}</div>
+          </Link>
+        ))}
+      </div>
+
+      {/* alertas em destaque */}
+      {insightsIA.length > 0 && (
+        <div className="flex gap-2.5 overflow-x-auto pb-1 mb-6 -mx-1 px-1">
+          {insightsIA.map((ins, i) => (
+            <Link key={i} href={ins.href}
+              className="shrink-0 flex items-center gap-2 bg-white border border-linha rounded-full pl-3 pr-3.5 py-2 text-[12px] text-[#495057] hover:border-amarelo hover:shadow-leve transition">
+              <span className="text-[11px]">{ins.icone}</span>{ins.texto}
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {/* agenda em timeline */}
+      <div className="grid lg:grid-cols-3 gap-4 mb-6">
+        <div className="card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-disp text-[14px] font-semibold text-[#1a1a1a]">Agenda de vencimentos</h3>
+            <Link href="/contas" className="text-[11.5px] font-semibold text-info hover:underline">Ver todas</Link>
+          </div>
+          <div className="relative pl-5">
+            <span className="absolute left-[5px] top-2 bottom-2 w-px bg-linha2" />
+            {agenda.map((a) => (
+              <div key={a.dia} className="relative pb-4 last:pb-0">
+                <span className="absolute -left-5 top-1 w-[11px] h-[11px] rounded-full border-2 border-white"
+                  style={{ background: a.fds ? "#E6A600" : a.dia === diaAtual ? "#D32F2F" : "#2A74C4", boxShadow: "0 0 0 1.5px #e9ecef" }} />
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[12.5px] font-semibold text-[#1a1a1a] capitalize">{a.rotulo}</span>
+                  <span className="text-[10.5px] text-[#adb5bd] font-mono">{String(a.dia).padStart(2, "0")}/{String(mes).padStart(2, "0")}</span>
+                </div>
+                <div className="flex items-baseline justify-between gap-2 mt-0.5">
+                  <span className="text-[11.5px] text-[#6c757d]">{a.qtd} {a.qtd === 1 ? "conta" : "contas"}</span>
+                  {a.valor > 0 && <span className="text-[12px] font-mono font-semibold text-[#1a1a1a]">{money(a.valor)}</span>}
+                </div>
+                {a.fds && a.qtd > 0 && (
+                  <div className="mt-1.5 text-[11px] text-amb bg-amb-bg rounded-md px-2 py-1.5">
+                    ⚠️ Cai em fim de semana — antecipar pagamento?
+                  </div>
+                )}
+              </div>
+            ))}
+            {agenda.length === 0 && <div className="text-[12px] text-[#adb5bd]">Nada vencendo nos próximos dias.</div>}
+          </div>
+        </div>
+
+        <div className="lg:col-span-2 card p-5">
+          <h3 className="font-disp text-[14px] font-semibold text-[#1a1a1a] mb-4">Gastos por categoria <span className="text-[11.5px] font-normal text-[#adb5bd]">· {formatarPeriodo(mes, ano)}</span></h3>
+          <DonutTipos fatias={fatiasTipo} total={totalDonut} />
         </div>
       </div>
 
@@ -254,7 +385,57 @@ export default async function PainelPage() {
             </div>
             <Link href="/contas" className="text-[12.5px] font-semibold text-info hover:underline">Ver todas as contas</Link>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
+                {/* atividade recente + resumo do seu dia */}
+      <div className="grid lg:grid-cols-3 gap-4 mb-6">
+        <div className="lg:col-span-2 card p-5">
+          <h3 className="font-disp text-[14px] font-semibold text-[#1a1a1a] mb-4">Atividade recente</h3>
+          <div className="relative pl-5">
+            <span className="absolute left-[5px] top-2 bottom-2 w-px bg-linha2" />
+            {(atividadeRecente ?? []).map((a: any) => {
+              const quando = a.lancado_em
+                ? new Date(a.lancado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+                : "";
+              const quem = nomePorId.get(a.lancado_por) ?? "Alguém";
+              const cor = a.situacao === "pago" ? "#2E7D32" : a.situacao === "contestado" ? "#D32F2F" : a.situacao === "aprovado" ? "#2A74C4" : "#E6A600";
+              const verbo = a.situacao === "pago" ? "pagou" : a.situacao === "aprovado" ? "aprovou" : a.situacao === "contestado" ? "recusou" : "lançou";
+              return (
+                <div key={a.id} className="relative pb-3.5 last:pb-0">
+                  <span className="absolute -left-5 top-1.5 w-[11px] h-[11px] rounded-full border-2 border-white"
+                    style={{ background: cor, boxShadow: "0 0 0 1.5px #e9ecef" }} />
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span className="text-[12.5px] text-[#1a1a1a]">
+                      <b className="font-semibold">{quem}</b> {verbo} {TIPOS[a.contas?.tipo]?.n?.toLowerCase() ?? "conta"}
+                      {a.contas?.lojas?.codigo ? <> · <span className="font-mono text-[11.5px]">{a.contas.lojas.codigo}</span></> : null}
+                    </span>
+                    {a.valor ? <span className="text-[11.5px] font-mono font-semibold text-[#495057]">{money(Number(a.valor))}</span> : null}
+                  </div>
+                  <div className="text-[10.5px] text-[#adb5bd] font-mono mt-0.5">{quando}</div>
+                </div>
+              );
+            })}
+            {(atividadeRecente ?? []).length === 0 && (
+              <div className="text-[12px] text-[#adb5bd]">Nenhuma movimentação registrada ainda.</div>
+            )}
+          </div>
+        </div>
+
+        <div className="card p-5 flex flex-col">
+          <h3 className="font-disp text-[14px] font-semibold text-[#1a1a1a] mb-1">🤖 Bom trabalho!</h3>
+          <p className="text-[11.5px] text-[#6c757d] mb-3.5">Como está o mês até agora</p>
+          <div className="space-y-2 text-[12.5px] text-[#495057] flex-1">
+            <div className="flex items-center gap-2"><span className="text-ok">✔</span> {totLancado} {totLancado === 1 ? "conta lançada" : "contas lançadas"}</div>
+            <div className="flex items-center gap-2"><span className="text-ok">✔</span> {aprovadasMes} {aprovadasMes === 1 ? "conta aprovada" : "contas aprovadas"}</div>
+            <div className="flex items-center gap-2"><span className="text-ok">✔</span> {pctPago}% do valor do mês já pago</div>
+            {rejeitadasMes > 0 && <div className="flex items-center gap-2"><span className="text-alerr">✖</span> {rejeitadasMes} {rejeitadasMes === 1 ? "recusada" : "recusadas"}</div>}
+          </div>
+          <div className="mt-4 pt-3 border-t border-linha2 space-y-1.5 text-[11.5px] text-[#6c757d]">
+            <div>💧 Aproveite para beber um copo de água.</div>
+            <div>☕ Faça uma pausa em alguns minutos.</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
             {porTipo.map(({ t, ativas, mapear, pagas, aguardando, aLancar, atrasadas }) => {
               const T = TIPOS[t];
               const base = ativas || 1;
