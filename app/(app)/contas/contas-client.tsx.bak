@@ -470,6 +470,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
   const [avisoExtracao, setAvisoExtracao] = useState<string | null>(null);
   const [alertas, setAlertas] = useState<string[]>([]);
   const [confirmarMesmoAssim, setConfirmarMesmoAssim] = useState(false);
+  const [bloqueio, setBloqueio] = useState<string | null>(null);
   const [verificando, setVerificando] = useState(false);
   const [salvandoLancamento, setSalvandoLancamento] = useState(false);
   const [erroLancamento, setErroLancamento] = useState<string | null>(null);
@@ -641,6 +642,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
   }) {
     setVerificando(true);
     const novosAlertas: string[] = [];
+    setBloqueio(null);
 
     // regra: o tipo de conta que a IA identificou no documento bate com o
     // tipo dessa conta específica? Pega quem anexa conta de telefone numa
@@ -689,17 +691,58 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
       }
     }
 
-    // regra 1: mesmo código de barras já lançado em outro lugar (duplicidade real)
+    // regra 1: BLOQUEIO - mesmo código de barras já lançado NESTA loja.
+    // Exceções: boleto anterior recusado/cancelado, ou competência diferente.
     const codigoLimpo = params.codigo?.replace(/\D/g, "") ?? "";
     if (codigoLimpo.length >= 40) {
       const { data: duplicados } = await supabase
         .from("lancamentos")
-        .select("id, mes, ano, contas!inner ( lojas ( codigo ) )")
+        .select("id, mes, ano, situacao, lancado_em, lancado_por, contas!inner ( loja_id, lojas ( codigo ) )")
         .eq("codigo_barras", params.codigo)
         .neq("id", lancamentoAtual?.id ?? "00000000-0000-0000-0000-000000000000");
-      const outro = (duplicados ?? [])[0] as any;
+
+      const mesmaLoja = (duplicados ?? []).filter((d: any) => d.contas?.loja_id === conta.loja_id);
+      // recusado/cancelado não bloqueia; competência diferente também não
+      const impeditivo = mesmaLoja.find((d: any) =>
+        d.situacao !== "contestado" && d.ano === ANO_ATUAL && d.mes === MES_ATUAL);
+
+      if (impeditivo) {
+        let quem = "";
+        if ((impeditivo as any).lancado_por) {
+          const { data: p } = await supabase.from("perfis").select("nome").eq("id", (impeditivo as any).lancado_por).maybeSingle();
+          if (p?.nome) quem = ` por ${p.nome}`;
+        }
+        const quando = (impeditivo as any).lancado_em
+          ? new Date((impeditivo as any).lancado_em).toLocaleString("pt-br", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+          : `${impeditivo.mes}/${impeditivo.ano}`;
+        const st = SITUACAO[(impeditivo as any).situacao]?.label ?? (impeditivo as any).situacao;
+        setBloqueio(`Este boleto já foi lançado anteriormente para esta loja e não pode ser cadastrado novamente.\nLançado em ${quando}${quem} · Status atual: ${st}.`);
+        setAlertas([]);
+        setVerificando(false);
+        return;
+      }
+      // mesmo código, mas em outra loja ou outra competência: só avisa
+      const outro = mesmaLoja[0] ?? (duplicados ?? [])[0];
       if (outro) {
-        novosAlertas.push(`Esse código de barras já foi lançado antes: ${outro.contas?.lojas?.codigo ?? "outra conta"} (${outro.mes}/${outro.ano}). Confere se não é o mesmo boleto duplicado.`);
+        novosAlertas.push(`Esse código de barras já foi lançado antes: ${(outro as any).contas?.lojas?.codigo ?? "outra conta"} (${outro.mes}/${outro.ano}). Confere se não é o mesmo boleto duplicado.`);
+      }
+    }
+
+    // regra 1b: possível duplicidade - mesma loja + fornecedor + valor + vencimento,
+    // mesmo com código de barras diferente.
+    if (params.valor != null && params.valor > 0 && conta.fornecedor_nome) {
+      const { data: semelhantes } = await supabase
+        .from("lancamentos")
+        .select("id, mes, ano, valor, contas!inner ( loja_id, fornecedor_nome, dia_vencimento )")
+        .eq("ano", ANO_ATUAL).eq("mes", MES_ATUAL)
+        .eq("valor", params.valor)
+        .neq("id", lancamentoAtual?.id ?? "00000000-0000-0000-0000-000000000000");
+      const parecido = (semelhantes ?? []).find((s: any) =>
+        s.contas?.loja_id === conta.loja_id &&
+        (s.contas?.fornecedor_nome ?? "").toLowerCase() === (conta.fornecedor_nome ?? "").toLowerCase() &&
+        s.contas?.dia_vencimento === conta.dia_vencimento);
+      if (parecido) {
+        novosAlertas.push("Foi encontrada uma conta muito semelhante já cadastrada (mesma loja, fornecedor, valor e vencimento). Deseja revisar antes de continuar?");
       }
     }
 
@@ -1058,14 +1101,14 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
                     {(lancamentoAtual as any).aprovado_em && ` em ${new Date((lancamentoAtual as any).aprovado_em).toLocaleString("pt-br", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}`}
                   </div>
                 )}
-                <button onClick={() => { setValorLancar(String(lancamentoAtual.valor ?? "")); setAlertas([]); setConfirmarMesmoAssim(false); setCodigoBarras(""); setHashArquivo(null); setLancando(true); }}
+                <button onClick={() => { setValorLancar(String(lancamentoAtual.valor ?? "")); setAlertas([]); setConfirmarMesmoAssim(false); setCodigoBarras(""); setHashArquivo(null); setBloqueio(null); setLancando(true); }}
                   className="w-full mt-3 pt-3 border-t border-linha2 text-[12px] font-semibold text-[#6c757d] hover:text-amb transition text-center">
                   Boleto errado? Substituir
                 </button>
               </div>
             ) : !lancando ? (
               contaValidaNoPeriodo(conta.status, conta.data_encerramento, ANO_ATUAL, MES_ATUAL) ? (
-                <button onClick={() => { setValorLancar(lancamentoAtual ? String(lancamentoAtual.valor ?? "") : ""); setAlertas([]); setConfirmarMesmoAssim(false); setCodigoBarras(""); setHashArquivo(null); setLancando(true); }}
+                <button onClick={() => { setValorLancar(lancamentoAtual ? String(lancamentoAtual.valor ?? "") : ""); setAlertas([]); setConfirmarMesmoAssim(false); setCodigoBarras(""); setHashArquivo(null); setBloqueio(null); setLancando(true); }}
                   className="w-full text-[12.5px] font-semibold text-amb border border-amarelo/40 bg-amb-bg rounded-md py-2.5 hover:bg-amarelo/10 transition">
                   {lancamentoAtual ? `Lançar fatura de ${formatarPeriodo(MES_ATUAL, ANO_ATUAL).toLowerCase()}` : `Lançar fatura de ${formatarPeriodo(MES_ATUAL, ANO_ATUAL).toLowerCase()} (sem lançamento pendente ainda)`}
                 </button>
@@ -1120,6 +1163,16 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
 
                 {verificando && <div className="text-[11px] text-[#adb5bd] mb-3">Verificando duplicidade e histórico...</div>}
 
+                {bloqueio && (
+                  <div className="bg-alerr-bg border border-alerr/35 rounded-md px-3 py-2.5 mb-3">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="#B23B3B" strokeWidth="1.8"><path d="M10.9 3.6l7.6 13a1 1 0 01-.9 1.5H2.4a1 1 0 01-.9-1.5l7.6-13a1 1 0 011.8 0z" /><path d="M10 8.5v4" /></svg>
+                      <b className="text-[11.5px] font-semibold text-alerr">Boleto duplicado — lançamento bloqueado</b>
+                    </div>
+                    <div className="text-[11.5px] text-[#7a3838] leading-snug whitespace-pre-line">{bloqueio}</div>
+                  </div>
+                )}
+
                 {alertas.length > 0 && (
                   <div className="bg-amb-bg border border-amarelo/40 rounded-md px-3 py-2.5 mb-3">
                     <div className="flex items-center gap-1.5 mb-1.5">
@@ -1138,7 +1191,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
 
                 {erroLancamento && <div className="text-[12px] text-alerr bg-alerr-bg rounded-md px-3 py-2 mb-3">{erroLancamento}</div>}
                 <div className="flex gap-2">
-                  <button onClick={lancarComBoleto} disabled={salvandoLancamento || (alertas.length > 0 && !confirmarMesmoAssim)}
+                  <button onClick={lancarComBoleto} disabled={salvandoLancamento || bloqueio != null || (alertas.length > 0 && !confirmarMesmoAssim)}
                     className="btn-primario flex-1 disabled:opacity-50">
                     {salvandoLancamento ? "Enviando..." : "Lançar"}
                   </button>

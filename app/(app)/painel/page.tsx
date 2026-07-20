@@ -53,7 +53,7 @@ export default async function PainelPage() {
   ] = await Promise.all([
     supabase.from("perfis").select("nome").eq("id", session?.user.id ?? "").maybeSingle(),
     supabase.from("contas").select("id, tipo, status, origem, dia_vencimento, data_encerramento").eq("situacao_cadastro", "aprovada"),
-    supabase.from("lancamentos").select("conta_id, situacao, contas!inner(tipo, dia_vencimento)").eq("ano", ano).eq("mes", mes),
+    supabase.from("lancamentos").select("conta_id, situacao, contas!inner(tipo, dia_vencimento, status, data_encerramento)").eq("ano", ano).eq("mes", mes),
     supabase.from("lancamentos")
       .select("id, valor, situacao, contas!inner ( id, tipo, dia_vencimento, fornecedor_nome, lojas ( codigo ) )")
       .eq("ano", ano).eq("mes", mes).eq("situacao", "pendente"),
@@ -83,7 +83,12 @@ export default async function PainelPage() {
     const ativas = doTipo.length;
     const mapear = doTipo.filter((c) => c.origem === "a_definir").length;
     const lanc = (lancamentos ?? []).filter((l: any) => l.contas?.tipo === t);
-    const atrasadas = lanc.filter((l: any) => estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano)).length;
+    // conta encerrada/inativa não aparece na tela de Contas — então também
+    // não pode entrar no total de atrasadas, senão o card diverge da lista.
+    const atrasadas = lanc.filter((l: any) =>
+      l.contas?.status !== "encerrado" && l.contas?.status !== "inativo" &&
+      contaValidaNoPeriodo(l.contas?.status, l.contas?.data_encerramento, ano, mes) &&
+      estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano)).length;
     const pagas = lanc.filter((l) => l.situacao === "pago").length;
     const aguardando = lanc.filter((l) => l.situacao === "lancado" || l.situacao === "aprovado").length;
     const aLancar = lanc.filter((l) => l.situacao === "pendente").length;
