@@ -41,6 +41,7 @@ export type Conta = {
   rateio_divisor: number | null;
   observacoes: string | null;
   status: string;
+  loja_id: string;
   lojas: { codigo: string; coban: string; empresas: { nome: string } | null } | null;
 };
 
