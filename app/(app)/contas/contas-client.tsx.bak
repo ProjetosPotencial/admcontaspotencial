@@ -223,7 +223,9 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
     return contas.filter((c) => {
       const t = fTipo === "todos" || c.tipo === fTipo;
       const cb = fCoban === "todos" || c.lojas?.coban === fCoban;
-      const st = fStatus === "todos" || c.status === fStatus;
+      // conta encerrada some da lista assim que é encerrada (o cadastro fica
+      // salvo, e ela continua acessível pelo filtro de status "Encerrada")
+      const st = fStatus === "todos" ? c.status !== "encerrado" : c.status === fStatus;
       const si = fSituacao === "todos" || (situacaoPorConta[c.id] ?? "pendente") === fSituacao;
       const q =
         buscaDebounced === "" ||

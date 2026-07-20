@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { agente } from "@/lib/agente-proativo";
 import { TIPOS, ORIGENS, SITUACAO, type Conta, type Lancamento } from "@/lib/types";
 import { CAMPOS_TIPO } from "@/lib/campos-tipo";
 import { useContaForm } from "@/lib/hooks/useContaForm";
@@ -430,6 +431,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
     setReativando(false);
     if (error) { setAviso("Não foi possível reativar a conta."); return; }
     setAviso("Conta reativada.");
+    agente.evento("conta_reativada", { loja: conta.lojas?.codigo });
     router.refresh();
   }
 
@@ -453,6 +455,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
       setSalvandoEncerramento(false);
       if (error) { setErroEncerramento("Não foi possível encerrar a conta."); return; }
     }
+    agente.evento("conta_encerrada", { loja: conta.lojas?.codigo });
     onClose();
     router.refresh();
   }
@@ -775,6 +778,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
     setConfirmarMesmoAssim(false);
     setErroLancamento(null);
     setSucessoLancamento("Lançamento realizado com sucesso.");
+    agente.evento("lancamento", { loja: conta.lojas?.codigo, tipo: conta.tipo });
     setTimeout(() => setSucessoLancamento(null), 6000);
     router.refresh(); // atualiza a lista de contas sem sair da página
   }
