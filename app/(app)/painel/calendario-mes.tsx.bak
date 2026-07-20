@@ -80,7 +80,7 @@ export default function CalendarioMes({
             <button
               key={dia}
               onClick={() => setSelecionado(ativo ? null : dia)}
-              className={`aspect-square rounded-lg flex flex-col items-center justify-center gap-1 transition
+              className={`h-9 sm:h-10 rounded-lg flex flex-col items-center justify-center gap-[3px] transition
                 ${ehHoje ? "bg-amarelo/15 ring-1 ring-amarelo" : ativo ? "bg-[#f1f3f5]" : "hover:bg-[#f8f9fa]"}`}
             >
               <span className={`text-[12px] leading-none ${ehHoje ? "font-bold text-[#1a1a1a]" : fds ? "text-[#c98a8a]" : "text-[#495057]"}`}>
