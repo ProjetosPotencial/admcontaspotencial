@@ -260,9 +260,7 @@ export default async function PainelPage() {
               <span className="w-7 h-7 rounded-lg grid place-items-center text-[13px]" style={{ background: `${k.cor}15` }}>{k.icone}</span>
             </div>
             <div className="font-disp font-bold text-[#1a1a1a] text-[26px] sm:text-[30px] leading-none tracking-tight">
-              {k.money
-                ? <ContadorAnimado valor={k.val} formatar={(n) => money(n)} />
-                : <ContadorAnimado valor={k.val} />}
+              <ContadorAnimado valor={k.val} formato={k.money ? "money" : "numero"} />
             </div>
             <div className="text-[11px] text-[#adb5bd] mt-1.5">{k.sub}</div>
           </Link>

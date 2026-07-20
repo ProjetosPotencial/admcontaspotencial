@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { money } from "@/lib/format";
 
 /**
  * Contador que sobe até o valor final quando o card aparece.
@@ -10,13 +11,14 @@ export default function ContadorAnimado({
   valor,
   duracao = 900,
   prefixo = "",
-  formatar,
+  formato = "numero",
   className = "",
 }: {
   valor: number;
   duracao?: number;
   prefixo?: string;
-  formatar?: (n: number) => string;
+  /** "numero" = 1.234 · "money" = R$ 1.234,00 (string, pra poder vir de Server Component) */
+  formato?: "numero" | "money";
   className?: string;
 }) {
   const [atual, setAtual] = useState(0);
@@ -51,6 +53,6 @@ export default function ContadorAnimado({
     return () => obs.disconnect();
   }, [valor, duracao]);
 
-  const texto = formatar ? formatar(atual) : Math.round(atual).toLocaleString("pt-BR");
+  const texto = formato === "money" ? money(atual) : Math.round(atual).toLocaleString("pt-BR");
   return <span ref={ref} className={className}>{prefixo}{texto}</span>;
 }
