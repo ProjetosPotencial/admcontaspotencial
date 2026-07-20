@@ -1,9 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import UsuariosClient from "./usuarios-client";
+import { podeAcessar, SemPermissao } from "@/lib/permissoes";
 
 export const dynamic = "force-dynamic";
 
 export default async function UsuariosPage() {
+  if (!(await podeAcessar("/usuarios"))) return <SemPermissao modulo="Usuários" />;
+
   const supabase = createClient();
   const { data: { session } } = await supabase.auth.getSession();
   const { data: meuPerfil } = await supabase.from("perfis").select("papel").eq("id", session?.user.id).maybeSingle();

@@ -3,13 +3,10 @@ import PagamentosClient from "./pagamentos-client";
 import { estaAtrasada } from "@/lib/date-utils";
 import { obterPeriodoSelecionado } from "@/lib/periodo";
 import { money } from "@/lib/format";
-import { podeAcessar, SemPermissao } from "@/lib/permissoes";
 
 export const dynamic = "force-dynamic";
 
 export default async function PagamentosPage() {
-  if (!(await podeAcessar("/pagamentos"))) return <SemPermissao modulo="Pagamentos" />;
-
   const supabase = createClient();
   const { ano, mes, ehPeriodoAtual } = obterPeriodoSelecionado();
   const diaAtual = new Date().getDate();

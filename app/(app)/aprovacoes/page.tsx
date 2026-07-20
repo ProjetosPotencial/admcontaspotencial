@@ -1,10 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import AprovacoesClient from "./aprovacoes-client";
 import { obterPeriodoSelecionado } from "@/lib/periodo";
+import { podeAcessar, SemPermissao } from "@/lib/permissoes";
 
 export const dynamic = "force-dynamic";
 
 export default async function AprovacoesPage() {
+  if (!(await podeAcessar("/aprovacoes"))) return <SemPermissao modulo="Aprovações" />;
+
   const supabase = createClient();
   const { ano, mes } = obterPeriodoSelecionado();
 

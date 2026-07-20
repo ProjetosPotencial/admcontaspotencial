@@ -10,6 +10,7 @@ import CalendarioMes, { type DiaCal } from "./calendario-mes";
 import DonutTipos, { type FatiaTipo } from "./donut-tipos";
 import ContadorAnimado from "@/components/contador-animado";
 import Link from "next/link";
+import { podeAcessar } from "@/lib/permissoes";
 
 export const dynamic = "force-dynamic";
 
@@ -218,6 +219,8 @@ export default async function PainelPage() {
   const aprovadasMes = (lancamentos ?? []).filter((l) => l.situacao === "aprovado" || l.situacao === "pago").length;
   const rejeitadasMes = (lancamentos ?? []).filter((l) => l.situacao === "contestado").length;
 
+  const podeAprovacoes = await podeAcessar("/aprovacoes");
+
   return (
     <div className="px-4 sm:px-8 py-5 sm:py-6 max-w-[1560px] w-full">
       <div className="mb-4">
@@ -250,7 +253,7 @@ export default async function PainelPage() {
           { icone: "📄", rot: "Contas ativas", val: totAtivas, sub: metricaAnterior?.contas_ativas != null ? `${totAtivas - metricaAnterior.contas_ativas >= 0 ? "+" : ""}${totAtivas - metricaAnterior.contas_ativas} este mês` : "sem dado anterior", href: "/contas", cor: "#2A74C4" },
           { icone: "💰", rot: "Valor do mês", val: totalAPagar, money: true, sub: `${(lancamentosDetalhados ?? []).length} lançamentos`, href: "/lancamentos", cor: "#2E7D32" },
           { icone: "⏰", rot: "Contas vencidas", val: totAtrasadas, sub: "precisam de atenção", href: "/contas", cor: "#D32F2F" },
-          { icone: "🟡", rot: "Aprovações", val: aprovacoesPendentes, sub: "aguardando", href: "/aprovacoes", cor: "#E6A600" },
+          { icone: "🟡", rot: "Aprovações", val: aprovacoesPendentes, sub: podeAprovacoes ? "aguardando" : "acesso restrito", href: podeAprovacoes ? "/aprovacoes" : "/painel", cor: "#E6A600" },
           { icone: "🏪", rot: "Lojas ativas", val: lojasAtivas, sub: `${totalLojasFechadas ?? 0} encerradas`, href: "/lojas", cor: "#7B4FC4" },
         ].map((k) => (
           <Link key={k.rot} href={k.href}
