@@ -425,46 +425,46 @@ export default async function PainelPage() {
             </div>
             <Link href="/contas" className="text-[12.5px] font-semibold text-info hover:underline">Ver todas as contas</Link>
           </div>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
-            {porTipo.map(({ t, ativas, mapear, pagas, aguardando, aLancar, atrasadas }) => {
-              const T = TIPOS[t];
-              const base = ativas || 1;
-              const pctPagas = Math.round((pagas / base) * 100);
-              return (
-                <div key={t} className="bg-white border border-linha rounded-xl p-4 shadow-leve hover:shadow-media transition">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-full grid place-items-center shrink-0" style={{ background: T.bg }}>
-                      <TipoIcon tipo={t} size={18} color={T.c} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
+                {porTipo.map(({ t, ativas, mapear, pagas, aguardando, aLancar, atrasadas }) => {
+                  const T = TIPOS[t];
+                  const base = ativas || 1;
+                  const pctPagas = Math.round((pagas / base) * 100);
+                  return (
+                    <div key={t} className="bg-white border border-linha rounded-xl p-4 shadow-leve hover:shadow-media transition">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-full grid place-items-center shrink-0" style={{ background: T.bg }}>
+                          <TipoIcon tipo={t} size={18} color={T.c} />
+                        </div>
+                        <div>
+                          <div className="text-[14px] font-semibold text-[#1a1a1a] leading-tight">{T.n}</div>
+                          <div className="text-[11.5px] text-[#6c757d]">{ativas} contas</div>
+                        </div>
+                        <Link href={`/contas?tipo=${t}`} className="ml-auto text-[#adb5bd] hover:text-[#1a1a1a]">
+                          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M7.5 4.5l6 5.5-6 5.5" /></svg>
+                        </Link>
+                      </div>
+                      <div className="flex items-center gap-2 mb-2.5">
+                        <div className="flex-1 h-1.5 rounded-full bg-[#f1f3f5] overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${Math.min(pctPagas, 100)}%`, background: T.c }} />
+                        </div>
+                        <span className="text-[11.5px] font-semibold shrink-0">{pctPagas}%</span>
+                      </div>
+                      <div className="flex gap-3 text-[11px] text-[#6c757d]">
+                        <span>Pagas <b className="text-[#1a1a1a]">{pagas}</b></span>
+                        <span>Aguardando <b className="text-[#1a1a1a]">{aguardando}</b></span>
+                        <span>A lançar <b className="text-[#1a1a1a]">{aLancar}</b></span>
+                        {atrasadas > 0 && <span className="text-alerr font-semibold ml-auto">{atrasadas} atrasada{atrasadas > 1 ? "s" : ""}</span>}
+                      </div>
+                      {mapear > 0 && <div className="mt-2 text-[10.5px] text-alerr font-medium">{mapear} sem origem mapeada</div>}
                     </div>
-                    <div>
-                      <div className="text-[14px] font-semibold text-[#1a1a1a] leading-tight">{T.n}</div>
-                      <div className="text-[11.5px] text-[#6c757d]">{ativas} contas</div>
-                    </div>
-                    <Link href={`/contas?tipo=${t}`} className="ml-auto text-[#adb5bd] hover:text-[#1a1a1a]">
-                      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M7.5 4.5l6 5.5-6 5.5" /></svg>
-                    </Link>
-                  </div>
-                  <div className="flex items-center gap-2 mb-2.5">
-                    <div className="flex-1 h-1.5 rounded-full bg-[#f1f3f5] overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${Math.min(pctPagas, 100)}%`, background: T.c }} />
-                    </div>
-                    <span className="text-[11.5px] font-semibold shrink-0">{pctPagas}%</span>
-                  </div>
-                  <div className="flex gap-3 text-[11px] text-[#6c757d]">
-                    <span>Pagas <b className="text-[#1a1a1a]">{pagas}</b></span>
-                    <span>Aguardando <b className="text-[#1a1a1a]">{aguardando}</b></span>
-                    <span>A lançar <b className="text-[#1a1a1a]">{aLancar}</b></span>
-                    {atrasadas > 0 && <span className="text-alerr font-semibold ml-auto">{atrasadas} atrasada{atrasadas > 1 ? "s" : ""}</span>}
-                  </div>
-                  {mapear > 0 && <div className="mt-2 text-[10.5px] text-alerr font-medium">{mapear} sem origem mapeada</div>}
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
+            </div>
         </div>
+
 
         <div className="space-y-6">
           <div className="rounded-xl p-5 border border-amarelo/30" style={{ background: "#FFF8E8" }}>
@@ -575,6 +575,7 @@ export default async function PainelPage() {
             <Link href="/relatorios" className="block text-center mt-4 pt-3 border-t border-linha2 text-[12px] font-semibold text-info hover:underline">Ver relatório completo</Link>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
