@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { listarArquivosNaPasta, baixarArquivoDoDrive } from "@/lib/google-drive";
 import { extrairDadosBoleto } from "@/lib/extrair-boleto";
+import { lerNomeArquivo, casarLoja } from "@/lib/ler-nome-arquivo";
 
 // tira acento, deixa minúsculo, tira espaço duplicado - pra comparar nome
 // de arquivo com código de loja sem depender de escrita idêntica
@@ -23,7 +24,7 @@ export async function importarCaixaEntradaDrive() {
   const [arquivos, { data: jaImportados }, { data: lojas }] = await Promise.all([
     listarArquivosNaPasta(pastaId),
     supabase.from("caixa_entrada_boletos").select("drive_file_id"),
-    supabase.from("lojas").select("id, codigo").eq("status", "ativo"),
+    supabase.from("lojas").select("id, codigo, nome, cidade").eq("status", "ativo"),
   ]);
 
   const idsJaImportados = new Set((jaImportados ?? []).map((r) => r.drive_file_id));
@@ -46,9 +47,13 @@ export async function importarCaixaEntradaDrive() {
       // tenta casar a loja pelo NOME DO ARQUIVO primeiro (mais confiável,
       // já que quem colocou o arquivo lá geralmente nomeia com a loja),
       // e só depois pelo que a IA leu dentro do documento.
-      const nomeNorm = normalizar(arquivo.name);
-      let lojaEncontrada = lojasNormalizadas.find((l) => nomeNorm.includes(l.norm));
-      let confianca: "alta" | "media" | "baixa" = lojaEncontrada ? "alta" : "baixa";
+      // lê o nome do arquivo: tipo, competência e o texto que sobra pra loja
+      const leitura = lerNomeArquivo(arquivo.name);
+      const casado = casarLoja(leitura.textoLoja, (lojas ?? []) as any);
+
+      let lojaEncontrada: { id: string; codigo: string } | undefined =
+        casado ? { id: casado.loja.id, codigo: casado.loja.codigo } : undefined;
+      let confianca: "alta" | "media" | "baixa" = casado ? casado.confianca : "baixa";
 
       if (!lojaEncontrada && extraido.loja_mencionada) {
         const menorNorm = normalizar(extraido.loja_mencionada);
@@ -76,7 +81,10 @@ export async function importarCaixaEntradaDrive() {
         drive_web_view_link: arquivo.webViewLink,
         valor_detectado: extraido.valor,
         codigo_barras_detectado: extraido.codigo_barras,
-        tipo_detectado: extraido.tipo_conta,
+        // o nome do arquivo é mais confiável que a leitura do PDF pro tipo
+        tipo_detectado: leitura.tipo ?? extraido.tipo_conta,
+        competencia_ano: leitura.ano,
+        competencia_mes: leitura.mes,
         loja_sugerida_id: lojaEncontrada?.id ?? null,
         loja_sugerida_texto: lojaEncontrada?.codigo ?? extraido.loja_mencionada ?? null,
         conta_sugerida_id: contaId,

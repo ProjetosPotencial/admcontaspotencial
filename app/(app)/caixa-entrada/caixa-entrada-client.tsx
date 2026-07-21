@@ -10,6 +10,7 @@ type Item = {
   valor_detectado: number | null; codigo_barras_detectado: string | null; tipo_detectado: string | null;
   loja_sugerida_id: string | null; loja_sugerida_texto: string | null; conta_sugerida_id: string | null;
   confianca: "alta" | "media" | "baixa"; observacao: string | null;
+  competencia_ano?: number | null; competencia_mes?: number | null;
 };
 
 const CONFIANCA_LABEL: Record<string, { texto: string; cor: string }> = {
@@ -124,6 +125,10 @@ function ItemCard({ item, lojas, processando, onConfirmar, onRejeitar }: {
   const [tipo, setTipo] = useState(item.tipo_detectado ?? "");
   const [origem, setOrigem] = useState("boleto_reembolso");
   const [comp, setComp] = useState(() => {
+    // usa a competência lida do nome do arquivo; só cai no mês atual se não houver
+    if (item.competencia_ano && item.competencia_mes) {
+      return `${item.competencia_ano}-${String(item.competencia_mes).padStart(2, "0")}`;
+    }
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   });

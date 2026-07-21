@@ -17,10 +17,12 @@ export default async function AprovacoesPage() {
     // fazer ela sumir da fila.
     supabase
       .from("lancamentos")
-      .select("id, ano, mes, valor, situacao, observacao, lancado_em, lancado_por, comprovante_url, comprovante_drive_url, codigo_barras, contas!inner ( tipo, fornecedor_nome, identificador, eh_rateio, lojas ( codigo, coban, cidade, uf, empresas ( nome ) ) )")
-      .eq("situacao", "lancado")
+      .select("id, ano, mes, valor, situacao, observacao, lancado_em, lancado_por, aprovado_em, aprovado_por, motivo_recusa, recusado_em, recusado_por, comprovante_url, comprovante_drive_url, codigo_barras, contas!inner ( tipo, fornecedor_nome, identificador, eh_rateio, lojas ( codigo, coban, cidade, uf, empresas ( nome ) ) )")
+      // pendentes SEM filtro de período + decididas do período selecionado,
+      // para os filtros de situação terem o que mostrar
+      .or(`situacao.eq.lancado,and(ano.eq.${ano},mes.eq.${mes},situacao.in.(aprovado,contestado,cancelado,pago))`)
       .order("lancado_em", { ascending: true })
-      .limit(500),
+      .limit(800),
     supabase.from("lancamentos").select("valor, situacao").eq("ano", ano).eq("mes", mes).in("situacao", ["aprovado", "pago", "contestado"]),
   ]);
 
@@ -35,7 +37,7 @@ export default async function AprovacoesPage() {
   );
 
   // nomes de quem solicitou (para exibir no card e filtrar por solicitante)
-  const ids = Array.from(new Set((data ?? []).map((l: any) => l.lancado_por).filter(Boolean)));
+  const ids = Array.from(new Set((data ?? []).flatMap((l: any) => [l.lancado_por, l.aprovado_por, l.recusado_por]).filter(Boolean)));
   const { data: perfis } = ids.length
     ? await supabase.from("perfis").select("id, nome").in("id", ids)
     : { data: [] as { id: string; nome: string }[] };

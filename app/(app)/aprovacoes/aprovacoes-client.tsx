@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { TIPOS } from "@/lib/types";
+import { TIPOS, SITUACAO } from "@/lib/types";
 import TipoIcon from "@/components/tipo-icon";
 import { money } from "@/lib/format";
 
@@ -13,6 +13,8 @@ type Item = {
   observacao?: string | null;
   lancado_em?: string | null;
   lancado_por?: string | null;
+  aprovado_em?: string | null; aprovado_por?: string | null;
+  motivo_recusa?: string | null; recusado_em?: string | null; recusado_por?: string | null;
   valor: number | null;
   situacao: string;
   comprovante_url?: string | null;
@@ -41,6 +43,7 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {} }
   const [fLoja, setFLoja] = useState("todas");
   const [fTipo, setFTipo] = useState("todos");
   const [fSolic, setFSolic] = useState("todos");
+  const [fSituacao, setFSituacao] = useState("lancado");
   const [fDe, setFDe] = useState("");
   const [fAte, setFAte] = useState("");
   const [vMin, setVMin] = useState("");
@@ -53,6 +56,7 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {} }
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
     return fila.filter((i) => {
+      if (fSituacao !== "todas" && i.situacao !== fSituacao) return false;
       const L = i.contas.lojas;
       if (fEmpresa !== "todas" && L?.empresas?.nome !== fEmpresa) return false;
       if (fLoja !== "todas" && L?.codigo !== fLoja) return false;
@@ -78,10 +82,10 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {} }
       }
       return true;
     });
-  }, [fila, busca, fEmpresa, fLoja, fTipo, fSolic, fDe, fAte, vMin, vMax, solicitantes]);
+  }, [fila, busca, fEmpresa, fLoja, fTipo, fSolic, fSituacao, fDe, fAte, vMin, vMax, solicitantes]);
 
-  const temFiltro = busca !== "" || fEmpresa !== "todas" || fLoja !== "todas" || fTipo !== "todos" || fSolic !== "todos" || fDe !== "" || fAte !== "" || vMin !== "" || vMax !== "";
-  function limpar() { setBusca(""); setFEmpresa("todas"); setFLoja("todas"); setFTipo("todos"); setFSolic("todos"); setFDe(""); setFAte(""); setVMin(""); setVMax(""); }
+  const temFiltro = fSituacao !== "lancado" || busca !== "" || fEmpresa !== "todas" || fLoja !== "todas" || fTipo !== "todos" || fSolic !== "todos" || fDe !== "" || fAte !== "" || vMin !== "" || vMax !== "";
+  function limpar() { setFSituacao("lancado"); setBusca(""); setFEmpresa("todas"); setFLoja("todas"); setFTipo("todos"); setFSolic("todos"); setFDe(""); setFAte(""); setVMin(""); setVMax(""); }
 
   const total = filtrados.length;
   const totalPendenteValor = filtrados.reduce((s, i) => s + Number(i.valor ?? 0), 0);
@@ -180,6 +184,14 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {} }
                 placeholder="Buscar por fornecedor, loja, empresa, boleto, nota ou observação..."
                 className="h-10 w-full bg-white border border-linha rounded-md pl-9 pr-3 text-[13px]" />
             </div>
+            <select value={fSituacao} onChange={(e) => setFSituacao(e.target.value)} className="h-10 bg-white border border-linha rounded-md px-3 text-[13px] font-semibold">
+              <option value="lancado">Aguardando decisão</option>
+              <option value="aprovado">Aprovadas</option>
+              <option value="contestado">Reprovadas</option>
+              <option value="cancelado">Canceladas</option>
+              <option value="pago">Pagas</option>
+              <option value="todas">Todas</option>
+            </select>
             <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="h-10 bg-white border border-linha rounded-md px-3 text-[13px]">
               <option value="todas">Todas as empresas</option>
               {empresas.map((e) => <option key={e} value={e}>{e}</option>)}
@@ -211,7 +223,7 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {} }
                 <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 5l10 10M15 5L5 15" /></svg>Limpar filtros
               </button>
             )}
-            <span className="ml-auto text-[12px] text-[#adb5bd]">{filtrados.length} de {fila.length} pendentes</span>
+            <span className="ml-auto text-[12px] text-[#adb5bd]">{filtrados.length} {filtrados.length === 1 ? "registro" : "registros"}</span>
           </div>
         </div>
 
@@ -293,6 +305,21 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {} }
                                   )}
                                 </div>
 
+                                {item.situacao !== "lancado" ? (
+                                  <div className="mt-auto rounded-md px-2.5 py-2 text-[11.5px]" style={{
+                                    background: item.situacao === "contestado" ? "#FDEDED" : item.situacao === "cancelado" ? "#f1f3f5" : "#E8F5E9",
+                                    color: item.situacao === "contestado" ? "#7a3838" : item.situacao === "cancelado" ? "#6c757d" : "#1E5C22",
+                                  }}>
+                                    <b>{SITUACAO[item.situacao]?.label ?? item.situacao}</b>
+                                    {(item.aprovado_por || item.recusado_por) && (
+                                      <> por {solicitantes[(item.recusado_por ?? item.aprovado_por) as string] ?? "—"}</>
+                                    )}
+                                    {(item.aprovado_em || item.recusado_em) && (
+                                      <> · {new Date((item.recusado_em ?? item.aprovado_em) as string).toLocaleDateString("pt-BR")}</>
+                                    )}
+                                    {item.motivo_recusa && <div className="mt-1 leading-snug">Motivo: {item.motivo_recusa}</div>}
+                                  </div>
+                                ) : (
                                 <div className="mt-auto flex gap-2">
                                   <button onClick={() => decidir(item, true)} disabled={ocupado}
                                     className="flex-1 flex items-center justify-center gap-1.5 bg-ok hover:bg-ok-dark text-white rounded-md py-2 text-[12px] font-semibold transition-colors disabled:opacity-50">
@@ -305,6 +332,7 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {} }
                                     Recusar
                                   </button>
                                 </div>
+                                )}
                               </div>
                             );
                           })}
