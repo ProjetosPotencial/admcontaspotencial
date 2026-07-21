@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatarPeriodo } from "@/lib/date-utils";
 import { obterPeriodoSelecionado } from "@/lib/periodo";
 import RelatoriosClient from "./relatorios-client";
+import Comparativos from "./comparativos";
 import { podeAcessar, SemPermissao } from "@/lib/permissoes";
 
 export const dynamic = "force-dynamic";
@@ -27,8 +28,15 @@ export default async function RelatoriosPage() {
   return (
     <div className="px-4 sm:px-8 py-6 sm:py-8">
       <h1 className="text-[32px] font-bold text-[#1a1a1a] leading-none">Relatórios</h1>
-      <p className="text-[14px] text-[#6c757d] mt-2.5">Exportações reais de {formatarPeriodo(1, ano).split("/")[1]}, prontas para baixar em CSV</p>
-      <div className="max-w-[700px] mt-6">
+      <p className="text-[14px] text-[#6c757d] mt-2.5">Comparativos por praça, fornecedor e evolução do consumo em {ano}</p>
+
+      <div className="mt-6">
+        <Comparativos lancamentos={(lancamentos ?? []) as any[]} ano={ano} />
+      </div>
+
+      <h2 className="text-[18px] font-bold text-[#1a1a1a] mt-8">Exportações</h2>
+      <p className="text-[13px] text-[#6c757d] mt-1">Baixe os dados completos em CSV para trabalhar em planilha</p>
+      <div className="max-w-[700px] mt-4">
         <RelatoriosClient
           lancamentos={(lancamentos ?? []) as any[]}
           centrosCusto={(centrosCusto ?? []) as any[]}

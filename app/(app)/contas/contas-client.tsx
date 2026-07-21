@@ -9,6 +9,7 @@ import { CAMPOS_TIPO } from "@/lib/campos-tipo";
 import { useContaForm } from "@/lib/hooks/useContaForm";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import { formatarPeriodo, contaValidaNoPeriodo, estaAtrasada } from "@/lib/date-utils";
+import { Calendario, type Feriado, type RegraVencimento } from "@/lib/calendario";
 import TipoIcon from "@/components/tipo-icon";
 import { money, MES, nomeArquivoSeguro, formatarDataSemFuso } from "@/lib/format";
 
@@ -194,9 +195,16 @@ function FornecedorCell({ contaId, nome }: { contaId: string; nome: string | nul
   );
 }
 
-export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes }: {
+export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes, feriados = [], regraVencimento = "adiar" }: {
   contas: Conta[]; situacaoPorConta: Record<string, string>; lojas: { id: string; codigo: string }[]; ano: number; mes: number;
+  feriados?: Feriado[]; regraVencimento?: RegraVencimento;
 }) {
+  // calendário da empresa: vencimento em fim de semana ou feriado é ajustado
+  // pela regra, e o que foi ajustado não conta como atraso.
+  const cal = useMemo(() => ({
+    calendario: new Calendario([ano - 1, ano, ano + 1], feriados),
+    regra: regraVencimento,
+  }), [ano, feriados, regraVencimento]);
   const params = useSearchParams();
   const [fTipo, setFTipo] = useState<string>(params.get("tipo") ?? "todos");
   const [fCoban, setFCoban] = useState("todos");
@@ -230,7 +238,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
       const sit = situacaoPorConta[c.id] ?? "pendente";
       const si =
         fSituacao === "todos" ? true
-        : fSituacao === "atrasada" ? estaAtrasada(sit, c.dia_vencimento, mes, ano)
+        : fSituacao === "atrasada" ? estaAtrasada(sit, c.dia_vencimento, mes, ano, undefined, cal)
         : sit === fSituacao;
       const q =
         buscaDebounced === "" ||
@@ -238,7 +246,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
         (c.fornecedor_nome ?? "").toLowerCase().includes(buscaDebounced.toLowerCase());
       return t && cb && st && si && q;
     });
-  }, [contas, fTipo, fCoban, fStatus, fSituacao, buscaDebounced, situacaoPorConta]);
+  }, [contas, fTipo, fCoban, fStatus, fSituacao, buscaDebounced, situacaoPorConta, cal]);
 
   useEffect(() => { setPagina(1); }, [fTipo, fCoban, fStatus, fSituacao, buscaDebounced]);
 
@@ -484,6 +492,8 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
   // pessoa está navegando, não sempre o mês real atual.
 
   const [aprovadorNome, setAprovadorNome] = useState<string | null>(null);
+  const [historico, setHistorico] = useState<{ de: string | null; para: string; em: string; comentario: string | null; nome: string | null }[] | null>(null);
+  const [verHistorico, setVerHistorico] = useState(false);
   const [reenviando, setReenviando] = useState(false);
   const [ajustandoStatus, setAjustandoStatus] = useState(false);
   const [novoStatus, setNovoStatus] = useState("");
@@ -515,6 +525,31 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
     supabase.from("perfis").select("nome").eq("id", idAprovador).maybeSingle()
       .then(({ data }) => setAprovadorNome(data?.nome ?? null));
   }, [(lancamentoAtual as any)?.aprovado_por]);
+
+  // linha do tempo do lançamento (quem fez o quê, quando e por quê)
+  useEffect(() => {
+    if (!verHistorico || !lancamentoAtual?.id) return;
+    let vivo = true;
+    (async () => {
+      const { data } = await supabase
+        .from("lancamento_historico")
+        .select("de, para, em, comentario, quem")
+        .eq("lancamento_id", lancamentoAtual.id)
+        .order("em", { ascending: true });
+      if (!vivo) return;
+      const ids = Array.from(new Set((data ?? []).map((h: any) => h.quem).filter(Boolean)));
+      const { data: pf } = ids.length
+        ? await supabase.from("perfis").select("id, nome").in("id", ids)
+        : { data: [] as any[] };
+      const mapa = new Map((pf ?? []).map((x: any) => [x.id, x.nome]));
+      if (!vivo) return;
+      setHistorico((data ?? []).map((h: any) => ({
+        de: h.de, para: h.para, em: h.em, comentario: h.comentario,
+        nome: h.quem ? (mapa.get(h.quem) ?? null) : null,
+      })));
+    })();
+    return () => { vivo = false; };
+  }, [verHistorico, lancamentoAtual?.id]);
 
   const STATUS_AJUSTE: { valor: string; rotulo: string; ajuda: string }[] = [
     { valor: "pendente",   rotulo: "Em lançamento",       ajuda: "volta para edição, sai da fila" },
@@ -1180,6 +1215,53 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
                     {(lancamentoAtual as any).aprovado_em && ` em ${new Date((lancamentoAtual as any).aprovado_em).toLocaleString("pt-br", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}`}
                   </div>
                 )}
+                {/* linha do tempo do lançamento */}
+                <div className="mt-3 pt-3 border-t border-linha2">
+                  <button onClick={() => setVerHistorico((v) => !v)}
+                    className="w-full flex items-center justify-center gap-1.5 text-[12px] font-semibold text-[#6c757d] hover:text-info transition">
+                    {verHistorico ? "Ocultar histórico" : "Ver histórico"}
+                    <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.2"
+                      style={{ transform: verHistorico ? "rotate(180deg)" : "none", transition: "transform 150ms" }}>
+                      <path d="M5 8l5 5 5-5" />
+                    </svg>
+                  </button>
+
+                  {verHistorico && (
+                    <div className="mt-3">
+                      {historico === null && <div className="text-[12px] text-[#adb5bd]">Carregando...</div>}
+                      {historico?.length === 0 && (
+                        <div className="text-[12px] text-[#adb5bd]">Sem registros anteriores para este lançamento.</div>
+                      )}
+                      <div className="relative pl-4">
+                        {(historico?.length ?? 0) > 0 && <span className="absolute left-[4px] top-1.5 bottom-1.5 w-px bg-linha2" />}
+                        {(historico ?? []).map((h, i) => {
+                          const cor = h.para === "aprovado" ? "#2E7D32"
+                            : h.para === "contestado" ? "#D32F2F"
+                            : h.para === "pago" ? "#2A74C4"
+                            : h.para === "cancelado" ? "#8A8A8A" : "#E6A600";
+                          const rotulo = SITUACAO[h.para]?.label ?? h.para;
+                          return (
+                            <div key={i} className="relative pb-2.5 last:pb-0">
+                              <span className="absolute -left-4 top-1 w-[9px] h-[9px] rounded-full border-2 border-white"
+                                style={{ background: cor, boxShadow: "0 0 0 1.5px #e9ecef" }} />
+                              <div className="flex items-baseline gap-1.5 flex-wrap">
+                                <span className="text-[12px] font-semibold" style={{ color: cor }}>{rotulo}</span>
+                                {h.nome && <span className="text-[11.5px] text-[#495057]">por {h.nome}</span>}
+                                <span className="text-[10.5px] text-[#adb5bd] font-mono ml-auto">
+                                  {new Date(h.em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                                </span>
+                              </div>
+                              {h.comentario && (
+                                <div className="text-[11px] text-[#6c757d] leading-snug mt-0.5">{h.comentario}</div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* ajuste manual de status (admin/gestor) */}
                 <div className="mt-3 pt-3 border-t border-linha2">
                   {!ajustandoStatus ? (

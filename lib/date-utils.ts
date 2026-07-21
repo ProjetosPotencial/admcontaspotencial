@@ -97,12 +97,17 @@ export function periodoPassed(mes: number, ano: number, dataAtual?: Date): boole
  * @param ano - ano do período
  * @param dataAtual - data atual para comparação
  */
+import type { Calendario, RegraVencimento } from "@/lib/calendario";
+
 export function estaAtrasada(
   situacao: string,
   diaVencimento: number | null,
   mes: number,
   ano: number,
-  dataAtual?: Date
+  dataAtual?: Date,
+  /** quando informado, o vencimento é ajustado por fim de semana/feriado
+   *  antes de decidir se está atrasado */
+  cal?: { calendario: Calendario; regra: RegraVencimento } | null
 ): boolean {
   // Só pendente pode estar atrasada. Lançada, aprovada, paga ou contestada
   // já saíram do estado de "ninguém tratou ainda".
@@ -123,6 +128,13 @@ export function estaAtrasada(
   // Se estamos no mesmo período, verifica o dia
   if (anoAtual === ano && mesAtual === mes) {
     if (!diaVencimento) return false;
+    if (cal) {
+      // vencimento em sábado, domingo ou feriado é ajustado pela regra da
+      // empresa — e o que foi ajustado nunca conta como atraso.
+      const { data } = cal.calendario.vencimentoDoMes(diaVencimento, ano, mes, cal.regra);
+      const hojeSemHora = new Date(anoAtual, mesAtual - 1, diaAtual);
+      return data.getTime() < hojeSemHora.getTime();
+    }
     return diaVencimento < diaAtual;
   }
 

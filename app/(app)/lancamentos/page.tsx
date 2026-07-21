@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import LancamentosClient from "./lancamentos-client";
+import { carregarCalendario } from "@/lib/calendario-server";
 import { formatarPeriodo, estaAtrasada } from "@/lib/date-utils";
 import { obterPeriodoSelecionado } from "@/lib/periodo";
 import { money } from "@/lib/format";
@@ -10,6 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function LancamentosPage() {
   const supabase = createClient();
   const { ano, mes, ehPeriodoAtual } = obterPeriodoSelecionado();
+  const cal = await carregarCalendario(ano);
   const diaAtual = new Date().getDate();
 
   await supabase.rpc("garantir_lancamentos_pendentes", { p_ano: ano, p_mes: mes });
@@ -40,7 +42,7 @@ export default async function LancamentosPage() {
     const dv = l.contas?.dia_vencimento;
     return dv != null && dv >= diaAtual && dv <= diaAtual + 7 && (l.situacao === "pendente" || l.situacao === "lancado");
   }) : [];
-  const atrasadas = ehPeriodoAtual ? mesAtual.filter((l) => estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano)) : [];
+  const atrasadas = ehPeriodoAtual ? mesAtual.filter((l) => estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano, undefined, cal)) : [];
   const somaValor = (arr: any[]) => arr.reduce((s, l) => s + Number(l.valor ?? 0), 0);
 
   const totalPago = mesAtual.filter((l) => l.situacao === "pago").reduce((s, l) => s + Number(l.valor ?? 0), 0);

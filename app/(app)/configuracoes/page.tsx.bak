@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import MenuAdminClient from "./menu-admin-client";
-import CalendarioAdminClient from "./calendario-admin-client";
 import TestarSlackButton from "./testar-slack-button";
 import TrocarSenhaForm from "./trocar-senha-form";
 
@@ -13,14 +12,6 @@ export default async function ConfiguracoesPage() {
   const { data: perfil } = await supabase.from("perfis").select("nome, email, papel, ativo, created_at").eq("id", user?.id).single();
 
   const ehAdmin = perfil?.papel === "admin";
-  const anoAtual = new Date().getFullYear();
-  const [{ data: feriados }, { data: cfgCal }] = ehAdmin
-    ? await Promise.all([
-        supabase.from("feriados").select("id, data, nome, escopo, uf, municipio, facultativo").order("data"),
-        supabase.from("config_calendario").select("regra_vencimento, considerar_facultativos").eq("id", 1).maybeSingle(),
-      ])
-    : [{ data: [] as any[] }, { data: null as any }];
-
   const { data: menuItens } = ehAdmin
     ? await supabase.from("menu_itens").select("id, label, href, papel_minimo, ativo, ordem").order("ordem")
     : { data: null };
@@ -65,21 +56,6 @@ export default async function ConfiguracoesPage() {
           <p className="text-[13px] text-[#6c757d] mb-4">Pede sua senha atual antes de trocar, por segurança.</p>
           <TrocarSenhaForm />
         </div>
-
-        {ehAdmin && (
-          <div className="mt-8">
-            <h2 className="text-[16px] font-semibold text-[#1a1a1a] mb-1">Calendário de dias úteis</h2>
-            <p className="text-[13px] text-[#6c757d] mb-4">
-              Define o que acontece com vencimento em dia não útil e quais feriados valem para cada praça.
-            </p>
-            <CalendarioAdminClient
-              feriados={(feriados ?? []) as any[]}
-              regra={(cfgCal?.regra_vencimento ?? "adiar") as any}
-              facultativos={!!cfgCal?.considerar_facultativos}
-              ano={anoAtual}
-            />
-          </div>
-        )}
 
         {ehAdmin && (
           <div className="mt-8">

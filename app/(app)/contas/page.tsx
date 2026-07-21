@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import ContasClient from "./contas-client";
 import type { Conta } from "@/lib/types";
 import { TIPOS } from "@/lib/types";
+import { carregarCalendario } from "@/lib/calendario-server";
 import { formatarPeriodo, estaAtrasada, variacaoPct, contaValidaNoPeriodo } from "@/lib/date-utils";
 import { obterPeriodoSelecionado } from "@/lib/periodo";
 import { money, MES } from "@/lib/format";
@@ -12,6 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function ContasPage() {
   const supabase = createClient();
   const { ano, mes, mesAnterior, anoAnterior, ehPeriodoAtual } = obterPeriodoSelecionado();
+  const cal = await carregarCalendario(ano);
   const diaAtual = new Date().getDate();
 
   await supabase.rpc("garantir_lancamentos_pendentes", { p_ano: ano, p_mes: mes });
@@ -52,7 +54,7 @@ export default async function ContasPage() {
     const dv = l.contas?.dia_vencimento;
     return dv != null && dv >= diaAtual && dv <= diaAtual + 7;
   }) : [];
-  const atrasadas = pendentes.filter((l: any) => estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano));
+  const atrasadas = pendentes.filter((l: any) => estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano, undefined, cal));
   const semOrigem = pendentes.filter((l: any) => l.contas?.origem === "a_definir");
 
   const somaValor = (arr: any[]) => arr.reduce((s, l) => s + Number(l.valor ?? 0), 0);
@@ -68,7 +70,7 @@ export default async function ContasPage() {
 
   const lancMesAtual = (lancamentosAno ?? []).filter((l) => l.mes === mes);
   const totalPagas = lancMesAtual.filter((l) => l.situacao === "pago").reduce((s, l) => s + Number(l.valor ?? 0), 0);
-  const totalAVencer = somaValor(pendentes.filter((l: any) => !estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano)));
+  const totalAVencer = somaValor(pendentes.filter((l: any) => !estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano, undefined, cal)));
   const totalAtrasadasValor = somaValor(atrasadas);
   const totalGeralResumo = totalPagas + totalAVencer + totalAtrasadasValor || 1;
 
@@ -90,7 +92,7 @@ export default async function ContasPage() {
             <KpiMini icon="pin" cor="#6B5B95" bg="#EDE7F6" value={semOrigem.length} label="Sem origem" extra={<span className="text-[11px] font-mono text-[#6c757d]">{money(somaValor(semOrigem))}</span>} />
           </div>
 
-          <ContasClient contas={contas} situacaoPorConta={situacaoPorConta} lojas={lojas ?? []} ano={ano} mes={mes} />
+          <ContasClient feriados={cal.feriados} regraVencimento={cal.regra} contas={contas} situacaoPorConta={situacaoPorConta} lojas={lojas ?? []} ano={ano} mes={mes} />
         </div>
 
         <div className="space-y-6">

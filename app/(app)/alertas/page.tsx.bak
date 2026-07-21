@@ -2,7 +2,6 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { TIPOS } from "@/lib/types";
 import TipoIcon from "@/components/tipo-icon";
-import { carregarCalendario } from "@/lib/calendario-server";
 import { obterPeriodoAtual, estaAtrasada } from "@/lib/date-utils";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +22,6 @@ function agruparPorTipo(itens: any[]): [string, any[]][] {
 export default async function AlertasPage() {
   const supabase = createClient();
   const { ano, mes } = obterPeriodoAtual();
-  const cal = await carregarCalendario(ano);
 
   await supabase.rpc("garantir_lancamentos_pendentes", { p_ano: ano, p_mes: mes });
 
@@ -40,7 +38,7 @@ export default async function AlertasPage() {
   ]);
 
   const atrasadas = (lancMes ?? []).filter((l: any) =>
-    estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano, undefined, cal)
+    estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano)
   );
   const atrasadasPorTipo = agruparPorTipo(atrasadas);
   const mapearPorTipo = agruparPorTipo(mapear ?? []);

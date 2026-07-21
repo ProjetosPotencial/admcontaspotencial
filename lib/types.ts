@@ -22,7 +22,8 @@ export const SITUACAO: Record<string, { label: string; cls: string }> = {
   lancado: { label: "Lançado", cls: "bg-amb-bg text-[#B5860A]" },
   aprovado: { label: "Aprovado", cls: "bg-info-bg text-info" },
   pago: { label: "Pago", cls: "bg-ok-bg text-ok" },
-  contestado: { label: "Contestado", cls: "bg-alerr-bg text-alerr" },
+  contestado: { label: "Reprovado", cls: "bg-alerr-bg text-alerr" },
+  cancelado: { label: "Cancelado", cls: "bg-[#f1f3f5] text-[#8A8A8A]" },
 };
 
 export type Conta = {

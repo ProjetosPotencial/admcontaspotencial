@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import TipoIcon from "@/components/tipo-icon";
 import { TIPOS } from "@/lib/types";
+import { carregarCalendario } from "@/lib/calendario-server";
+import { gerarAlertas } from "@/lib/alertas-inteligentes";
 import { formatarPeriodo, estaAtrasada, variacaoPct, contaValidaNoPeriodo } from "@/lib/date-utils";
 import { obterPeriodoSelecionado } from "@/lib/periodo";
 import { money, MES, formatarDataSemFuso } from "@/lib/format";
@@ -31,6 +33,7 @@ function saudacao(): string {
 export default async function PainelPage() {
   const supabase = createClient();
   const { ano, mes, mesAnterior, anoAnterior, ehPeriodoAtual } = obterPeriodoSelecionado();
+  const cal = await carregarCalendario(ano);
 
   // garante que toda conta ativa tenha uma linha "pendente" pro período
   // sendo visto, antes de qualquer coisa - sem isso, contas sem lançamento
@@ -88,7 +91,7 @@ export default async function PainelPage() {
     const atrasadas = lanc.filter((l: any) =>
       l.contas?.status !== "encerrado" && l.contas?.status !== "inativo" &&
       contaValidaNoPeriodo(l.contas?.status, l.contas?.data_encerramento, ano, mes) &&
-      estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano)).length;
+      estaAtrasada(l.situacao, l.contas?.dia_vencimento, mes, ano, undefined, cal)).length;
     const pagas = lanc.filter((l) => l.situacao === "pago").length;
     const aguardando = lanc.filter((l) => l.situacao === "lancado" || l.situacao === "aprovado").length;
     const aLancar = lanc.filter((l) => l.situacao === "pendente").length;
@@ -144,7 +147,7 @@ export default async function PainelPage() {
     atual.valor += Number(l.valor ?? 0);
     if (l.situacao === "pago") atual.pagas++;
     else if (l.situacao === "lancado") atual.aprovacoes++;
-    else if (estaAtrasada(l.situacao, dia, mes, ano)) atual.atrasadas++;
+    else if (estaAtrasada(l.situacao, dia, mes, ano, undefined, cal)) atual.atrasadas++;
     else atual.aVencer++;
     mapaDias.set(dia, atual);
   });
@@ -175,6 +178,17 @@ export default async function PainelPage() {
   ].filter(Boolean) as { icone: string; texto: string; href: string }[];
 
   const totalAnalisado = (lancamentosDetalhados ?? []).length;
+
+  // --- alertas proativos do assistente (calendário + padrão de valores) ---
+  const historicoValores = (lancamentosAno ?? [])
+    .filter((l: any) => l.mes !== mes && l.valor)
+    .map((l: any) => ({ fornecedor: l.contas?.fornecedor_nome ?? null, tipo: l.contas?.tipo ?? null, valor: Number(l.valor) }));
+
+  const alertasIA = gerarAlertas(
+    (lancamentos ?? []) as any,
+    historicoValores,
+    cal, ano, mes
+  );
 
 
   // --- fatias do donut (gasto por categoria no mês) ---
@@ -349,8 +363,28 @@ export default async function PainelPage() {
             Analisei {totalAnalisado} {totalAnalisado === 1 ? "conta" : "contas"} deste mês:
           </p>
 
+          {/* alertas proativos: o que o assistente detectou sozinho */}
+          {alertasIA.length > 0 && (
+            <div className="space-y-1.5 mb-2.5">
+              {alertasIA.slice(0, 3).map((a) => (
+                <Link key={a.chave} href={a.href}
+                  className={`block rounded-lg px-2.5 py-2 border transition ${
+                    a.prioridade === "alta" ? "bg-amb-bg border-amarelo/40 hover:border-amarelo"
+                    : "bg-off border-linha hover:border-[#d5d3cd]"}`}>
+                  <div className="flex items-start gap-2">
+                    <span className="text-[12px] leading-tight">{a.icone}</span>
+                    <div className="min-w-0">
+                      <div className="text-[12px] font-semibold text-[#1a1a1a] leading-snug">{a.titulo}</div>
+                      {a.detalhe && <div className="text-[10.5px] text-[#6c757d] leading-snug mt-0.5">{a.detalhe}</div>}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+
           <div className="space-y-1.5 flex-1">
-            {insightsIA.length === 0 && (
+            {insightsIA.length === 0 && alertasIA.length === 0 && (
               <div className="text-[12.5px] text-ok bg-ok-bg rounded-lg px-3 py-2.5">
                 ✅ Tudo em dia por aqui. Nenhuma pendência encontrada.
               </div>
