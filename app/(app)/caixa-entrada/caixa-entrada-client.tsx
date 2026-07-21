@@ -58,7 +58,7 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
       const { data: { user } } = await supabase.auth.getUser();
       const { data: lancamento, error } = await supabase.from("lancamentos").upsert({
         conta_id: contaId, ano, mes,
-        valor: item.valor_detectado, situacao: "aprovado", lancado_em: agora.toISOString(),
+        valor: item.valor_detectado, situacao: "lancado", lancado_em: agora.toISOString(),
         codigo_barras: item.codigo_barras_detectado, comprovante_drive_url: item.drive_web_view_link,
       }, { onConflict: "conta_id,ano,mes" }).select("id").single();
 

@@ -8,7 +8,7 @@ import { TIPOS, ORIGENS, SITUACAO, type Conta, type Lancamento } from "@/lib/typ
 import { CAMPOS_TIPO } from "@/lib/campos-tipo";
 import { useContaForm } from "@/lib/hooks/useContaForm";
 import { useDebounce } from "@/lib/hooks/useDebounce";
-import { formatarPeriodo, contaValidaNoPeriodo } from "@/lib/date-utils";
+import { formatarPeriodo, contaValidaNoPeriodo, estaAtrasada } from "@/lib/date-utils";
 import TipoIcon from "@/components/tipo-icon";
 import { money, MES, nomeArquivoSeguro, formatarDataSemFuso } from "@/lib/format";
 
@@ -227,7 +227,11 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
       // conta encerrada some da lista assim que é encerrada (o cadastro fica
       // salvo, e ela continua acessível pelo filtro de status "Encerrada")
       const st = fStatus === "todos" ? c.status !== "encerrado" : c.status === fStatus;
-      const si = fSituacao === "todos" || (situacaoPorConta[c.id] ?? "pendente") === fSituacao;
+      const sit = situacaoPorConta[c.id] ?? "pendente";
+      const si =
+        fSituacao === "todos" ? true
+        : fSituacao === "atrasada" ? estaAtrasada(sit, c.dia_vencimento, mes, ano)
+        : sit === fSituacao;
       const q =
         buscaDebounced === "" ||
         (c.lojas?.codigo ?? "").toLowerCase().includes(buscaDebounced.toLowerCase()) ||
@@ -290,7 +294,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
           <select value={fSituacao} onChange={(e) => setFSituacao(e.target.value)}
             className="h-10 bg-white border border-linha rounded-md px-3 text-[13px] text-[#1a1a1a] min-w-[170px]">
             <option value="todos">Qualquer situação</option>
-            <option value="pendente">Em aberto</option><option value="lancado">Aguardando pagamento</option><option value="pago">Pagas</option>
+            <option value="pendente">Em aberto</option><option value="atrasada">Atrasadas</option><option value="lancado">Aguardando pagamento</option><option value="pago">Pagas</option>
           </select>
           {temFiltro && (
             <button onClick={limparFiltros} className="flex items-center gap-1.5 text-[13px] text-[#6c757d] hover:text-alerr font-medium">

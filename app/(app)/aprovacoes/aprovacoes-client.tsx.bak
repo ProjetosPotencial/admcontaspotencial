@@ -9,28 +9,80 @@ import { money } from "@/lib/format";
 
 type Item = {
   id: string;
+  ano?: number; mes?: number;
+  observacao?: string | null;
+  lancado_em?: string | null;
+  lancado_por?: string | null;
   valor: number | null;
   situacao: string;
   comprovante_url?: string | null;
   comprovante_drive_url?: string | null;
   codigo_barras?: string | null;
   contas: {
-    tipo: string; fornecedor_nome: string | null; eh_rateio: boolean;
+    tipo: string; fornecedor_nome: string | null; identificador?: string | null; eh_rateio: boolean;
     lojas: { codigo: string; coban: string; cidade: string | null; uf: string | null; empresas: { nome: string } | null } | null;
   };
 };
 
-export default function AprovacoesClient({ itens, resumoMes }: {
+export default function AprovacoesClient({ itens, resumoMes, solicitantes = {} }: {
   itens: Item[];
   resumoMes: { aprovado: { qtd: number; total: number }; contestado: { qtd: number; total: number } };
+  solicitantes?: Record<string, string>;
 }) {
   const supabase = createClient();
   const router = useRouter();
   const [fila, setFila] = useState<Item[]>(itens);
   const [toast, setToast] = useState<string | null>(null);
   const [decidindo, setDecidindo] = useState<string | null>(null);
-  const total = itens.length;
-  const totalPendenteValor = itens.reduce((s, i) => s + Number(i.valor ?? 0), 0);
+  const [busca, setBusca] = useState("");
+  const [fEmpresa, setFEmpresa] = useState("todas");
+  const [fLoja, setFLoja] = useState("todas");
+  const [fTipo, setFTipo] = useState("todos");
+  const [fSolic, setFSolic] = useState("todos");
+  const [fDe, setFDe] = useState("");
+  const [fAte, setFAte] = useState("");
+  const [vMin, setVMin] = useState("");
+  const [vMax, setVMax] = useState("");
+
+  const empresas = useMemo(() => Array.from(new Set(fila.map((i) => i.contas.lojas?.empresas?.nome).filter(Boolean))).sort() as string[], [fila]);
+  const lojasLista = useMemo(() => Array.from(new Set(fila.map((i) => i.contas.lojas?.codigo).filter(Boolean))).sort() as string[], [fila]);
+  const solicLista = useMemo(() => Array.from(new Set(fila.map((i) => i.lancado_por).filter(Boolean))) as string[], [fila]);
+
+  const filtrados = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    return fila.filter((i) => {
+      const L = i.contas.lojas;
+      if (fEmpresa !== "todas" && L?.empresas?.nome !== fEmpresa) return false;
+      if (fLoja !== "todas" && L?.codigo !== fLoja) return false;
+      if (fTipo !== "todos" && i.contas.tipo !== fTipo) return false;
+      if (fSolic !== "todos" && i.lancado_por !== fSolic) return false;
+      const v = Number(i.valor ?? 0);
+      if (vMin && v < Number(vMin)) return false;
+      if (vMax && v > Number(vMax)) return false;
+      if (fDe || fAte) {
+        const d = i.lancado_em ? i.lancado_em.slice(0, 10) : "";
+        if (fDe && d < fDe) return false;
+        if (fAte && d > fAte) return false;
+      }
+      if (q) {
+        // busca inteligente: fornecedor, loja, empresa, cidade, boleto,
+        // identificador (nota/matrícula) e observações
+        const alvo = [
+          i.contas.fornecedor_nome, i.contas.identificador, L?.codigo, L?.cidade, L?.uf,
+          L?.empresas?.nome, i.codigo_barras, i.observacao,
+          TIPOS[i.contas.tipo]?.n, solicitantes[i.lancado_por ?? ""],
+        ].filter(Boolean).join(" ").toLowerCase();
+        if (!alvo.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [fila, busca, fEmpresa, fLoja, fTipo, fSolic, fDe, fAte, vMin, vMax, solicitantes]);
+
+  const temFiltro = busca !== "" || fEmpresa !== "todas" || fLoja !== "todas" || fTipo !== "todos" || fSolic !== "todos" || fDe !== "" || fAte !== "" || vMin !== "" || vMax !== "";
+  function limpar() { setBusca(""); setFEmpresa("todas"); setFLoja("todas"); setFTipo("todos"); setFSolic("todos"); setFDe(""); setFAte(""); setVMin(""); setVMax(""); }
+
+  const total = filtrados.length;
+  const totalPendenteValor = filtrados.reduce((s, i) => s + Number(i.valor ?? 0), 0);
 
   async function decidir(item: Item, aprovar: boolean) {
     setDecidindo(item.id);
@@ -45,6 +97,15 @@ export default function AprovacoesClient({ itens, resumoMes }: {
       .eq("id", item.id);
     setDecidindo(null);
     if (error) { setToast(`Não foi possível decidir: ${error.message}`); return; }
+    // avisa o Slack (quem decidiu, loja, tipo, valor) sem travar a tela
+    fetch("/api/notificar-evento", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        evento: aprovar ? "aprovada" : "reprovada",
+        loja: item.contas.lojas?.codigo, tipo: TIPOS[item.contas.tipo]?.n ?? item.contas.tipo,
+        valor: money(Number(item.valor ?? 0)), por: user?.email ?? undefined,
+      }),
+    }).catch(() => {});
     setFila((f) => f.filter((x) => x.id !== item.id));
     setToast(`${aprovar ? "Aprovado" : "Recusado"}: ${item.contas.lojas?.codigo}.`);
     setTimeout(() => setToast(null), 2600);
@@ -71,7 +132,7 @@ export default function AprovacoesClient({ itens, resumoMes }: {
   // vez, em vez de rolar uma lista comprida misturando tudo.
   const porEmpresa = useMemo(() => {
     const grupos = new Map<string, Map<string, Item[]>>();
-    for (const item of fila) {
+    for (const item of filtrados) {
       const empresa = item.contas.lojas?.empresas?.nome ?? "Sem empresa";
       const loja = item.contas.lojas?.codigo ?? "Sem loja";
       if (!grupos.has(empresa)) grupos.set(empresa, new Map());
@@ -80,7 +141,7 @@ export default function AprovacoesClient({ itens, resumoMes }: {
       porLoja.get(loja)!.push(item);
     }
     return Array.from(grupos.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [fila]);
+  }, [filtrados]);
 
   return (
     <>
@@ -101,9 +162,52 @@ export default function AprovacoesClient({ itens, resumoMes }: {
           <KpiMini label="Total do mês" value={resumoMes.aprovado.qtd + resumoMes.contestado.qtd + fila.length} sub={money(resumoMes.aprovado.total + resumoMes.contestado.total + totalPendenteValor)} cor="#1976d2" bg="#e3f2fd" />
         </div>
 
+        <div className="card p-4 mb-4">
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="relative flex-1 min-w-[240px]">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2" width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#adb5bd" strokeWidth="1.8"><circle cx="9" cy="9" r="6" /><path d="M13.5 13.5L17 17" /></svg>
+              <input value={busca} onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar por fornecedor, loja, empresa, boleto, nota ou observação..."
+                className="h-10 w-full bg-white border border-linha rounded-md pl-9 pr-3 text-[13px]" />
+            </div>
+            <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="h-10 bg-white border border-linha rounded-md px-3 text-[13px]">
+              <option value="todas">Todas as empresas</option>
+              {empresas.map((e) => <option key={e} value={e}>{e}</option>)}
+            </select>
+            <select value={fLoja} onChange={(e) => setFLoja(e.target.value)} className="h-10 bg-white border border-linha rounded-md px-3 text-[13px]">
+              <option value="todas">Todas as lojas</option>
+              {lojasLista.map((l) => <option key={l} value={l}>{l}</option>)}
+            </select>
+            <select value={fTipo} onChange={(e) => setFTipo(e.target.value)} className="h-10 bg-white border border-linha rounded-md px-3 text-[13px]">
+              <option value="todos">Todo tipo de despesa</option>
+              {Object.entries(TIPOS).map(([k, v]) => <option key={k} value={k}>{v.n}</option>)}
+            </select>
+            <select value={fSolic} onChange={(e) => setFSolic(e.target.value)} className="h-10 bg-white border border-linha rounded-md px-3 text-[13px]">
+              <option value="todos">Qualquer solicitante</option>
+              {solicLista.map((id) => <option key={id} value={id}>{solicitantes[id] ?? "—"}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-wrap gap-2 items-center mt-2">
+            <label className="flex items-center gap-1.5 text-[12px] text-[#6c757d]">De
+              <input type="date" value={fDe} onChange={(e) => setFDe(e.target.value)} className="h-9 bg-white border border-linha rounded-md px-2 text-[12.5px]" /></label>
+            <label className="flex items-center gap-1.5 text-[12px] text-[#6c757d]">até
+              <input type="date" value={fAte} onChange={(e) => setFAte(e.target.value)} className="h-9 bg-white border border-linha rounded-md px-2 text-[12.5px]" /></label>
+            <label className="flex items-center gap-1.5 text-[12px] text-[#6c757d]">Valor de
+              <input type="number" value={vMin} onChange={(e) => setVMin(e.target.value)} placeholder="0" className="h-9 w-[92px] bg-white border border-linha rounded-md px-2 text-[12.5px]" /></label>
+            <label className="flex items-center gap-1.5 text-[12px] text-[#6c757d]">até
+              <input type="number" value={vMax} onChange={(e) => setVMax(e.target.value)} placeholder="—" className="h-9 w-[92px] bg-white border border-linha rounded-md px-2 text-[12.5px]" /></label>
+            {temFiltro && (
+              <button onClick={limpar} className="flex items-center gap-1.5 text-[12.5px] text-[#6c757d] hover:text-alerr font-medium ml-1">
+                <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 5l10 10M15 5L5 15" /></svg>Limpar filtros
+              </button>
+            )}
+            <span className="ml-auto text-[12px] text-[#adb5bd]">{filtrados.length} de {fila.length} pendentes</span>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-6">
         <div className="min-w-0">
-        {fila.length === 0 ? (
+        {filtrados.length === 0 ? (
           <div className="card">
             <div className="text-center py-16 text-[#adb5bd]">
               <div className="w-14 h-14 rounded-full bg-ok-bg text-ok grid place-items-center mx-auto mb-4">

@@ -34,6 +34,8 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {} }
   const [fila, setFila] = useState<Item[]>(itens);
   const [toast, setToast] = useState<string | null>(null);
   const [decidindo, setDecidindo] = useState<string | null>(null);
+  const [recusando, setRecusando] = useState<Item | null>(null);
+  const [motivoRecusa, setMotivoRecusa] = useState("");
   const [busca, setBusca] = useState("");
   const [fEmpresa, setFEmpresa] = useState("todas");
   const [fLoja, setFLoja] = useState("todas");
@@ -84,15 +86,20 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {} }
   const total = filtrados.length;
   const totalPendenteValor = filtrados.reduce((s, i) => s + Number(i.valor ?? 0), 0);
 
-  async function decidir(item: Item, aprovar: boolean) {
+  async function decidir(item: Item, aprovar: boolean, motivo?: string) {
     setDecidindo(item.id);
     const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase
       .from("lancamentos")
-      .update({
-        situacao: aprovar ? "aprovado" : "contestado",
+      .update(aprovar ? {
+        situacao: "aprovado",
         aprovado_em: new Date().toISOString(),
         aprovado_por: user?.id ?? null,
+      } : {
+        situacao: "contestado",
+        motivo_recusa: motivo ?? null,
+        recusado_em: new Date().toISOString(),
+        recusado_por: user?.id ?? null,
       })
       .eq("id", item.id);
     setDecidindo(null);
@@ -103,11 +110,14 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {} }
       body: JSON.stringify({
         evento: aprovar ? "aprovada" : "reprovada",
         loja: item.contas.lojas?.codigo, tipo: TIPOS[item.contas.tipo]?.n ?? item.contas.tipo,
-        valor: money(Number(item.valor ?? 0)), por: user?.email ?? undefined,
+        valor: money(Number(item.valor ?? 0)), por: user?.email ?? undefined, motivo: aprovar ? undefined : motivo,
       }),
     }).catch(() => {});
     setFila((f) => f.filter((x) => x.id !== item.id));
-    setToast(`${aprovar ? "Aprovado" : "Recusado"}: ${item.contas.lojas?.codigo}.`);
+    setToast(aprovar
+      ? `Aprovado: ${item.contas.lojas?.codigo}.`
+      : `Recusado: ${item.contas.lojas?.codigo}. Voltou para Contas para correção.`);
+    setRecusando(null); setMotivoRecusa("");
     setTimeout(() => setToast(null), 2600);
     // sem isso, o Next.js pode continuar mostrando por até 30s a versão
     // antiga da lista (de antes da decisão) se a pessoa navegar pra outra
@@ -289,7 +299,7 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {} }
                                     <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 10.5l3.5 3.5L16 5.5" /></svg>
                                     Aprovar
                                   </button>
-                                  <button onClick={() => decidir(item, false)} disabled={ocupado}
+                                  <button onClick={() => { setRecusando(item); setMotivoRecusa(""); }} disabled={ocupado}
                                     className="flex-1 flex items-center justify-center gap-1.5 bg-alerr hover:bg-alerr-dark text-white rounded-md py-2 text-[12px] font-semibold transition-colors disabled:opacity-50">
                                     <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 5l10 10M15 5L5 15" /></svg>
                                     Recusar
@@ -349,6 +359,35 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {} }
         </div>
         </div>
       </div>
+
+      {recusando && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div onClick={() => setRecusando(null)} className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-white rounded-2xl shadow-forte border border-linha w-full max-w-[420px] p-5">
+            <div className="text-[15px] font-bold text-[#1a1a1a]">Recusar lançamento</div>
+            <div className="text-[12.5px] text-[#6c757d] mt-1 mb-3">
+              {recusando.contas.lojas?.codigo} · {TIPOS[recusando.contas.tipo]?.n} · {money(Number(recusando.valor ?? 0))}
+            </div>
+            <label className="block">
+              <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Motivo da recusa</div>
+              <textarea value={motivoRecusa} onChange={(e) => setMotivoRecusa(e.target.value)} rows={3}
+                placeholder="Ex.: valor divergente do boleto, loja errada, falta comprovante..."
+                className="w-full border border-linha rounded-md px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-alerr" />
+            </label>
+            <div className="text-[11px] text-[#6c757d] mt-2 leading-snug">
+              A conta volta para <b>Contas</b> com este motivo visível, para quem lançou corrigir e reenviar.
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => decidir(recusando, false, motivoRecusa.trim())}
+                disabled={!motivoRecusa.trim() || decidindo === recusando.id}
+                className="flex-1 bg-alerr text-white rounded-md py-2.5 text-[12.5px] font-semibold disabled:opacity-50">
+                {decidindo === recusando.id ? "Recusando..." : "Confirmar recusa"}
+              </button>
+              <button onClick={() => setRecusando(null)} className="btn-secundario">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-ebano text-white px-5 py-3 rounded-lg text-[13px] flex items-center gap-2.5 shadow-forte z-50">
