@@ -111,6 +111,8 @@ export type LojaBusca = { id: string; codigo: string; nome?: string | null; cida
  * Casa o texto do nome do arquivo com a loja certa.
  * Tenta, nesta ordem: código exato → nome cadastrado → cidade.
  */
+const UFS_SIGLA = new Set(["mg","sp","ms","rj","pr","sc","rs","go","ba","ce","pe","ma","mt","es","pb","rn","pa","am","df","to","pi","al","se","ro","rr","ap","ac"]);
+
 export function casarLoja(textoLoja: string, lojas: LojaBusca[]) {
   const alvo = normalizar(textoLoja);
   if (!alvo) return null;
@@ -139,7 +141,33 @@ export function casarLoja(textoLoja: string, lojas: LojaBusca[]) {
   });
   if (achou) return { loja: achou.loja, confianca: "media" as const, por: "nome" };
 
-  // 4) cidade — só se for única, senão é ambíguo
+  // 4) o CAMINHO MAIS COMUM: o arquivo traz só o apelido da loja
+  //    ("MOCOCA") e o cadastro tem o nome completo ("SP 123 PE Mococa").
+  //    Compara pelas palavras que realmente identificam a loja, ignorando
+  //    UF, número e prefixos de formato (PE, OP, QQ...).
+  const IGNORAR = new Set(["pe", "op", "qq", "pf", "pj", "loja", "quiosque", "matriz", "escritorio", "filial", "cent"]);
+  // as palavras de tipo (água, energia...) já saíram do nome do arquivo,
+  // então precisam sair do nome da loja também — senão "Jucesp Água Branca"
+  // nunca casaria com "JUCESP BRANCA".
+  const PISTAS = new Set(PISTAS_TIPO.flatMap(([, p]) => p).filter((p) => !p.includes(" ")));
+  const distintivas = (nome: string) =>
+    nome.split(" ").filter((w) =>
+      w.length >= 3 && !/^\d+$/.test(w) && !IGNORAR.has(w) && !UFS_SIGLA.has(w) && !PISTAS.has(w));
+
+  const porNomeCurto = cands.filter((c) => {
+    const d = distintivas(c.nome);
+    if (d.length === 0) return false;
+    return d.every((w) => palavrasAlvo.includes(w));
+  });
+  if (porNomeCurto.length === 1) return { loja: porNomeCurto[0].loja, confianca: "alta" as const, por: "nome" };
+  if (porNomeCurto.length > 1) {
+    // várias lojas com o mesmo apelido: só aceita se o texto trouxer o código
+    const comCodigo = porNomeCurto.find((c) => alvo.includes(c.codigo));
+    if (comCodigo) return { loja: comCodigo.loja, confianca: "alta" as const, por: "código" };
+    return null; // ambíguo, melhor deixar a pessoa escolher
+  }
+
+  // 5) cidade — só se for única, senão é ambíguo
   const porCidade = cands.filter((c) => c.cidade.length >= 4 && alvo.includes(c.cidade));
   if (porCidade.length === 1) return { loja: porCidade[0].loja, confianca: "media" as const, por: "cidade" };
 
