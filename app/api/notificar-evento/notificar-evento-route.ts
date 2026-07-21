@@ -13,6 +13,7 @@ const TEMPLATES: Record<string, (d: any) => string> = {
   lancamento: (d) => `✅ *Nova conta lançada* — ${d.loja ?? "loja"} · ${d.tipo ?? "conta"}${d.valor ? ` · ${d.valor}` : ""}${d.por ? `\n_por ${d.por}_` : ""}`,
   aprovada:   (d) => `✔️ *Conta aprovada* — ${d.loja ?? "loja"} · ${d.tipo ?? "conta"}${d.valor ? ` · ${d.valor}` : ""}`,
   reprovada:  (d) => `❌ *Conta reprovada* — ${d.loja ?? "loja"} · ${d.tipo ?? "conta"}${d.valor ? ` · ${d.valor}` : ""}${d.motivo ? `\nMotivo: ${d.motivo}` : ""}`,
+  reenviada:  (d) => `🔁 *Nova solicitação de aprovação* — ${d.loja ?? "loja"} · ${d.tipo ?? "conta"}${d.valor ? ` · ${d.valor}` : ""}\n_status ajustado manualmente; voltou para a fila_`,
   conta_criada:    (d) => `🆕 *Nova conta cadastrada* — ${d.loja ?? "loja"} · ${d.tipo ?? "conta"}${d.fornecedor ? ` · ${d.fornecedor}` : ""}`,
   conta_excluida:  (d) => `🗑️ *Conta excluída* — ${d.loja ?? "loja"} · ${d.tipo ?? "conta"}`,
   fornecedor_novo: (d) => `🏭 *Novo fornecedor cadastrado* — ${d.fornecedor ?? "—"}`,

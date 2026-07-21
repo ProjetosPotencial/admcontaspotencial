@@ -485,6 +485,9 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
 
   const [aprovadorNome, setAprovadorNome] = useState<string | null>(null);
   const [reenviando, setReenviando] = useState(false);
+  const [ajustandoStatus, setAjustandoStatus] = useState(false);
+  const [novoStatus, setNovoStatus] = useState("");
+  const [salvandoStatus, setSalvandoStatus] = useState(false);
 
   function carregarLancamentos() {
     supabase.from("lancamentos").select("id, ano, mes, valor, situacao, comprovante_url, comprovante_drive_url, aprovado_por, aprovado_em")
@@ -512,6 +515,47 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
     supabase.from("perfis").select("nome").eq("id", idAprovador).maybeSingle()
       .then(({ data }) => setAprovadorNome(data?.nome ?? null));
   }, [(lancamentoAtual as any)?.aprovado_por]);
+
+  const STATUS_AJUSTE: { valor: string; rotulo: string; ajuda: string }[] = [
+    { valor: "pendente",   rotulo: "Em lançamento",       ajuda: "volta para edição, sai da fila" },
+    { valor: "lancado",    rotulo: "Aguardando aprovação", ajuda: "volta para a fila como solicitação nova" },
+    { valor: "aprovado",   rotulo: "Aprovada",            ajuda: "considera aprovada" },
+    { valor: "contestado", rotulo: "Reprovada",           ajuda: "marca como recusada" },
+    { valor: "cancelado",  rotulo: "Cancelada",           ajuda: "encerra sem pagamento" },
+  ];
+
+  async function aplicarAjusteStatus() {
+    if (!lancamentoAtual?.id || !novoStatus) return;
+    setSalvandoStatus(true);
+    const { data, error } = await supabase.rpc("ajustar_status_lancamento", {
+      p_id: lancamentoAtual.id, p_situacao: novoStatus,
+    });
+    setSalvandoStatus(false);
+    if (error) {
+      setAviso(/permiss|42501/i.test(error.message ?? "")
+        ? "Só admin ou gestor pode ajustar o status."
+        : "Não foi possível ajustar o status.");
+      return;
+    }
+    if (!data || Number(data) === 0) { setAviso("Nada foi alterado."); return; }
+
+    // voltou para a fila: avisa o Slack como uma solicitação nova
+    if (novoStatus === "lancado") {
+      const { data: { user } } = await supabase.auth.getUser();
+      fetch("/api/notificar-evento", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          evento: "reenviada", loja: conta.lojas?.codigo,
+          tipo: TIPOS[conta.tipo]?.n ?? conta.tipo,
+          valor: money(Number(lancamentoAtual.valor ?? 0)), por: user?.email ?? undefined,
+        }),
+      }).catch(() => {});
+    }
+    setAjustandoStatus(false); setNovoStatus("");
+    setSucessoLancamento("Status ajustado.");
+    setTimeout(() => setSucessoLancamento(null), 6000);
+    router.refresh();
+  }
 
   async function reenviarParaAprovacao() {
     if (!lancamentoAtual?.id) return;
@@ -1136,6 +1180,44 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
                     {(lancamentoAtual as any).aprovado_em && ` em ${new Date((lancamentoAtual as any).aprovado_em).toLocaleString("pt-br", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}`}
                   </div>
                 )}
+                {/* ajuste manual de status (admin/gestor) */}
+                <div className="mt-3 pt-3 border-t border-linha2">
+                  {!ajustandoStatus ? (
+                    <button onClick={() => { setAjustandoStatus(true); setNovoStatus(lancamentoAtual.situacao); }}
+                      className="w-full text-[12px] font-semibold text-[#6c757d] hover:text-info transition text-center">
+                      Ajustar status
+                    </button>
+                  ) : (
+                    <div>
+                      <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1.5">Ajustar status</div>
+                      <div className="space-y-1 mb-2.5">
+                        {STATUS_AJUSTE.map((op) => (
+                          <label key={op.valor} className="flex items-start gap-2 text-[12.5px] cursor-pointer rounded px-1.5 py-1 hover:bg-off">
+                            <input type="radio" name="ajuste-status" className="mt-0.5" checked={novoStatus === op.valor}
+                              onChange={() => setNovoStatus(op.valor)} />
+                            <span>
+                              <b className="font-medium">{op.rotulo}</b>
+                              <span className="block text-[10.5px] text-[#adb5bd]">{op.ajuda}</span>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                      {novoStatus === "lancado" && (
+                        <div className="text-[11px] text-info bg-info-bg rounded-md px-2 py-1.5 mb-2.5">
+                          A conta sai das aprovadas, volta para a fila de Aprovações e avisa o Slack.
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <button onClick={aplicarAjusteStatus} disabled={salvandoStatus || novoStatus === lancamentoAtual.situacao}
+                          className="btn-primario flex-1 disabled:opacity-50">
+                          {salvandoStatus ? "Ajustando..." : "Aplicar"}
+                        </button>
+                        <button onClick={() => { setAjustandoStatus(false); setNovoStatus(""); }} className="btn-secundario">Cancelar</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <button onClick={() => { setValorLancar(String(lancamentoAtual.valor ?? "")); setAlertas([]); setConfirmarMesmoAssim(false); setCodigoBarras(""); setHashArquivo(null); setBloqueio(null); setLancando(true); }}
                   className="w-full mt-3 pt-3 border-t border-linha2 text-[12px] font-semibold text-[#6c757d] hover:text-amb transition text-center">
                   Boleto errado? Substituir

@@ -484,6 +484,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
   // pessoa está navegando, não sempre o mês real atual.
 
   const [aprovadorNome, setAprovadorNome] = useState<string | null>(null);
+  const [reenviando, setReenviando] = useState(false);
 
   function carregarLancamentos() {
     supabase.from("lancamentos").select("id, ano, mes, valor, situacao, comprovante_url, comprovante_drive_url, aprovado_por, aprovado_em")
@@ -511,6 +512,22 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
     supabase.from("perfis").select("nome").eq("id", idAprovador).maybeSingle()
       .then(({ data }) => setAprovadorNome(data?.nome ?? null));
   }, [(lancamentoAtual as any)?.aprovado_por]);
+
+  async function reenviarParaAprovacao() {
+    if (!lancamentoAtual?.id) return;
+    setReenviando(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from("lancamentos").update({
+      situacao: "lancado",
+      reenviado_em: new Date().toISOString(),
+      reenviado_por: user?.id ?? null,
+    }).eq("id", lancamentoAtual.id);
+    setReenviando(false);
+    if (error) { setAviso("Não foi possível reenviar para aprovação."); return; }
+    setSucessoLancamento("Reenviado para aprovação.");
+    setTimeout(() => setSucessoLancamento(null), 6000);
+    router.refresh();
+  }
 
   async function salvarDetalhes() {
     setSalvandoDetalhes(true); setErroDetalhes(null);
@@ -1099,6 +1116,20 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
                     )}
                   </div>
                 </div>
+                {lancamentoAtual.situacao === "contestado" && (
+                  <div className="mt-3 bg-alerr-bg border border-alerr/30 rounded-md px-3 py-2.5">
+                    <div className="text-[12px] font-semibold text-alerr mb-0.5">Recusado — precisa de correção</div>
+                    {(lancamentoAtual as any).motivo_recusa && (
+                      <div className="text-[11.5px] text-[#7a3838] leading-snug">
+                        Motivo: {(lancamentoAtual as any).motivo_recusa}
+                      </div>
+                    )}
+                    <button onClick={reenviarParaAprovacao} disabled={reenviando}
+                      className="mt-2.5 w-full bg-amarelo text-[#1a1a1a] rounded-md py-2 text-[12px] font-semibold disabled:opacity-50">
+                      {reenviando ? "Reenviando..." : "Corrigi — reenviar para aprovação"}
+                    </button>
+                  </div>
+                )}
                 {(lancamentoAtual.situacao === "aprovado" || lancamentoAtual.situacao === "pago" || lancamentoAtual.situacao === "contestado") && (aprovadorNome || (lancamentoAtual as any).aprovado_em) && (
                   <div className="mt-3 pt-3 border-t border-linha2 text-[11.5px] text-[#6c757d]">
                     {lancamentoAtual.situacao === "contestado" ? "Recusado" : "Aprovado"} por <b className="text-[#1a1a1a]">{aprovadorNome ?? "—"}</b>
