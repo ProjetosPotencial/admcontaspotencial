@@ -180,7 +180,7 @@ export default function LojasClient({ lojas: lojasIniciais, statusInicial, empre
         </div>
       </div>
 
-      {aberta && <LojaDrawer loja={aberta} onClose={() => setAberta(null)} onSalvar={atualizarNaLista} empresas={empresas} />}
+      {aberta && <LojaDrawer loja={aberta} onClose={() => setAberta(null)} onSalvar={atualizarNaLista} onExcluir={(id) => { setLojas((ls) => ls.filter((l) => l.id !== id)); setAberta(null); }} empresas={empresas} />}
       {criando && (
         <NovaLojaDrawer
           empresas={empresas}
@@ -328,7 +328,7 @@ function NovaLojaDrawer({ onClose, onCriada, empresas }: { onClose: () => void; 
 }
 
 /* ---------------- ficha de loja existente ---------------- */
-function LojaDrawer({ loja, onClose, onSalvar, empresas }: { loja: Loja; onClose: () => void; onSalvar: (l: Loja) => void; empresas: { id: string; nome: string }[] }) {
+function LojaDrawer({ loja, onClose, onSalvar, onExcluir, empresas }: { loja: Loja; onClose: () => void; onSalvar: (l: Loja) => void; onExcluir: (id: string) => void; empresas: { id: string; nome: string }[] }) {
   const supabase = createClient();
   const [codigo, setCodigo] = useState(loja.codigo);
   const [coban, setCoban] = useState(loja.coban);
@@ -346,6 +346,9 @@ function LojaDrawer({ loja, onClose, onSalvar, empresas }: { loja: Loja; onClose
   const [encerrando, setEncerrando] = useState(false);
   const [motivo, setMotivo] = useState("");
   const [reativando, setReativando] = useState(false);
+  const [excluindoLoja, setExcluindoLoja] = useState(false);
+  const [confirmCodigo, setConfirmCodigo] = useState("");
+  const [excluindoAgora, setExcluindoAgora] = useState(false);
 
   function set<K extends keyof FormInst>(k: K, v: string) { setForm((f) => ({ ...f, [k]: v })); }
 
@@ -385,6 +388,22 @@ function LojaDrawer({ loja, onClose, onSalvar, empresas }: { loja: Loja; onClose
     if (error) { setAviso("Sem permissão para reativar esta loja."); return; }
     setStatus("ativo");
     onSalvar({ ...loja, status: "ativo", motivo_encerramento: null });
+  }
+
+  async function excluirLoja() {
+    setExcluindoAgora(true); setAviso(null);
+    // RPC SECURITY DEFINER: checa papel e apaga toda a cadeia (cofre/credenciais/lançamentos/contas/contratos/loja)
+    const { data, error } = await supabase.rpc("excluir_loja", { p_loja_id: loja.id });
+    setExcluindoAgora(false);
+    if (error) {
+      setAviso(/permiss|42501/i.test(error.message ?? "")
+        ? "Você não tem permissão para excluir lojas (só admin ou gestor)."
+        : "Não foi possível excluir a loja.");
+      return;
+    }
+    if (!data || Number(data) === 0) { setAviso("A loja não foi removida (pode já ter sido apagada)."); return; }
+    onExcluir(loja.id);
+    onClose();
   }
 
   return (
@@ -482,6 +501,35 @@ function LojaDrawer({ loja, onClose, onSalvar, empresas }: { loja: Loja; onClose
               )}
             </div>
           )}
+
+          <div className="card p-4 mt-4">
+            {!excluindoLoja ? (
+              <button onClick={() => { setExcluindoLoja(true); setConfirmCodigo(""); setAviso(null); }}
+                className="w-full text-[12px] font-semibold text-alerr hover:underline">
+                Excluir loja permanentemente
+              </button>
+            ) : (
+              <div>
+                <div className="font-disp text-[13px] font-semibold mb-1.5 text-alerr">Excluir permanentemente</div>
+                <div className="text-[11.5px] text-txt-2 mb-3 leading-snug">
+                  Apaga a loja <b>{loja.codigo}</b> e <b>tudo</b> ligado a ela (contas, lançamentos, contratos e credenciais). Não dá pra desfazer.
+                  Para confirmar, digite <b>{loja.codigo}</b> abaixo.
+                </div>
+                <input value={confirmCodigo} onChange={(e) => setConfirmCodigo(e.target.value)} placeholder={loja.codigo}
+                  className="w-full border border-alerr/40 rounded-[9px] px-3 py-2 text-[13px] mb-3 focus:outline-none focus:ring-2 focus:ring-alerr" />
+                <div className="flex gap-2">
+                  <button onClick={excluirLoja} disabled={confirmCodigo.trim() !== loja.codigo || excluindoAgora}
+                    className="flex-1 bg-alerr text-white rounded-[9px] py-2.5 text-[12.5px] font-semibold disabled:opacity-50">
+                    {excluindoAgora ? "Excluindo..." : "Excluir para sempre"}
+                  </button>
+                  <button onClick={() => { setExcluindoLoja(false); setConfirmCodigo(""); }}
+                    className="bg-white border border-linha text-txt-2 rounded-[9px] px-4 py-2.5 text-[12.5px] font-semibold">
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </aside>
     </>

@@ -12,7 +12,11 @@ export const dynamic = "force-dynamic";
 const TEMPLATES: Record<string, (d: any) => string> = {
   lancamento: (d) => `✅ *Nova conta lançada* — ${d.loja ?? "loja"} · ${d.tipo ?? "conta"}${d.valor ? ` · ${d.valor}` : ""}${d.por ? `\n_por ${d.por}_` : ""}`,
   aprovada:   (d) => `✔️ *Conta aprovada* — ${d.loja ?? "loja"} · ${d.tipo ?? "conta"}${d.valor ? ` · ${d.valor}` : ""}`,
-  reprovada:  (d) => `❌ *Conta reprovada* — ${d.loja ?? "loja"} · ${d.tipo ?? "conta"}${d.motivo ? `\nMotivo: ${d.motivo}` : ""}`,
+  reprovada:  (d) => `❌ *Conta reprovada* — ${d.loja ?? "loja"} · ${d.tipo ?? "conta"}${d.valor ? ` · ${d.valor}` : ""}${d.motivo ? `\nMotivo: ${d.motivo}` : ""}`,
+  conta_criada:    (d) => `🆕 *Nova conta cadastrada* — ${d.loja ?? "loja"} · ${d.tipo ?? "conta"}${d.fornecedor ? ` · ${d.fornecedor}` : ""}`,
+  conta_excluida:  (d) => `🗑️ *Conta excluída* — ${d.loja ?? "loja"} · ${d.tipo ?? "conta"}`,
+  fornecedor_novo: (d) => `🏭 *Novo fornecedor cadastrado* — ${d.fornecedor ?? "—"}`,
+  pagamento:       (d) => `💸 *Pagamento realizado* — ${d.loja ?? "loja"} · ${d.tipo ?? "conta"}${d.valor ? ` · ${d.valor}` : ""}`,
   encerrada:  (d) => `🏢 *Fornecedor encerrado* — ${d.loja ?? "loja"} · ${d.tipo ?? "conta"}\n_Não gera mais cobranças; cadastro mantido._`,
   reativada:  (d) => `🔄 *Fornecedor reativado* — ${d.loja ?? "loja"} · ${d.tipo ?? "conta"}`,
   loja_concluida: (d) => `🏪 *Loja concluída* — todas as contas de ${d.loja ?? "uma loja"} foram lançadas.`,
@@ -34,7 +38,10 @@ export async function POST(req: Request) {
     await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: montar(body) }),
+      body: JSON.stringify({
+        text: montar(body) +
+          `\n_${body.por ?? "sistema"} · ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}_`,
+      }),
     });
   } catch {
     // Slack fora do ar não pode quebrar o fluxo de quem está lançando

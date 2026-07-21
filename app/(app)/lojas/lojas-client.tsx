@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Loja } from "@/lib/loja-types";
 import { TIPOS, ORIGENS } from "@/lib/types";
+import { formatarDataSemFuso } from "@/lib/format";
 import { CAMPOS_TIPO } from "@/lib/campos-tipo";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 
@@ -345,6 +346,10 @@ function LojaDrawer({ loja, onClose, onSalvar, onExcluir, empresas }: { loja: Lo
   const [erro, setErro] = useState<string | null>(null);
   const [encerrando, setEncerrando] = useState(false);
   const [motivo, setMotivo] = useState("");
+  const [dataEncLoja, setDataEncLoja] = useState(() => new Date().toISOString().slice(0, 10));
+  const [contasLoja, setContasLoja] = useState<{ id: string; tipo: string; fornecedor_nome: string | null; data_encerramento: string | null }[] | null>(null);
+  // fornecedores que CONTINUAM ativos após o fechamento (id -> data própria de encerramento, "" = sem data)
+  const [mantidos, setMantidos] = useState<Record<string, string>>({});
   const [reativando, setReativando] = useState(false);
   const [excluindoLoja, setExcluindoLoja] = useState(false);
   const [confirmCodigo, setConfirmCodigo] = useState("");
@@ -367,14 +372,44 @@ function LojaDrawer({ loja, onClose, onSalvar, onExcluir, empresas }: { loja: Lo
     setTimeout(() => setAviso(null), 2000);
   }
 
+  async function abrirEncerramento() {
+    setEncerrando(true); setContasLoja(null); setMantidos({});
+    const { data } = await supabase.from("contas")
+      .select("id, tipo, fornecedor_nome, data_encerramento")
+      .eq("loja_id", loja.id).neq("status", "encerrado").order("tipo");
+    setContasLoja(data ?? []);
+  }
+
   async function confirmarEncerramento() {
-    if (!motivo.trim()) return;
+    if (!motivo.trim() || !dataEncLoja) return;
     setSalvando(true);
+
+    // 1) fecha a loja
     const { error } = await supabase.from("lojas")
-      .update({ status: "encerrada", motivo_encerramento: motivo.trim() })
+      .update({ status: "encerrada", motivo_encerramento: motivo.trim(), encerrada_em: new Date().toISOString() })
       .eq("id", loja.id);
+    if (error) { setSalvando(false); setAviso("Sem permissão para encerrar esta loja."); return; }
+
+    // 2) encerra os fornecedores NÃO mantidos, na data da loja
+    const paraEncerrar = (contasLoja ?? []).filter((c) => !(c.id in mantidos)).map((c) => c.id);
+    if (paraEncerrar.length) {
+      await supabase.from("contas").update({
+        status: "encerrado", data_encerramento: dataEncLoja,
+        motivo_encerramento: `Loja encerrada: ${motivo.trim()}`,
+      }).in("id", paraEncerrar);
+    }
+
+    // 3) os mantidos seguem ativos; se a pessoa deu uma data própria, agenda o fim deles
+    for (const [id, dataFim] of Object.entries(mantidos)) {
+      if (dataFim) {
+        await supabase.from("contas").update({
+          data_encerramento: dataFim,
+          motivo_encerramento: "Contrato mantido após o fechamento da loja",
+        }).eq("id", id);
+      }
+    }
+
     setSalvando(false);
-    if (error) { setAviso("Sem permissão para encerrar esta loja."); return; }
     onSalvar({ ...loja, status: "encerrada", motivo_encerramento: motivo.trim() });
     setEncerrando(false);
   }
@@ -477,18 +512,73 @@ function LojaDrawer({ loja, onClose, onSalvar, onExcluir, empresas }: { loja: Lo
           {loja.status !== "encerrada" && (
             <div className="card p-4 mt-4">
               {!encerrando ? (
-                <button onClick={() => setEncerrando(true)}
+                <button onClick={abrirEncerramento}
                   className="w-full text-[12.5px] font-semibold text-alerr border border-alerr/30 bg-alerr-bg rounded-[9px] py-2.5 hover:bg-alerr/10 transition">
                   Encerrar loja
                 </button>
               ) : (
                 <div>
-                  <div className="font-disp text-[13px] font-semibold mb-2">Motivo do encerramento</div>
+                  <div className="font-disp text-[13px] font-semibold mb-2">Encerrar loja</div>
+
+                  <label className="block mb-3">
+                    <div className="text-[11px] font-semibold text-txt-3 uppercase mb-1">Data de encerramento</div>
+                    <input type="date" value={dataEncLoja} onChange={(e) => setDataEncLoja(e.target.value)}
+                      className="w-full border border-linha rounded-[9px] px-3 py-2 text-[13px]" />
+                  </label>
+
+                  <div className="text-[11px] font-semibold text-txt-3 uppercase mb-1">Motivo</div>
                   <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)}
                     placeholder="Ex.: loja fechou, contrato encerrado..."
-                    className="w-full border border-linha rounded-[9px] px-3 py-2 text-[13px] mb-3 focus:outline-none focus:ring-2 focus:ring-amarelo" rows={3} />
+                    className="w-full border border-linha rounded-[9px] px-3 py-2 text-[13px] mb-3 focus:outline-none focus:ring-2 focus:ring-amarelo" rows={2} />
+
+                  {/* fornecedores da loja */}
+                  <div className="border border-linha rounded-[9px] p-3 mb-3">
+                    <div className="text-[12.5px] font-semibold mb-1">Quais fornecedores continuam ativos?</div>
+                    <div className="text-[11px] text-txt-3 mb-2.5 leading-snug">
+                      Os não marcados serão encerrados em {dataEncLoja ? formatarDataSemFuso(dataEncLoja) : "—"}.
+                      Marque os que seguem gerando contas e, se quiser, defina a data final de cada um.
+                    </div>
+
+                    {contasLoja === null && <div className="text-[12px] text-txt-3">Carregando fornecedores...</div>}
+                    {contasLoja?.length === 0 && <div className="text-[12px] text-txt-3">Esta loja não tem contas ativas.</div>}
+
+                    <div className="space-y-1.5 max-h-[230px] overflow-y-auto">
+                      {(contasLoja ?? []).map((c) => {
+                        const T = TIPOS[c.tipo];
+                        const mantido = c.id in mantidos;
+                        return (
+                          <div key={c.id} className="flex items-center gap-2 text-[12.5px]">
+                            <input type="checkbox" checked={mantido} className="w-4 h-4 shrink-0"
+                              onChange={(e) => setMantidos((m) => {
+                                const n = { ...m };
+                                if (e.target.checked) n[c.id] = ""; else delete n[c.id];
+                                return n;
+                              })} />
+                            <span className="w-[7px] h-[7px] rounded-full shrink-0" style={{ background: T?.c }} />
+                            <span className="font-medium">{T?.n ?? c.tipo}</span>
+                            <span className="text-txt-3 truncate flex-1">{c.fornecedor_nome ?? "sem fornecedor"}</span>
+                            {mantido ? (
+                              <input type="date" value={mantidos[c.id]} title="Data de encerramento deste fornecedor"
+                                onChange={(e) => setMantidos((m) => ({ ...m, [c.id]: e.target.value }))}
+                                className="border border-linha rounded-md px-1.5 py-1 text-[11px] shrink-0" />
+                            ) : (
+                              <span className="text-[10.5px] text-alerr shrink-0">encerra junto</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {Object.keys(mantidos).length > 0 && (
+                      <div className="mt-2.5 text-[11px] text-info bg-info-bg rounded-md px-2 py-1.5">
+                        {Object.keys(mantidos).length} {Object.keys(mantidos).length === 1 ? "fornecedor continua" : "fornecedores continuam"} ativo(s).
+                        Sem data definida, seguem até você encerrar manualmente.
+                      </div>
+                    )}
+                  </div>
+
                   <div className="flex gap-2">
-                    <button onClick={confirmarEncerramento} disabled={!motivo.trim() || salvando}
+                    <button onClick={confirmarEncerramento} disabled={!motivo.trim() || !dataEncLoja || salvando}
                       className="flex-1 bg-alerr text-white rounded-[9px] py-2.5 text-[12.5px] font-semibold disabled:opacity-50">
                       {salvando ? "Encerrando..." : "Confirmar encerramento"}
                     </button>

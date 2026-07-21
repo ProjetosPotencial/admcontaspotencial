@@ -12,15 +12,11 @@ export default async function AprovacoesPage() {
   const { ano, mes } = obterPeriodoSelecionado();
 
   const [{ data }, { data: resumoRaw }] = await Promise.all([
-    // pendências NÃO são filtradas por período: uma solicitação fica visível
-    // até ser aprovada, reprovada ou cancelada — trocar de mês não pode
-    // fazer ela sumir da fila.
     supabase
       .from("lancamentos")
-      .select("id, ano, mes, valor, situacao, observacao, lancado_em, lancado_por, comprovante_url, comprovante_drive_url, codigo_barras, contas!inner ( tipo, fornecedor_nome, identificador, eh_rateio, lojas ( codigo, coban, cidade, uf, empresas ( nome ) ) )")
-      .eq("situacao", "lancado")
-      .order("lancado_em", { ascending: true })
-      .limit(500),
+      .select("id, valor, situacao, comprovante_url, comprovante_drive_url, codigo_barras, contas!inner ( tipo, fornecedor_nome, eh_rateio, lojas ( codigo, coban, cidade, uf, empresas ( nome ) ) )")
+      .eq("ano", ano).eq("mes", mes).eq("situacao", "lancado")
+      .limit(50),
     supabase.from("lancamentos").select("valor, situacao").eq("ano", ano).eq("mes", mes).in("situacao", ["aprovado", "pago", "contestado"]),
   ]);
 
@@ -34,12 +30,5 @@ export default async function AprovacoesPage() {
     { aprovado: { qtd: 0, total: 0 }, contestado: { qtd: 0, total: 0 } }
   );
 
-  // nomes de quem solicitou (para exibir no card e filtrar por solicitante)
-  const ids = Array.from(new Set((data ?? []).map((l: any) => l.lancado_por).filter(Boolean)));
-  const { data: perfis } = ids.length
-    ? await supabase.from("perfis").select("id, nome").in("id", ids)
-    : { data: [] as { id: string; nome: string }[] };
-  const solicitantes = Object.fromEntries((perfis ?? []).map((p: any) => [p.id, p.nome ?? "—"]));
-
-  return <AprovacoesClient itens={(data ?? []) as any[]} resumoMes={resumo} solicitantes={solicitantes} />;
+  return <AprovacoesClient itens={(data ?? []) as any[]} resumoMes={resumo} />;
 }
