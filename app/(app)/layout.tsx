@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getMenuParaUsuario } from "@/lib/menu-cache";
 import { obterPeriodoSelecionado } from "@/lib/periodo";
 import Sidebar from "@/components/sidebar";
+import SincronizacaoTempoReal from "@/components/sincronizacao-tempo-real";
 import TopNav from "@/components/topnav";
 import AppShell from "@/components/app-shell";
 import IaFlutuante from "@/components/ia-flutuante";
@@ -31,7 +32,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </Suspense>
       <div className="flex-1 flex flex-col min-w-0">
         <TopNav mes={mes} ano={ano} ehPeriodoAtual={ehPeriodoAtual} />
-        <main className="flex-1 min-w-0">{children}</main>
+        <main className="flex-1 min-w-0"><SincronizacaoTempoReal />{children}</main>
       </div>
       <IaFlutuante />
     </AppShell>
