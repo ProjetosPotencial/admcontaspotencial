@@ -52,6 +52,7 @@ export default async function PainelPage() {
     { count: totalLojasFechadas },
     { count: totalLojasAtivas },
     { data: atividadeRecente },
+    { data: contratosAtivos },
     { data: metricaAnterior },
   ] = await Promise.all([
     supabase.from("perfis").select("nome").eq("id", session?.user.id ?? "").maybeSingle(),
@@ -69,6 +70,7 @@ export default async function PainelPage() {
     supabase.from("lancamentos")
       .select("id, valor, lancado_em, situacao, lancado_por, contas!inner ( tipo, lojas ( codigo ) )")
       .not("lancado_em", "is", null).order("lancado_em", { ascending: false }).limit(8),
+    supabase.from("contratos").select("numero, data_fim, status").eq("status", "ativo"),
     supabase.from("metricas_mensais").select("contas_ativas, a_lancar, aguardando_pagamento, origem_a_mapear").eq("ano", anoAnterior).eq("mes", mesAnterior).maybeSingle(),
   ]);
 
@@ -187,7 +189,7 @@ export default async function PainelPage() {
   const alertasIA = gerarAlertas(
     (lancamentos ?? []) as any,
     historicoValores,
-    cal, ano, mes
+    cal, ano, mes, new Date(), (contratosAtivos ?? []) as any
   );
 
 

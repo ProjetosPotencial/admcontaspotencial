@@ -41,7 +41,8 @@ export function gerarAlertas(
   cal: { calendario: Calendario; regra: RegraVencimento },
   ano: number,
   mes: number,
-  hoje: Date = new Date()
+  hoje: Date = new Date(),
+  contratos: { numero?: string | null; data_fim: string | null; status: string }[] = []
 ): Alerta[] {
   const alertas: Alerta[] = [];
   const emAberto = lancamentos.filter((l) => l.situacao === "pendente");
@@ -152,6 +153,37 @@ export function gerarAlertas(
       detalhe: "Provavelmente sobra de antes do encerramento.",
       href: "/contas",
       prioridade: "baixa",
+    });
+  }
+
+  // ---- 5. contratos vencendo ----
+  const base = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).getTime();
+  const contratosAlvo = contratos
+    .filter((c) => c.status === "ativo" && c.data_fim)
+    .map((c) => {
+      const [a2, m2, d2] = (c.data_fim as string).split("-").map(Number);
+      return { c, dias: Math.round((new Date(a2, m2 - 1, d2).getTime() - base) / 86400000) };
+    })
+    .filter((x) => x.dias <= 45);
+
+  const vencidos = contratosAlvo.filter((x) => x.dias < 0).length;
+  const proximos = contratosAlvo.filter((x) => x.dias >= 0).length;
+
+  if (vencidos > 0) {
+    alertas.push({
+      chave: "contrato-vencido", icone: "📑",
+      titulo: `${vencidos} ${vencidos === 1 ? "contrato ativo já venceu" : "contratos ativos já venceram"}`,
+      detalhe: "Renovar ou encerrar para o valor parar de contar.",
+      href: "/contratos", prioridade: "alta",
+    });
+  }
+  if (proximos > 0) {
+    const maisProximo = contratosAlvo.filter((x) => x.dias >= 0).sort((a, b) => a.dias - b.dias)[0];
+    alertas.push({
+      chave: "contrato-vencendo", icone: "⏳",
+      titulo: `${proximos} ${proximos === 1 ? "contrato vence" : "contratos vencem"} nos próximos 45 dias`,
+      detalhe: maisProximo?.c.numero ? `O mais próximo é o ${maisProximo.c.numero}, em ${maisProximo.dias} dias.` : undefined,
+      href: "/contratos", prioridade: maisProximo && maisProximo.dias <= 15 ? "alta" : "media",
     });
   }
 

@@ -26,25 +26,6 @@ export default function ContratosClient({ contratos: iniciais, lojas, empresas, 
   const [criando, setCriando] = useState(false);
   const [editando, setEditando] = useState<ContratoRow | null>(null);
 
-  // quantos dias faltam para o contrato acabar (null = sem data de fim)
-  const diasParaFim = (dataFim: string | null) => {
-    if (!dataFim) return null;
-    const [a, m, d] = dataFim.split("-").map(Number);
-    const fim = new Date(a, m - 1, d).getTime();
-    const hoje = new Date();
-    const base = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).getTime();
-    return Math.round((fim - base) / 86400000);
-  };
-
-  const ativos = useMemo(() => contratos.filter((c) => c.status === "ativo"), [contratos]);
-  const vencendo = useMemo(() => ativos
-    .map((c) => ({ c, dias: diasParaFim(c.data_fim) }))
-    .filter((x) => x.dias !== null && x.dias <= 90)
-    .sort((a, b) => (a.dias ?? 0) - (b.dias ?? 0)), [ativos]);
-  const vencidos = vencendo.filter((x) => (x.dias ?? 0) < 0);
-  const em30 = vencendo.filter((x) => (x.dias ?? 0) >= 0 && (x.dias ?? 0) <= 30);
-  const valorMensal = ativos.reduce((s2, c) => s2 + Number(c.valor ?? 0), 0);
-
   const filtrados = useMemo(() => contratos.filter((c) => {
     const s = fStatus === "todos" || c.status === fStatus;
     const q = buscaDebounced === "" || c.numero.toLowerCase().includes(buscaDebounced.toLowerCase()) || (c.lojas?.codigo ?? "").toLowerCase().includes(buscaDebounced.toLowerCase());
@@ -57,57 +38,6 @@ export default function ContratosClient({ contratos: iniciais, lojas, empresas, 
 
   return (
     <>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        {[
-          { rot: "Contratos ativos", val: String(ativos.length), sub: `${contratos.length} no total`, cor: "#2A74C4" },
-          { rot: "Vencem em 30 dias", val: String(em30.length), sub: em30.length ? "renovar ou encerrar" : "nada no radar", cor: "#E6A600" },
-          { rot: "Já vencidos", val: String(vencidos.length), sub: vencidos.length ? "precisam de decisão" : "nenhum pendente", cor: "#D32F2F" },
-          { rot: "Valor mensal", val: money(valorMensal), sub: "soma dos ativos", cor: "#2E7D32" },
-        ].map((k) => (
-          <div key={k.rot} className="card p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11.5px] font-semibold text-[#6c757d]">{k.rot}</span>
-              <span className="w-2 h-2 rounded-full" style={{ background: k.cor }} />
-            </div>
-            <div className="font-disp font-bold text-[#1a1a1a] text-[22px] leading-none tracking-tight">{k.val}</div>
-            <div className="text-[11px] text-[#adb5bd] mt-1.5">{k.sub}</div>
-          </div>
-        ))}
-      </div>
-
-      {vencendo.length > 0 && (
-        <div className="card p-4 mb-4" style={{ background: "#FFFBF0", borderColor: "#F0DFAE" }}>
-          <div className="flex items-center gap-2 mb-2.5">
-            <span className="text-[14px]">⏳</span>
-            <h3 className="font-disp text-[13.5px] font-semibold text-[#1a1a1a]">
-              {vencendo.length === 1 ? "1 contrato precisa de atenção" : `${vencendo.length} contratos precisam de atenção`}
-            </h3>
-          </div>
-          <div className="space-y-1.5">
-            {vencendo.slice(0, 6).map(({ c, dias }) => {
-              const d = dias ?? 0;
-              const cor = d < 0 ? "#D32F2F" : d <= 30 ? "#E6A600" : "#6c757d";
-              const texto = d < 0 ? `venceu há ${Math.abs(d)} ${Math.abs(d) === 1 ? "dia" : "dias"}`
-                : d === 0 ? "vence hoje"
-                : `vence em ${d} ${d === 1 ? "dia" : "dias"}`;
-              return (
-                <button key={c.id} onClick={() => setEditando(c)}
-                  className="w-full flex items-center gap-2.5 text-[12.5px] text-left rounded px-1.5 py-1 hover:bg-white/60 transition">
-                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: cor }} />
-                  <b className="font-mono text-[11.5px]">{c.numero}</b>
-                  <span className="text-[#495057] truncate flex-1">{c.lojas?.codigo ?? "—"} · {c.tipo ?? "contrato"}</span>
-                  {c.valor ? <span className="font-mono text-[11.5px] text-[#6c757d] shrink-0">{money(Number(c.valor))}</span> : null}
-                  <span className="font-semibold shrink-0" style={{ color: cor }}>{texto}</span>
-                </button>
-              );
-            })}
-            {vencendo.length > 6 && (
-              <div className="text-[11px] text-[#6c757d] pt-1">e mais {vencendo.length - 6}...</div>
-            )}
-          </div>
-        </div>
-      )}
-
       <div className="flex flex-wrap items-center gap-2.5 mb-4">
         <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar número ou loja..."
           className="h-10 bg-[#f8f9fa] border border-linha rounded-md px-3 text-[13px] min-w-[200px] flex-1" />
@@ -140,17 +70,6 @@ export default function ContratosClient({ contratos: iniciais, lojas, empresas, 
                 <td className="px-4 text-[12px] text-[#6c757d] font-mono">
                   {c.data_inicio ? formatarDataSemFuso(c.data_inicio) : "—"}
                   {c.data_fim ? ` – ${formatarDataSemFuso(c.data_fim)}` : ""}
-                  {(() => {
-                    if (c.status !== "ativo") return null;
-                    const d = diasParaFim(c.data_fim);
-                    if (d === null || d > 90) return null;
-                    const cor = d < 0 ? "#D32F2F" : d <= 30 ? "#E6A600" : "#6c757d";
-                    return (
-                      <span className="ml-1.5 text-[10.5px] font-semibold" style={{ color: cor }}>
-                        {d < 0 ? "vencido" : d === 0 ? "vence hoje" : `${d}d`}
-                      </span>
-                    );
-                  })()}
                 </td>
                 <td className="px-4 text-[13px] font-mono font-semibold">{money(c.valor)}</td>
                 <td className="px-4"><span className={`badge ${STATUS_CLS[c.status] ?? ""}`}>{c.status}</span></td>
