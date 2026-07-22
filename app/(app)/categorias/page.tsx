@@ -1,10 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { TIPOS } from "@/lib/types";
 import TipoIcon from "@/components/tipo-icon";
+import { podeAcessar, SemPermissao } from "@/lib/permissoes";
 
 export const dynamic = "force-dynamic";
 
 export default async function CategoriasPage() {
+  if (!(await podeAcessar("/categorias"))) return <SemPermissao modulo="Cadastros" />;
   const supabase = createClient();
   const { data } = await supabase
     .from("contas")

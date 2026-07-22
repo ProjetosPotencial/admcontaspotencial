@@ -55,3 +55,12 @@ export async function getMenuParaUsuario(userId: string, papel: string) {
     return (RANK[item.papel_minimo] ?? 0) <= meuRank;               // padrão do papel
   });
 }
+
+// Primeira rota que o usuário TEM permissão de abrir, seguindo a ordem do
+// menu. É o destino do redirecionamento após o login e também para onde
+// mandamos alguém que caiu numa página sem acesso. Retorna null quando a
+// pessoa não pode abrir nenhum módulo - o chamador decide o que mostrar.
+export async function getRotaInicial(userId: string, papel: string): Promise<string | null> {
+  const itens = await getMenuParaUsuario(userId, papel);
+  return itens[0]?.href ?? null;
+}

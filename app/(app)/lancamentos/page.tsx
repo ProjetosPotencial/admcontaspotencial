@@ -5,10 +5,12 @@ import { formatarPeriodo, estaAtrasada } from "@/lib/date-utils";
 import { obterPeriodoSelecionado } from "@/lib/periodo";
 import { money } from "@/lib/format";
 import Link from "next/link";
+import { podeAcessar, SemPermissao } from "@/lib/permissoes";
 
 export const dynamic = "force-dynamic";
 
 export default async function LancamentosPage() {
+  if (!(await podeAcessar("/lancamentos"))) return <SemPermissao modulo="Lançamentos" />;
   const supabase = createClient();
   const { ano, mes, ehPeriodoAtual } = obterPeriodoSelecionado();
   const cal = await carregarCalendario(ano);

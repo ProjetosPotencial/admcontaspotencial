@@ -3,10 +3,12 @@ import MenuAdminClient from "./menu-admin-client";
 import CalendarioAdminClient from "./calendario-admin-client";
 import TestarSlackButton from "./testar-slack-button";
 import TrocarSenhaForm from "./trocar-senha-form";
+import { podeAcessar, SemPermissao } from "@/lib/permissoes";
 
 export const dynamic = "force-dynamic";
 
 export default async function ConfiguracoesPage() {
+  if (!(await podeAcessar("/configuracoes"))) return <SemPermissao modulo="Configurações" />;
   const supabase = createClient();
   const { data: { session } } = await supabase.auth.getSession();
   const user = session?.user;
