@@ -216,6 +216,9 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
   const [itensPorPagina, setItensPorPagina] = useState(25);
   const [aberta, setAberta] = useState<Conta | null>(null);
   const [criando, setCriando] = useState(false);
+  // Ordenação da tabela. Padrão: vencimento crescente (vencidas mais
+  // antigas -> vence hoje -> a vencer), independente do filtro aplicado.
+  const [ordem, setOrdem] = useState<{ campo: "venc" | "loja" | "fornecedor" | "status"; dir: "asc" | "desc" }>({ campo: "venc", dir: "asc" });
 
   // abre direto a conta específica quando a URL vem com ?conta=id (ex.: um
   // clique em "atrasada" no Painel ou em Alertas) - sem isso, a pessoa cai
@@ -248,16 +251,57 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
     });
   }, [contas, fTipo, fCoban, fStatus, fSituacao, buscaDebounced, situacaoPorConta, cal]);
 
-  useEffect(() => { setPagina(1); }, [fTipo, fCoban, fStatus, fSituacao, buscaDebounced]);
+  // Ordena o resultado JÁ filtrado. Vencimento é o critério padrão: como
+  // todas as contas estão no mesmo mês/ano, ordenar pelo dia_vencimento
+  // crescente produz exatamente vencidas (mais antigas) -> vence hoje ->
+  // a vencer crescente. Contas sem vencimento definido ficam sempre no fim.
+  const ordenadas = useMemo(() => {
+    const dir = ordem.dir === "asc" ? 1 : -1;
+    const rankStatus = (s?: string) => (s === "ativo" ? 0 : s === "inativo" ? 1 : s === "encerrado" ? 2 : 3);
+    const dvKey = (c: Conta) => (c.dia_vencimento == null ? Number.POSITIVE_INFINITY : c.dia_vencimento);
+    const base = (a: Conta, b: Conta) => {
+      switch (ordem.campo) {
+        case "loja": return (a.lojas?.codigo ?? "").localeCompare(b.lojas?.codigo ?? "", "pt-BR");
+        case "fornecedor": return (a.fornecedor_nome ?? "").localeCompare(b.fornecedor_nome ?? "", "pt-BR");
+        case "status": return rankStatus(a.status) - rankStatus(b.status);
+        default: return 0;
+      }
+    };
+    return [...filtradas].sort((a, b) => {
+      if (ordem.campo === "venc") {
+        const an = a.dia_vencimento == null, bn = b.dia_vencimento == null;
+        if (an || bn) return an === bn ? 0 : an ? 1 : -1; // sem venc -> fim, sempre
+        const r = (a.dia_vencimento! - b.dia_vencimento!) * dir;
+        return r !== 0 ? r : (a.fornecedor_nome ?? "").localeCompare(b.fornecedor_nome ?? "", "pt-BR");
+      }
+      const r = base(a, b) * dir;
+      return r !== 0 ? r : dvKey(a) - dvKey(b); // desempate sempre por vencimento
+    });
+  }, [filtradas, ordem]);
 
-  const totalPaginas = Math.max(Math.ceil(filtradas.length / itensPorPagina), 1);
+  useEffect(() => { setPagina(1); }, [fTipo, fCoban, fStatus, fSituacao, buscaDebounced, ordem]);
+
+  const totalPaginas = Math.max(Math.ceil(ordenadas.length / itensPorPagina), 1);
   const paginaSegura = Math.min(pagina, totalPaginas);
   const inicio = (paginaSegura - 1) * itensPorPagina;
-  const visiveis = filtradas.slice(inicio, inicio + itensPorPagina);
+  const visiveis = ordenadas.slice(inicio, inicio + itensPorPagina);
 
   const limparFiltros = () => { setFTipo("todos"); setFCoban("todos"); setFStatus("todos"); setFSituacao("todos"); setBusca(""); };
   const temFiltro = fTipo !== "todos" || fCoban !== "todos" || fStatus !== "todos" || fSituacao !== "todos" || busca !== "";
   const chips = ["todos", ...Object.keys(TIPOS)];
+
+  const COLUNAS: { label: string; campo?: "venc" | "loja" | "fornecedor" | "status"; sortable: boolean }[] = [
+    { label: "Loja", campo: "loja", sortable: true },
+    { label: "Tipo", sortable: false },
+    { label: "Fornecedor", campo: "fornecedor", sortable: true },
+    { label: "Venc.", campo: "venc", sortable: true },
+    { label: "Origem", sortable: false },
+    { label: "Status", campo: "status", sortable: true },
+    { label: "", sortable: false },
+  ];
+  function alternarOrdem(campo: "venc" | "loja" | "fornecedor" | "status") {
+    setOrdem((o) => (o.campo === campo ? { campo, dir: o.dir === "asc" ? "desc" : "asc" } : { campo, dir: "asc" }));
+  }
 
   return (
     <>
@@ -318,9 +362,25 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
         <div className="overflow-x-auto"><table className="w-full border-collapse min-w-[720px]">
           <thead>
             <tr className="bg-[#f1f3f5] h-12">
-              {["Loja", "Tipo", "Fornecedor", "Venc.", "Origem", "Status", ""].map((h) => (
-                <th key={h} className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">{h}</th>
-              ))}
+              {COLUNAS.map((col) => {
+                const ativa = col.sortable && ordem.campo === col.campo;
+                return (
+                  <th key={col.label || "acao"} className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">
+                    {col.sortable ? (
+                      <button
+                        onClick={() => alternarOrdem(col.campo!)}
+                        className="inline-flex items-center gap-1 hover:text-amb transition select-none"
+                        title="Ordenar por esta coluna"
+                      >
+                        {col.label}
+                        <span className={`text-[10px] leading-none ${ativa ? "text-amb" : "text-[#c4c4c4]"}`}>
+                          {ativa ? (ordem.dir === "asc" ? "▲" : "▼") : "⇅"}
+                        </span>
+                      </button>
+                    ) : col.label}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
