@@ -4,6 +4,7 @@ import { TIPOS } from "@/lib/types";
 import TipoIcon from "@/components/tipo-icon";
 import { carregarCalendario } from "@/lib/calendario-server";
 import { obterPeriodoAtual, estaAtrasada } from "@/lib/date-utils";
+import { podeAcessar, SemPermissao } from "@/lib/permissoes";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ function agruparPorTipo(itens: any[]): [string, any[]][] {
 }
 
 export default async function AlertasPage() {
+  if (!(await podeAcessar("/alertas"))) return <SemPermissao modulo="Alertas" />;
   const supabase = createClient();
   const { ano, mes } = obterPeriodoAtual();
   const cal = await carregarCalendario(ano);

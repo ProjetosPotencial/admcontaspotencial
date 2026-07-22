@@ -12,7 +12,7 @@ import CalendarioMes, { type DiaCal } from "./calendario-mes";
 import DonutTipos, { type FatiaTipo } from "./donut-tipos";
 import ContadorAnimado from "@/components/contador-animado";
 import Link from "next/link";
-import { podeAcessar } from "@/lib/permissoes";
+import { podeAcessar, SemPermissao } from "@/lib/permissoes";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +31,7 @@ function saudacao(): string {
 }
 
 export default async function PainelPage() {
+  if (!(await podeAcessar("/painel"))) return <SemPermissao modulo="Painel" />;
   const supabase = createClient();
   const { ano, mes, mesAnterior, anoAnterior, ehPeriodoAtual } = obterPeriodoSelecionado();
   const cal = await carregarCalendario(ano);

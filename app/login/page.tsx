@@ -42,7 +42,7 @@ function LoginForm() {
       setErro("E-mail ou senha incorretos.");
       return;
     }
-    router.push("/painel");
+    router.push("/inicio");
     router.refresh();
   }
 
