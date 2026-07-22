@@ -1,3 +1,4 @@
+import { podeAcessar, SemPermissao } from "@/lib/permissoes";
 const REGRAS = [
   {
     tipo: "Valor mensal", cor: "#1976d2",
@@ -16,7 +17,8 @@ const REGRAS = [
   },
 ];
 
-export default function RegrasAprovacaoPage() {
+export default async function RegrasAprovacaoPage() {
+  if (!(await podeAcessar("/regras-aprovacao"))) return <SemPermissao modulo="Regras de Aprovação" />;
   return (
     <>
       <div className="px-4 sm:px-8 py-6 sm:py-8">

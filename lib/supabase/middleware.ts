@@ -31,7 +31,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
   if (user && path.startsWith("/login")) {
-    return NextResponse.redirect(new URL("/painel", request.url));
+    return NextResponse.redirect(new URL("/inicio", request.url));
   }
   return response;
 }

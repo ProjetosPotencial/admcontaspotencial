@@ -1,10 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import LojasClient from "./lojas-client";
 import type { Loja } from "@/lib/loja-types";
+import { podeAcessar, SemPermissao } from "@/lib/permissoes";
 
 export const dynamic = "force-dynamic";
 
 export default async function LojasPage({ searchParams }: { searchParams: { status?: string } }) {
+  if (!(await podeAcessar("/lojas"))) return <SemPermissao modulo="Lojas" />;
   const supabase = createClient();
   const [{ data }, { data: empresas }] = await Promise.all([
     supabase

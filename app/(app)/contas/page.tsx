@@ -7,10 +7,12 @@ import { formatarPeriodo, estaAtrasada, variacaoPct, contaValidaNoPeriodo } from
 import { obterPeriodoSelecionado } from "@/lib/periodo";
 import { money, MES } from "@/lib/format";
 import Link from "next/link";
+import { podeAcessar, SemPermissao } from "@/lib/permissoes";
 
 export const dynamic = "force-dynamic";
 
 export default async function ContasPage() {
+  if (!(await podeAcessar("/contas"))) return <SemPermissao modulo="Contas" />;
   const supabase = createClient();
   const { ano, mes, mesAnterior, anoAnterior, ehPeriodoAtual } = obterPeriodoSelecionado();
   const cal = await carregarCalendario(ano);

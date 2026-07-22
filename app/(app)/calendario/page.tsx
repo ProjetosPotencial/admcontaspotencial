@@ -1,9 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { TIPOS } from "@/lib/types";
+import { podeAcessar, SemPermissao } from "@/lib/permissoes";
 
 export const dynamic = "force-dynamic";
 
 export default async function CalendarioPage() {
+  if (!(await podeAcessar("/calendario"))) return <SemPermissao modulo="Calendário" />;
   const supabase = createClient();
   const { data } = await supabase
     .from("contas")
