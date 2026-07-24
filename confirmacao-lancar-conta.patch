@@ -1,0 +1,229 @@
+diff --git a/app/(app)/caixa-entrada/caixa-entrada-client.tsx b/app/(app)/caixa-entrada/caixa-entrada-client.tsx
+index dc43e1c..935c3ba 100644
+--- a/app/(app)/caixa-entrada/caixa-entrada-client.tsx
++++ b/app/(app)/caixa-entrada/caixa-entrada-client.tsx
+@@ -13,13 +13,31 @@ type Item = {
+   competencia_ano?: number | null; competencia_mes?: number | null;
+ };
+ 
++type Loja = { id: string; codigo: string; empresas?: { nome: string | null } | null };
++
++/** Dados que a janela de confirmação mostra antes de lançar de verdade. */
++type Previa = {
++  loja: string;
++  empresa: string;
++  fornecedor: string;
++  valor: number | null;
++  vencimento: string;
++  formaPagamento: string;
++  contaNova: boolean;
++  ano: number;
++  mes: number;
++  lojaId: string;
++  tipo: string;
++  origem: string;
++};
++
+ const CONFIANCA_LABEL: Record<string, { texto: string; cor: string }> = {
+   alta: { texto: "Confiança alta", cor: "bg-ok-bg text-ok" },
+   media: { texto: "Confiança média - confere antes", cor: "bg-amb-bg text-amb" },
+   baixa: { texto: "Não identificado - escolhe manual", cor: "bg-alerr-bg text-alerr" },
+ };
+ 
+-export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { itens: Item[]; lojas: { id: string; codigo: string }[] }) {
++export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { itens: Item[]; lojas: Loja[] }) {
+   const supabase = createClient();
+   const [itens, setItens] = useState(itensIniciais);
+   const [processando, setProcessando] = useState<string | null>(null);
+@@ -40,7 +58,7 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
+     setTimeout(() => setToast(null), 3500);
+   }
+ 
+-  async function confirmar(item: Item, lojaId: string, tipo: string, ano: number, mes: number, origem: string) {
++  async function confirmar(item: Item, lojaId: string, tipo: string, ano: number, mes: number, origem: string, previa?: Previa) {
+     setProcessando(item.id);
+     try {
+       const { data: conta } = await supabase.from("contas").select("id").eq("loja_id", lojaId).eq("tipo", tipo).eq("status", "ativo").maybeSingle();
+@@ -70,12 +88,18 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
+       }).eq("id", item.id);
+ 
+       setItens((lista) => lista.filter((i) => i.id !== item.id));
+-      setToast("Lançado com sucesso! Já está na fila de Aprovações.");
++      // mensagem detalhada: confirma o que saiu da caixa e virou lançamento
++      setToast([
++        "Conta lançada com sucesso!",
++        previa?.loja ? `Loja: ${previa.loja}` : null,
++        previa?.vencimento && previa.vencimento !== "—" ? `Vencimento: ${previa.vencimento}` : null,
++        "Já está na fila de Aprovações.",
++      ].filter(Boolean).join("\n"));
+     } catch {
+       setToast("Erro ao confirmar.");
+     }
+     setProcessando(null);
+-    setTimeout(() => setToast(null), 3000);
++    setTimeout(() => setToast(null), 5000);
+   }
+ 
+   async function rejeitar(item: Item) {
+@@ -109,7 +133,7 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
+       )}
+ 
+       {toast && (
+-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-ebano text-white px-5 py-3 rounded-lg text-[13px] shadow-forte z-50">
++        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-ebano text-white px-5 py-3 rounded-lg text-[13px] shadow-forte z-50 whitespace-pre-line text-center">
+           {toast}
+         </div>
+       )}
+@@ -118,8 +142,8 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
+ }
+ 
+ function ItemCard({ item, lojas, processando, onConfirmar, onRejeitar }: {
+-  item: Item; lojas: { id: string; codigo: string }[]; processando: boolean;
+-  onConfirmar: (item: Item, lojaId: string, tipo: string, ano: number, mes: number, origem: string) => void; onRejeitar: (item: Item) => void;
++  item: Item; lojas: Loja[]; processando: boolean;
++  onConfirmar: (item: Item, lojaId: string, tipo: string, ano: number, mes: number, origem: string, previa?: Previa) => void; onRejeitar: (item: Item) => void;
+ }) {
+   const [lojaId, setLojaId] = useState(item.loja_sugerida_id ?? "");
+   const [tipo, setTipo] = useState(item.tipo_detectado ?? "");
+@@ -134,12 +158,41 @@ function ItemCard({ item, lojas, processando, onConfirmar, onRejeitar }: {
+   });
+   const [buscaLoja, setBuscaLoja] = useState("");
+   const [buscandoLoja, setBuscandoLoja] = useState(false);
++  const [previa, setPrevia] = useState<Previa | null>(null);
++  const [carregandoPrevia, setCarregandoPrevia] = useState(false);
+   const conf = CONFIANCA_LABEL[item.confianca];
+   const lojaSelecionada = lojas.find((l) => l.id === lojaId);
+   const lojasFiltradas = buscaLoja.trim()
+     ? lojas.filter((l) => l.codigo.toLowerCase().includes(buscaLoja.toLowerCase())).slice(0, 30)
+     : lojas.slice(0, 30);
+ 
++  // Monta os dados da confirmação. Fornecedor e vencimento vêm da conta
++  // cadastrada (loja + tipo); se ela ainda não existe, o lançamento vai
++  // criá-la — e a janela avisa isso em vez de mostrar campos vazios.
++  async function abrirConfirmacao() {
++    const [a, m] = comp.split("-").map(Number);
++    setCarregandoPrevia(true);
++    const supabase = createClient();
++    const { data: conta } = await supabase
++      .from("contas")
++      .select("fornecedor_nome, dia_vencimento")
++      .eq("loja_id", lojaId).eq("tipo", tipo).eq("status", "ativo")
++      .maybeSingle();
++    setCarregandoPrevia(false);
++
++    const dia = conta?.dia_vencimento ?? null;
++    setPrevia({
++      loja: lojaSelecionada?.codigo ?? "—",
++      empresa: lojaSelecionada?.empresas?.nome ?? "—",
++      fornecedor: conta?.fornecedor_nome ?? "—",
++      valor: item.valor_detectado,
++      vencimento: dia ? `${String(dia).padStart(2, "0")}/${String(m).padStart(2, "0")}/${a}` : "—",
++      formaPagamento: ORIGENS[origem] ?? origem,
++      contaNova: !conta,
++      ano: a, mes: m, lojaId, tipo, origem,
++    });
++  }
++
+   return (
+     <div className="card p-4">
+       <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
+@@ -206,12 +259,74 @@ function ItemCard({ item, lojas, processando, onConfirmar, onRejeitar }: {
+       </div>
+ 
+       <div className="flex gap-2">
+-        <button onClick={() => { const [a, m] = comp.split("-").map(Number); onConfirmar(item, lojaId, tipo, a, m, origem); }} disabled={!lojaId || !tipo || !comp || processando}
++        <button onClick={abrirConfirmacao} disabled={!lojaId || !tipo || !comp || processando || carregandoPrevia}
+           className="btn-primario flex-1 disabled:opacity-40">
+-          {processando ? "Lançando..." : "Confirmar e lançar"}
++          {processando ? "Lançando..." : carregandoPrevia ? "Conferindo..." : "Confirmar e lançar"}
+         </button>
+         <button onClick={() => onRejeitar(item)} disabled={processando} className="btn-secundario">Descartar</button>
+       </div>
++
++      {previa && (
++        <ModalConfirmacao
++          previa={previa}
++          arquivo={item.nome_arquivo}
++          onCancelar={() => setPrevia(null)}
++          onConfirmar={() => {
++            const p = previa;
++            setPrevia(null);
++            onConfirmar(item, p.lojaId, p.tipo, p.ano, p.mes, p.origem, p);
++          }}
++        />
++      )}
+     </div>
+   );
++}
++
++function ModalConfirmacao({ previa, arquivo, onCancelar, onConfirmar }: {
++  previa: Previa; arquivo: string; onCancelar: () => void; onConfirmar: () => void;
++}) {
++  const linhas: [string, string][] = [
++    ["Loja", previa.loja],
++    ["Empresa", previa.empresa],
++    ["Fornecedor", previa.fornecedor],
++    ["Valor", previa.valor != null ? money(previa.valor) : "—"],
++    ["Vencimento", previa.vencimento],
++    ["Forma de pagamento", previa.formaPagamento],
++  ];
++
++  return (
++    <>
++      <div onClick={onCancelar} className="fixed inset-0 bg-ebano/40 z-40" />
++      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
++        <div className="bg-white rounded-xl shadow-forte w-full max-w-[420px] pointer-events-auto overflow-hidden">
++          <div className="px-5 pt-5 pb-3">
++            <h3 className="text-[17px] font-bold text-[#1a1a1a]">Deseja realmente lançar esta conta?</h3>
++            <p className="text-[12px] text-[#adb5bd] mt-1 truncate" title={arquivo}>{arquivo}</p>
++          </div>
++
++          <div className="px-5">
++            <dl className="border border-linha rounded-lg divide-y divide-linha2">
++              {linhas.map(([rotulo, valor]) => (
++                <div key={rotulo} className="flex items-center justify-between gap-3 px-3 py-2">
++                  <dt className="text-[12px] text-[#6c757d] shrink-0">{rotulo}</dt>
++                  <dd className={`text-[12.5px] font-semibold text-right truncate ${valor === "—" ? "text-[#adb5bd]" : "text-[#1a1a1a]"}`}>{valor}</dd>
++                </div>
++              ))}
++            </dl>
++          </div>
++
++          {previa.contaNova && (
++            <p className="mx-5 mt-3 text-[11.5px] text-amb bg-amb-bg rounded-md px-3 py-2">
++              Ainda não existe conta ativa para esta loja e tipo. Ela será criada agora — fornecedor e vencimento podem ser preenchidos depois em Contas.
++            </p>
++          )}
++
++          <div className="flex gap-2 p-5 pt-4">
++            <button onClick={onConfirmar} className="btn-primario flex-1">Sim, lançar conta</button>
++            <button onClick={onCancelar} className="btn-secundario flex-1">Não, cancelar</button>
++          </div>
++        </div>
++      </div>
++    </>
++  );
+ }
+\ No newline at end of file
+diff --git a/app/(app)/caixa-entrada/page.tsx b/app/(app)/caixa-entrada/page.tsx
+index 1d32f04..8267c26 100644
+--- a/app/(app)/caixa-entrada/page.tsx
++++ b/app/(app)/caixa-entrada/page.tsx
+@@ -14,7 +14,7 @@ export default async function CaixaEntradaPage() {
+       .select("id, nome_arquivo, drive_web_view_link, valor_detectado, codigo_barras_detectado, tipo_detectado, loja_sugerida_id, loja_sugerida_texto, conta_sugerida_id, confianca, status, observacao, importado_em, competencia_ano, competencia_mes")
+       .eq("status", "pendente")
+       .order("importado_em", { ascending: false }),
+-    supabase.from("lojas").select("id, codigo").eq("status", "ativo").order("codigo"),
++    supabase.from("lojas").select("id, codigo, empresas ( nome )").eq("status", "ativo").order("codigo"),
+   ]);
+ 
+   return (
+@@ -24,7 +24,7 @@ export default async function CaixaEntradaPage() {
+         <p className="text-[14px] text-[#6c757d] mt-2.5">Boletos importados de uma pasta do Google Drive, aguardando confirmação antes de virar lançamento.</p>
+       </div>
+       <div className="px-4 sm:px-8 pb-6 sm:pb-8 max-w-[1100px]">
+-        <CaixaEntradaClient itens={(pendentes ?? []) as any[]} lojas={lojas ?? []} />
++        <CaixaEntradaClient itens={(pendentes ?? []) as any[]} lojas={(lojas ?? []) as any[]} />
+       </div>
+     </>
+   );
