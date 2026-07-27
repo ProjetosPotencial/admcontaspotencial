@@ -11,6 +11,10 @@ type Item = {
   loja_sugerida_id: string | null; loja_sugerida_texto: string | null; conta_sugerida_id: string | null;
   confianca: "alta" | "media" | "baixa"; observacao: string | null;
   competencia_ano?: number | null; competencia_mes?: number | null;
+  classe_documento?: "boleto" | "nota_fiscal" | null;
+  fornecedor_detectado?: string | null; cnpj_detectado?: string | null;
+  numero_documento_detectado?: string | null;
+  emissao_ano?: number | null; emissao_mes?: number | null; emissao_dia?: number | null;
 };
 
 type Loja = { id: string; codigo: string; empresas?: { nome: string | null } | null };
@@ -126,8 +130,12 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
       ) : (
         <div className="space-y-4">
           {itens.map((item) => (
+            item.classe_documento === "nota_fiscal" ? (
+              <NotaFiscalCard key={item.id} item={item} processando={processando === item.id} onRejeitar={rejeitar} />
+            ) : (
             <ItemCard key={item.id} item={item} lojas={lojas} processando={processando === item.id}
               onConfirmar={confirmar} onRejeitar={rejeitar} />
+            )
           ))}
         </div>
       )}
@@ -138,6 +146,58 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
         </div>
       )}
     </>
+  );
+}
+
+function NotaFiscalCard({ item, processando, onRejeitar }: {
+  item: Item; processando: boolean; onRejeitar: (item: Item) => void;
+}) {
+  const emissao = item.emissao_dia && item.emissao_mes && item.emissao_ano
+    ? `${String(item.emissao_dia).padStart(2, "0")}/${String(item.emissao_mes).padStart(2, "0")}/${item.emissao_ano}`
+    : "—";
+  const cnpj = item.cnpj_detectado
+    ? item.cnpj_detectado.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2}).*/, "$1.$2.$3/$4-$5")
+    : "—";
+  const linhas: [string, string][] = [
+    ["Fornecedor", item.fornecedor_detectado ?? "—"],
+    ["CNPJ", cnpj],
+    ["Nº da nota", item.numero_documento_detectado ?? "—"],
+    ["Valor", item.valor_detectado != null ? money(item.valor_detectado) : "—"],
+    ["Emissão", emissao],
+    ["Categoria", item.tipo_detectado ? (TIPOS[item.tipo_detectado]?.n ?? item.tipo_detectado) : "—"],
+  ];
+
+  return (
+    <div className="card p-4">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-info-bg text-info">NOTA FISCAL</span>
+            <p className="text-[13px] text-[#6c757d] truncate" title={item.nome_arquivo}>{item.nome_arquivo}</p>
+          </div>
+        </div>
+        {item.drive_web_view_link && (
+          <a href={item.drive_web_view_link} target="_blank" rel="noreferrer" className="text-[12px] text-info shrink-0 hover:underline">Abrir arquivo</a>
+        )}
+      </div>
+
+      <dl className="border border-linha rounded-lg divide-y divide-linha2 mb-3">
+        {linhas.map(([rotulo, valor]) => (
+          <div key={rotulo} className="flex items-center justify-between gap-3 px-3 py-2">
+            <dt className="text-[12px] text-[#6c757d] shrink-0">{rotulo}</dt>
+            <dd className={`text-[12.5px] font-semibold text-right truncate ${valor === "—" ? "text-[#adb5bd]" : "text-[#1a1a1a]"}`}>{valor}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <p className="text-[11.5px] text-amb bg-amb-bg rounded-md px-3 py-2 mb-3">
+        NF reconhecida e pronta para revisão. O lançamento de NF (vínculo com a empresa e envio pra Aprovações) entra na próxima atualização — os dados acima já ficam salvos.
+      </p>
+
+      <div className="flex justify-end">
+        <button onClick={() => onRejeitar(item)} disabled={processando} className="btn-secundario">Descartar</button>
+      </div>
+    </div>
   );
 }
 

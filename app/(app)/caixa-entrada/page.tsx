@@ -11,7 +11,7 @@ export default async function CaixaEntradaPage() {
   const [{ data: pendentes }, { data: lojas }] = await Promise.all([
     supabase
       .from("caixa_entrada_boletos")
-      .select("id, nome_arquivo, drive_web_view_link, valor_detectado, codigo_barras_detectado, tipo_detectado, loja_sugerida_id, loja_sugerida_texto, conta_sugerida_id, confianca, status, observacao, importado_em, competencia_ano, competencia_mes")
+      .select("id, nome_arquivo, drive_web_view_link, valor_detectado, codigo_barras_detectado, tipo_detectado, loja_sugerida_id, loja_sugerida_texto, conta_sugerida_id, confianca, status, observacao, importado_em, competencia_ano, competencia_mes, classe_documento, fornecedor_detectado, cnpj_detectado, numero_documento_detectado, emissao_ano, emissao_mes, emissao_dia")
       .eq("status", "pendente")
       .order("importado_em", { ascending: false }),
     supabase.from("lojas").select("id, codigo, empresas ( nome )").eq("status", "ativo").order("codigo"),

@@ -44,6 +44,31 @@ export async function importarCaixaEntradaDrive() {
       const buffer = await baixarArquivoDoDrive(arquivo.id);
       const extraido = await extrairDadosBoleto(buffer, arquivo.name, arquivo.mimeType);
 
+      // Nota fiscal: não casa loja (é custo de empresa, não de loja). Guarda
+      // fornecedor/CNPJ/número/emissão pra revisão e lançamento posterior.
+      if (extraido.classe_documento === "nota_fiscal") {
+        const confiancaNF: "media" | "baixa" =
+          extraido.fornecedor && extraido.valor && extraido.data_emissao ? "media" : "baixa";
+        await supabase.from("caixa_entrada_boletos").insert({
+          drive_file_id: arquivo.id,
+          nome_arquivo: arquivo.name,
+          drive_web_view_link: arquivo.webViewLink,
+          classe_documento: "nota_fiscal",
+          valor_detectado: extraido.valor,
+          tipo_detectado: extraido.tipo_conta,
+          fornecedor_detectado: extraido.fornecedor,
+          cnpj_detectado: extraido.cnpj,
+          numero_documento_detectado: extraido.numero_documento,
+          emissao_ano: extraido.data_emissao?.ano ?? null,
+          emissao_mes: extraido.data_emissao?.mes ?? null,
+          emissao_dia: extraido.data_emissao?.dia ?? null,
+          confianca: extraido.parece_documento_valido ? confiancaNF : "baixa",
+          observacao: extraido.parece_documento_valido ? null : "O arquivo não parece um documento fiscal de verdade.",
+        });
+        processados++;
+        continue;
+      }
+
       // tenta casar a loja pelo NOME DO ARQUIVO primeiro (mais confiável,
       // já que quem colocou o arquivo lá geralmente nomeia com a loja),
       // e só depois pelo que a IA leu dentro do documento.
@@ -79,6 +104,7 @@ export async function importarCaixaEntradaDrive() {
         drive_file_id: arquivo.id,
         nome_arquivo: arquivo.name,
         drive_web_view_link: arquivo.webViewLink,
+        classe_documento: "boleto",
         valor_detectado: extraido.valor,
         codigo_barras_detectado: extraido.codigo_barras,
         // o nome do arquivo é mais confiável que a leitura do PDF pro tipo
