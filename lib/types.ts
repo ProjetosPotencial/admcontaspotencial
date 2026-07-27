@@ -6,6 +6,7 @@ export const TIPOS: Record<string, { n: string; c: string; bg: string }> = {
   condominio: { n: "Condomínio", c: "#fb8c00", bg: "#ffe0b2" },
   aluguel: { n: "Aluguel", c: "#00897b", bg: "#e0f2f1" },
   imposto: { n: "Imposto", c: "#c62828", bg: "#ffebee" },
+  nota_fiscal: { n: "Nota Fiscal", c: "#1565c0", bg: "#e3f2fd" },
   custo_geral: { n: "Custos gerais", c: "#757575", bg: "#f1f3f5" },
 };
 

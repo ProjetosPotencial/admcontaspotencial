@@ -211,8 +211,8 @@ function NotaFiscalCard({ item, lojas, processando, onConfirmarNF, onRejeitar }:
   // Só as lojas "Administrativo" (uma por empresa) entram no seletor.
   const admLojas = lojas.filter((l) => l.codigo.startsWith("ADM "));
   const [admLojaId, setAdmLojaId] = useState("");
-  // categoria: usa a detectada se fizer sentido pra custo de empresa
-  const tipoInicial = item.tipo_detectado && TIPOS[item.tipo_detectado] ? item.tipo_detectado : "custo_geral";
+  // categoria padrão: Nota Fiscal (documento fiscal); pode trocar se quiser
+  const tipoInicial = "nota_fiscal";
   const [tipo, setTipo] = useState(tipoInicial);
 
   const semEmissao = !(item.emissao_dia && item.emissao_mes && item.emissao_ano);

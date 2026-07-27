@@ -1,0 +1,27 @@
+diff --git a/app/(app)/caixa-entrada/caixa-entrada-client.tsx b/app/(app)/caixa-entrada/caixa-entrada-client.tsx
+index df7ed17..1f8f9b3 100644
+--- a/app/(app)/caixa-entrada/caixa-entrada-client.tsx
++++ b/app/(app)/caixa-entrada/caixa-entrada-client.tsx
+@@ -211,8 +211,8 @@ function NotaFiscalCard({ item, lojas, processando, onConfirmarNF, onRejeitar }:
+   // Só as lojas "Administrativo" (uma por empresa) entram no seletor.
+   const admLojas = lojas.filter((l) => l.codigo.startsWith("ADM "));
+   const [admLojaId, setAdmLojaId] = useState("");
+-  // categoria: usa a detectada se fizer sentido pra custo de empresa
+-  const tipoInicial = item.tipo_detectado && TIPOS[item.tipo_detectado] ? item.tipo_detectado : "custo_geral";
++  // categoria padrão: Nota Fiscal (documento fiscal); pode trocar se quiser
++  const tipoInicial = "nota_fiscal";
+   const [tipo, setTipo] = useState(tipoInicial);
+ 
+   const semEmissao = !(item.emissao_dia && item.emissao_mes && item.emissao_ano);
+diff --git a/lib/types.ts b/lib/types.ts
+index 04ad75a..16ae9c1 100644
+--- a/lib/types.ts
++++ b/lib/types.ts
+@@ -6,6 +6,7 @@ export const TIPOS: Record<string, { n: string; c: string; bg: string }> = {
+   condominio: { n: "Condomínio", c: "#fb8c00", bg: "#ffe0b2" },
+   aluguel: { n: "Aluguel", c: "#00897b", bg: "#e0f2f1" },
+   imposto: { n: "Imposto", c: "#c62828", bg: "#ffebee" },
++  nota_fiscal: { n: "Nota Fiscal", c: "#1565c0", bg: "#e3f2fd" },
+   custo_geral: { n: "Custos gerais", c: "#757575", bg: "#f1f3f5" },
+ };
+ 
