@@ -1,0 +1,52 @@
+diff --git a/app/(app)/caixa-entrada/caixa-entrada-client.tsx b/app/(app)/caixa-entrada/caixa-entrada-client.tsx
+index 1f8f9b3..91cb2b2 100644
+--- a/app/(app)/caixa-entrada/caixa-entrada-client.tsx
++++ b/app/(app)/caixa-entrada/caixa-entrada-client.tsx
+@@ -44,6 +44,8 @@ const CONFIANCA_LABEL: Record<string, { texto: string; cor: string }> = {
+ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { itens: Item[]; lojas: Loja[] }) {
+   const supabase = createClient();
+   const [itens, setItens] = useState(itensIniciais);
++  const notasFiscais = itens.filter((i) => i.classe_documento === "nota_fiscal");
++  const boletos = itens.filter((i) => i.classe_documento !== "nota_fiscal");
+   const [processando, setProcessando] = useState<string | null>(null);
+   const [toast, setToast] = useState<string | null>(null);
+ 
+@@ -180,15 +182,29 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
+           Nada esperando revisão. Clica em "Verificar pasta agora" pra checar se chegou algo novo.
+         </div>
+       ) : (
+-        <div className="space-y-4">
+-          {itens.map((item) => (
+-            item.classe_documento === "nota_fiscal" ? (
+-              <NotaFiscalCard key={item.id} item={item} lojas={lojas} processando={processando === item.id} onConfirmarNF={confirmarNF} onRejeitar={rejeitar} />
+-            ) : (
+-            <ItemCard key={item.id} item={item} lojas={lojas} processando={processando === item.id}
+-              onConfirmar={confirmar} onRejeitar={rejeitar} />
+-            )
+-          ))}
++        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
++          <div className="space-y-4">
++            <h2 className="text-[13px] font-bold text-[#6c757d] uppercase tracking-wide">
++              Boletos e faturas ({boletos.length})
++            </h2>
++            {boletos.length === 0 ? (
++              <div className="card text-center py-10 text-[13px] text-[#adb5bd]">Nenhum boleto esperando revisão.</div>
++            ) : boletos.map((item) => (
++              <ItemCard key={item.id} item={item} lojas={lojas} processando={processando === item.id}
++                onConfirmar={confirmar} onRejeitar={rejeitar} />
++            ))}
++          </div>
++          <div className="space-y-4">
++            <h2 className="text-[13px] font-bold text-[#6c757d] uppercase tracking-wide">
++              Notas fiscais ({notasFiscais.length})
++            </h2>
++            {notasFiscais.length === 0 ? (
++              <div className="card text-center py-10 text-[13px] text-[#adb5bd]">Nenhuma nota fiscal esperando revisão.</div>
++            ) : notasFiscais.map((item) => (
++              <NotaFiscalCard key={item.id} item={item} lojas={lojas} processando={processando === item.id}
++                onConfirmarNF={confirmarNF} onRejeitar={rejeitar} />
++            ))}
++          </div>
+         </div>
+       )}
+ 
