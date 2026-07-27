@@ -49,6 +49,34 @@ export async function importarCaixaEntradaDrive() {
       if (extraido.classe_documento === "nota_fiscal") {
         const confiancaNF: "media" | "baixa" =
           extraido.fornecedor && extraido.valor && extraido.data_emissao ? "media" : "baixa";
+
+        // Já processamos essa MESMA nota antes (número + CNPJ/fornecedor)?
+        // O drive_file_id já barra o mesmo arquivo; aqui pegamos a mesma NF
+        // reenviada como outro arquivo. Avisa quando e por quem foi lançada.
+        let avisoDup: string | null = null;
+        if (extraido.numero_documento && (extraido.cnpj || extraido.fornecedor)) {
+          let dq = supabase.from("caixa_entrada_boletos")
+            .select("status, revisado_em, revisado_por")
+            .eq("classe_documento", "nota_fiscal")
+            .eq("numero_documento_detectado", extraido.numero_documento);
+          dq = extraido.cnpj ? dq.eq("cnpj_detectado", extraido.cnpj) : dq.eq("fornecedor_detectado", extraido.fornecedor);
+          const { data: dups } = await dq.order("revisado_em", { ascending: false, nullsFirst: false });
+          const anterior = (dups ?? []).find((d: any) => d.status === "confirmado") ?? (dups ?? [])[0];
+          if (anterior) {
+            let quem = "outro usuário";
+            if (anterior.revisado_por) {
+              const { data: p } = await supabase.from("perfis").select("nome").eq("id", anterior.revisado_por).maybeSingle();
+              quem = p?.nome ?? quem;
+            }
+            const quando = anterior.revisado_em
+              ? new Date(anterior.revisado_em).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })
+              : "data anterior";
+            avisoDup = anterior.status === "confirmado"
+              ? `Atenção: NF nº ${extraido.numero_documento} já foi lançada em ${quando} por ${quem}.`
+              : `Atenção: NF nº ${extraido.numero_documento} já está na caixa (importada em ${quando}).`;
+          }
+        }
+
         await supabase.from("caixa_entrada_boletos").insert({
           drive_file_id: arquivo.id,
           nome_arquivo: arquivo.name,
@@ -62,8 +90,9 @@ export async function importarCaixaEntradaDrive() {
           emissao_ano: extraido.data_emissao?.ano ?? null,
           emissao_mes: extraido.data_emissao?.mes ?? null,
           emissao_dia: extraido.data_emissao?.dia ?? null,
+          duplicada: !!avisoDup,
           confianca: extraido.parece_documento_valido ? confiancaNF : "baixa",
-          observacao: extraido.parece_documento_valido ? null : "O arquivo não parece um documento fiscal de verdade.",
+          observacao: avisoDup ?? (extraido.parece_documento_valido ? null : "O arquivo não parece um documento fiscal de verdade."),
         });
         processados++;
         continue;

@@ -15,6 +15,7 @@ type Item = {
   fornecedor_detectado?: string | null; cnpj_detectado?: string | null;
   numero_documento_detectado?: string | null;
   emissao_ano?: number | null; emissao_mes?: number | null; emissao_dia?: number | null;
+  duplicada?: boolean | null;
 };
 
 type Loja = { id: string; codigo: string; empresas?: { nome: string | null } | null };
@@ -71,6 +72,28 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
       const ano = item.emissao_ano ?? null;
       const mes = item.emissao_mes ?? null;
       if (!ano || !mes) { setToast("NF sem data de emissão — informe a emissão antes de lançar."); setProcessando(null); return; }
+
+      // Trava de duplicidade: essa NF (número + CNPJ/fornecedor) já foi lançada?
+      if (item.numero_documento_detectado && (item.cnpj_detectado || item.fornecedor_detectado)) {
+        let dq = supabase.from("caixa_entrada_boletos")
+          .select("revisado_em, revisado_por")
+          .eq("classe_documento", "nota_fiscal").eq("status", "confirmado")
+          .eq("numero_documento_detectado", item.numero_documento_detectado)
+          .neq("id", item.id);
+        dq = item.cnpj_detectado ? dq.eq("cnpj_detectado", item.cnpj_detectado) : dq.eq("fornecedor_detectado", item.fornecedor_detectado);
+        const { data: existentes } = await dq.order("revisado_em", { ascending: false, nullsFirst: false }).limit(1);
+        const ja = existentes?.[0];
+        if (ja) {
+          let quem = "outro usuário";
+          if (ja.revisado_por) {
+            const { data: p } = await supabase.from("perfis").select("nome").eq("id", ja.revisado_por).maybeSingle();
+            quem = p?.nome ?? quem;
+          }
+          const quando = ja.revisado_em ? new Date(ja.revisado_em).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "data anterior";
+          setToast(`Essa NF (nº ${item.numero_documento_detectado}) já foi lançada em ${quando} por ${quem}. Não foi lançada de novo.`);
+          setProcessando(null); setTimeout(() => setToast(null), 6000); return;
+        }
+      }
 
       // Conta identificada por loja Administrativo + tipo + fornecedor (uma
       // conta por fornecedor). Não existe ainda? cria na hora.
@@ -284,6 +307,12 @@ function NotaFiscalCard({ item, lojas, processando, onConfirmarNF, onRejeitar }:
           </select>
         </label>
       </div>
+
+      {(item.duplicada || item.observacao?.startsWith("Atenção:")) && (
+        <p className="text-[12px] font-medium text-alerr bg-alerr-bg rounded-md px-3 py-2 mb-3">
+          ⚠️ {item.observacao ?? "Essa nota fiscal parece já ter sido lançada antes."}
+        </p>
+      )}
 
       {semEmissao && (
         <p className="text-[11.5px] text-alerr bg-alerr-bg rounded-md px-3 py-2 mb-3">
