@@ -116,7 +116,7 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
       const { data: { user } } = await supabase.auth.getUser();
       const { data: lanc, error } = await supabase.from("lancamentos").upsert({
         conta_id: contaId, ano, mes, valor: item.valor_detectado, situacao: "lancado",
-        lancado_em: agora.toISOString(), comprovante_drive_url: item.drive_web_view_link,
+        lancado_em: agora.toISOString(), codigo_barras: item.codigo_barras_detectado, comprovante_drive_url: item.drive_web_view_link,
       }, { onConflict: "conta_id,ano,mes" }).select("id").single();
       if (error || !lanc) { setToast("Não foi possível lançar."); setProcessando(null); return; }
 
@@ -267,6 +267,7 @@ function NotaFiscalCard({ item, lojas, processando, onConfirmarNF, onRejeitar }:
     ["Valor", item.valor_detectado != null ? money(item.valor_detectado) : "—"],
     ["Emissão", emissao],
   ];
+  const temBoleto = !!item.codigo_barras_detectado;
   const empresaNome = admLojas.find((l) => l.id === admLojaId)?.empresas?.nome ?? "";
 
   return (
@@ -289,6 +290,13 @@ function NotaFiscalCard({ item, lojas, processando, onConfirmarNF, onRejeitar }:
           </div>
         ))}
       </dl>
+
+      {temBoleto && (
+        <div className="border border-linha rounded-lg px-3 py-2 mb-3">
+          <div className="text-[11px] text-[#6c757d] mb-0.5">Código de barras (boleto anexo)</div>
+          <div className="text-[11px] font-mono text-[#1a1a1a] break-all">{item.codigo_barras_detectado}</div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
         <label className="block">

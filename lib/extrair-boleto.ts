@@ -7,7 +7,7 @@ const PROMPT = `Esse arquivo é um documento financeiro brasileiro que pode ser 
 2. "valor": o valor total a pagar/da nota, em reais, como número (ex: 118.95). null se não ler com confiança.
 3. "fornecedor": a razão social de quem emitiu (o prestador/fornecedor/empresa cobradora). Ex: "MESSANO ADVOGADOS", "SANEPAR". null se não achar.
 4. "cnpj": o CNPJ do emitente, só dígitos (ex: "08191494000140"). null se não achar. (Boletos de consumo geralmente não têm; NF sempre tem.)
-5. "codigo_barras": SÓ para boleto — a linha digitável (número longo, tipo "34191.79001 01043.510047 ..."). Para nota fiscal use null.
+5. "codigo_barras": a linha digitável de PAGAMENTO (boleto), quando existir — inclusive numa nota fiscal que vem com boleto anexo. É o número longo tipo "34191.79001 01043.510047 ...". NÃO confunda com a chave de acesso da NF-e (44 dígitos, que serve pra validar a nota, não pra pagar): se só houver a chave de acesso e nenhuma linha digitável de boleto, use null. Sem linha digitável, use null.
 6. "numero_documento": o número da NF (só para nota fiscal). null para boleto.
 7. "data": a data de referência como {"dia":D,"mes":M,"ano":A}. Para BOLETO use o VENCIMENTO; para NOTA FISCAL use a DATA DE EMISSÃO. Use null se não ler.
 8. "tipo_conta": categoria, um destes: "agua","energia","telefone","iptu","condominio","aluguel","imposto" (ISS/ISSQN/IRRF e tributos), "custo_geral" (serviços, honorários, software, materiais e qualquer outro). null se incerto.
@@ -60,9 +60,9 @@ export async function extrairDadosBoleto(buffer: Buffer, nomeArquivo: string, mi
   const classe: "boleto" | "nota_fiscal" | null =
     json.classe_documento === "boleto" || json.classe_documento === "nota_fiscal" ? json.classe_documento : null;
 
-  // Boleto valida a linha digitável; nota fiscal não tem código de barras,
-  // então nunca deve ser reprovada por isso.
-  const codigoBarras: string | null = classe === "nota_fiscal" ? null : (json.codigo_barras || null);
+  // Boleto exige linha digitável; NF pode ou não ter boleto anexo — se tiver,
+  // capturamos a linha digitável do mesmo jeito. Nunca reprova a NF por isso.
+  const codigoBarras: string | null = json.codigo_barras || null;
   const digitos = codigoBarras ? codigoBarras.replace(/\D/g, "") : "";
   const formatoValido = codigoBarras ? (digitos.length === 47 || digitos.length === 48) : true;
   const fechaMatematicamente = codigoBarras ? codigoBarrasFechaMatematicamente(codigoBarras) : true;
