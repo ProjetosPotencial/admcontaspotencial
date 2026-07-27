@@ -1,0 +1,12 @@
+diff --git a/lib/types.ts b/lib/types.ts
+index 6e913ed..04ad75a 100644
+--- a/lib/types.ts
++++ b/lib/types.ts
+@@ -5,6 +5,7 @@ export const TIPOS: Record<string, { n: string; c: string; bg: string }> = {
+   iptu: { n: "IPTU", c: "#43a047", bg: "#e8f5e9" },
+   condominio: { n: "Condomínio", c: "#fb8c00", bg: "#ffe0b2" },
+   aluguel: { n: "Aluguel", c: "#00897b", bg: "#e0f2f1" },
++  imposto: { n: "Imposto", c: "#c62828", bg: "#ffebee" },
+   custo_geral: { n: "Custos gerais", c: "#757575", bg: "#f1f3f5" },
+ };
+ 
