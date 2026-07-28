@@ -150,3 +150,69 @@ export async function baixarArquivoDoDrive(fileId: string): Promise<Buffer> {
   const resposta = await drive.files.get({ fileId, alt: "media" }, { responseType: "arraybuffer" });
   return Buffer.from(resposta.data as ArrayBuffer);
 }
+
+/**
+ * Lista as SUBPASTAS de uma pasta (usado pra descobrir os chamados do GLPI e,
+ * dentro de cada chamado, as pastas de loja).
+ */
+async function listarSubpastas(paiId: string): Promise<{ id: string; name: string }[]> {
+  const drive = getDrive();
+  const r = await drive.files.list({
+    q: `'${paiId}' in parents and trashed=false and mimeType = 'application/vnd.google-apps.folder'`,
+    fields: "files(id, name)",
+    spaces: "drive",
+    pageSize: 100,
+  });
+  return (r.data.files ?? []).map((f) => ({ id: f.id!, name: f.name ?? "sem-nome" }));
+}
+
+export type ChamadoGLPI = {
+  pastaId: string;        // id da pasta do chamado (chave de dedup por pasta)
+  chamadoNumero: string | null;
+  lojaTexto: string | null;   // nome da subpasta de loja, ex "MG 064 PE Ubá II"
+  arquivos: { id: string; name: string; webViewLink: string; mimeType: string }[];
+};
+
+/**
+ * Varre a pasta de entrada procurando a estrutura que o GLPI cria:
+ *
+ *   <raiz> / Compras / Chamado NNNNN / <LOJA> / {NF, boleto, anexos}
+ *
+ * O GLPI joga tudo dentro de uma subpasta "Compras", então primeiro descemos
+ * nela; ali dentro estão as pastas de chamado. Isso separa o fluxo GLPI do
+ * fluxo manual (PDFs soltos na raiz, tratados por listarArquivosNaPasta).
+ * Devolve um item por chamado, com número, loja e os arquivos daquele chamado.
+ * Se um chamado tiver arquivos soltos (sem subpasta de loja), inclui com
+ * lojaTexto=null. O nome da pasta "Compras" pode ser customizado via
+ * GLPI_COMPRAS_FOLDER_NAME (padrão "Compras").
+ */
+export async function listarChamadosGLPI(raizId: string): Promise<ChamadoGLPI[]> {
+  const nomeCompras = process.env.GLPI_COMPRAS_FOLDER_NAME ?? "Compras";
+  const subpastasRaiz = await listarSubpastas(raizId);
+  const pastaCompras = subpastasRaiz.find((p) => p.name.trim().toLowerCase() === nomeCompras.toLowerCase());
+  if (!pastaCompras) return []; // sem pasta "Compras" ainda, nada de GLPI a processar
+
+  const chamadosPastas = await listarSubpastas(pastaCompras.id);
+  const resultado: ChamadoGLPI[] = [];
+
+  for (const pastaChamado of chamadosPastas) {
+    const num = pastaChamado.name.match(/(\d{3,})/);
+    const chamadoNumero = num ? num[1] : null;
+
+    const pastasLoja = await listarSubpastas(pastaChamado.id);
+    if (pastasLoja.length > 0) {
+      for (const pl of pastasLoja) {
+        const arquivos = await listarArquivosNaPasta(pl.id);
+        if (arquivos.length > 0) {
+          resultado.push({ pastaId: pl.id, chamadoNumero, lojaTexto: pl.name, arquivos });
+        }
+      }
+    } else {
+      const arquivos = await listarArquivosNaPasta(pastaChamado.id);
+      if (arquivos.length > 0) {
+        resultado.push({ pastaId: pastaChamado.id, chamadoNumero, lojaTexto: null, arquivos });
+      }
+    }
+  }
+  return resultado;
+}
