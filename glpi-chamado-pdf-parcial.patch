@@ -1,0 +1,33 @@
+diff --git a/lib/importar-caixa-entrada.ts b/lib/importar-caixa-entrada.ts
+index a78e1c8..5ae8559 100644
+--- a/lib/importar-caixa-entrada.ts
++++ b/lib/importar-caixa-entrada.ts
+@@ -176,15 +176,24 @@ export async function importarCaixaEntradaDrive() {
+           docsChamado++;
+           if (!nf && ex.classe_documento === "nota_fiscal") nf = ex;
+           else if (!boleto && (ex.codigo_barras || ex.classe_documento === "boleto")) boleto = ex;
++          else if (!nf && (ex.fornecedor || ex.numero_documento)) nf = ex; // sobra que parece nota
+         }
+ 
+-        const faltaAlgo = !nf || !boleto;
+-        const ilegivel = pdfs.length === 0 || (nf && !nf.parece_documento_valido) || (boleto && !boleto.parece_documento_valido);
+-        const pendente = faltaAlgo || ilegivel;
++        // Cria o card com o que houver. Só é problema se não veio NENHUM PDF
++        // legível. Pendente de conferência quando falta a NF, falta o boleto,
++        // ou algum documento veio ilegível — mas o chamado sempre aparece.
++        const semDocumento = pdfs.length === 0 || (!nf && !boleto);
++        const ilegivel = (nf && !nf.parece_documento_valido) || (boleto && !boleto.parece_documento_valido);
++        const pendente = semDocumento || !nf || !boleto || ilegivel;
+         if (pendente) pendentesConf++;
+ 
+         const obs = pendente
+-          ? `Pendente de conferência: ${[!nf && "NF não identificada", !boleto && "boleto não identificado", ilegivel && "documento ilegível"].filter(Boolean).join("; ")}.`
++          ? `Pendente de conferência: ${[
++              semDocumento && "nenhum documento legível na pasta",
++              !semDocumento && !nf && "sem nota fiscal",
++              !semDocumento && !boleto && "sem boleto",
++              ilegivel && "documento ilegível",
++            ].filter(Boolean).join("; ")}.`
+           : null;
+ 
+         await supabase.from("caixa_entrada_boletos").insert({
