@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { listarArquivosNaPasta, baixarArquivoDoDrive } from "@/lib/google-drive";
+import { listarArquivosNaPasta, baixarArquivoDoDrive, listarChamadosGLPI } from "@/lib/google-drive";
 import { extrairDadosBoleto } from "@/lib/extrair-boleto";
 import { lerNomeArquivo, casarLoja } from "@/lib/ler-nome-arquivo";
 
@@ -153,5 +153,76 @@ export async function importarCaixaEntradaDrive() {
     }
   }
 
-  return { ok: true as const, novos: processados, erros: erros.length > 0 ? erros : undefined };
+  // ========================================================================
+  // GLPI: pasta "Compras" com estrutura Chamado NNNNN / <rótulo> / PDFs.
+  // Cada chamado vira UM card na Caixa, combinando NF + boleto. O rótulo da
+  // pasta é só exibição — quem confirma escolhe o destino. Dedup por pasta.
+  // ========================================================================
+  let chamadosNovos = 0, docsChamado = 0, pendentesConf = 0;
+  try {
+    const chamados = await listarChamadosGLPI(pastaId);
+    const { data: jaProcessados } = await supabase
+      .from("caixa_entrada_boletos").select("chamado_pasta_id").not("chamado_pasta_id", "is", null);
+    const pastasFeitas = new Set((jaProcessados ?? []).map((r: any) => r.chamado_pasta_id));
+
+    for (const ch of chamados) {
+      if (pastasFeitas.has(ch.pastaId)) continue;
+      try {
+        const pdfs = ch.arquivos.filter((a) => a.mimeType === "application/pdf" || /\.pdf$/i.test(a.name));
+        let nf: any = null, boleto: any = null;
+        for (const pdf of pdfs) {
+          const buf = await baixarArquivoDoDrive(pdf.id);
+          const ex = await extrairDadosBoleto(buf, pdf.name, pdf.mimeType);
+          docsChamado++;
+          if (!nf && ex.classe_documento === "nota_fiscal") nf = ex;
+          else if (!boleto && (ex.codigo_barras || ex.classe_documento === "boleto")) boleto = ex;
+        }
+
+        const faltaAlgo = !nf || !boleto;
+        const ilegivel = pdfs.length === 0 || (nf && !nf.parece_documento_valido) || (boleto && !boleto.parece_documento_valido);
+        const pendente = faltaAlgo || ilegivel;
+        if (pendente) pendentesConf++;
+
+        const obs = pendente
+          ? `Pendente de conferência: ${[!nf && "NF não identificada", !boleto && "boleto não identificado", ilegivel && "documento ilegível"].filter(Boolean).join("; ")}.`
+          : null;
+
+        await supabase.from("caixa_entrada_boletos").insert({
+          drive_file_id: ch.pastaId,
+          nome_arquivo: `Chamado ${ch.chamadoNumero ?? "?"}${ch.lojaTexto ? " — " + ch.lojaTexto : ""}`,
+          drive_web_view_link: `https://drive.google.com/drive/folders/${ch.pastaId}`,
+          classe_documento: "chamado",
+          chamado_numero: ch.chamadoNumero,
+          chamado_pasta_id: ch.pastaId,
+          chamado_rotulo: ch.lojaTexto,
+          tipo_detectado: "compra",
+          fornecedor_detectado: nf?.fornecedor ?? null,
+          cnpj_detectado: nf?.cnpj ?? null,
+          numero_documento_detectado: nf?.numero_documento ?? null,
+          emissao_ano: nf?.data_emissao?.ano ?? null,
+          emissao_mes: nf?.data_emissao?.mes ?? null,
+          emissao_dia: nf?.data_emissao?.dia ?? null,
+          codigo_barras_detectado: boleto?.codigo_barras ?? null,
+          valor_detectado: boleto?.valor ?? nf?.valor ?? null,
+          confianca: pendente ? "baixa" : "media",
+          observacao: obs,
+        });
+        chamadosNovos++;
+      } catch (err: any) {
+        erros.push(`Chamado ${ch.chamadoNumero ?? ch.pastaId}: ${err?.message ?? "erro"}`);
+      }
+    }
+  } catch (err: any) {
+    erros.push(`Varredura GLPI: ${err?.message ?? "erro"}`);
+  }
+
+  // log da rodada
+  await supabase.from("glpi_importacoes").insert({
+    chamados_novos: chamadosNovos,
+    documentos_lidos: docsChamado,
+    pendentes_conferencia: pendentesConf,
+    erros: erros.length > 0 ? erros : null,
+  });
+
+  return { ok: true as const, novos: processados, chamados: chamadosNovos, erros: erros.length > 0 ? erros : undefined };
 }

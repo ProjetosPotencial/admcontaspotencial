@@ -11,7 +11,9 @@ type Item = {
   loja_sugerida_id: string | null; loja_sugerida_texto: string | null; conta_sugerida_id: string | null;
   confianca: "alta" | "media" | "baixa"; observacao: string | null;
   competencia_ano?: number | null; competencia_mes?: number | null;
-  classe_documento?: "boleto" | "nota_fiscal" | null;
+  classe_documento?: "boleto" | "nota_fiscal" | "chamado" | null;
+  chamado_numero?: string | null; chamado_rotulo?: string | null;
+  beneficiario?: string | null;
   fornecedor_detectado?: string | null; cnpj_detectado?: string | null;
   numero_documento_detectado?: string | null;
   emissao_ano?: number | null; emissao_mes?: number | null; emissao_dia?: number | null;
@@ -46,7 +48,8 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
   const supabase = createClient();
   const [itens, setItens] = useState(itensIniciais);
   const notasFiscais = itens.filter((i) => i.classe_documento === "nota_fiscal");
-  const boletos = itens.filter((i) => i.classe_documento !== "nota_fiscal");
+  const chamados = itens.filter((i) => i.classe_documento === "chamado");
+  const boletos = itens.filter((i) => i.classe_documento !== "nota_fiscal" && i.classe_documento !== "chamado");
   const [processando, setProcessando] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -77,6 +80,55 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
       setItens((lista) => lista.map((i) => (i.id === item.id ? { ...i, classe_documento: nova } : i)));
     }
     setProcessando(null);
+  }
+
+  async function confirmarChamado(item: Item, lojaId: string) {
+    setProcessando(item.id);
+    try {
+      const fornecedor = item.fornecedor_detectado?.trim() || null;
+      const ano = item.emissao_ano ?? new Date().getFullYear();
+      const mes = item.emissao_mes ?? (new Date().getMonth() + 1);
+
+      // conta de Compra por loja + fornecedor (não duplica)
+      let consulta = supabase.from("contas").select("id")
+        .eq("loja_id", lojaId).eq("tipo", "compra").eq("status", "ativo");
+      consulta = fornecedor ? consulta.eq("fornecedor_nome", fornecedor) : consulta.is("fornecedor_nome", null);
+      const { data: conta } = await consulta.maybeSingle();
+      let contaId = conta?.id as string | undefined;
+      if (!contaId) {
+        const { data: nova, error: e1 } = await supabase.from("contas").insert({
+          loja_id: lojaId, tipo: "compra", fornecedor_nome: fornecedor, origem: "email",
+          status: "ativo", situacao_cadastro: "aprovada",
+        }).select("id").single();
+        if (e1 || !nova) { setToast("Não foi possível criar a conta."); setProcessando(null); return; }
+        contaId = nova.id;
+      }
+
+      const agora = new Date();
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: lanc, error } = await supabase.from("lancamentos").upsert({
+        conta_id: contaId, ano, mes, valor: item.valor_detectado, situacao: "lancado",
+        lancado_em: agora.toISOString(), codigo_barras: item.codigo_barras_detectado,
+        comprovante_drive_url: item.drive_web_view_link,
+      }, { onConflict: "conta_id,ano,mes" }).select("id").single();
+      if (error || !lanc) { setToast("Não foi possível lançar."); setProcessando(null); return; }
+
+      await supabase.from("caixa_entrada_boletos").update({
+        status: "confirmado", revisado_por: user?.id ?? null, revisado_em: agora.toISOString(), lancamento_criado_id: lanc.id,
+      }).eq("id", item.id);
+
+      setItens((lista) => lista.filter((i) => i.id !== item.id));
+      setToast([
+        "Compra lançada com sucesso!",
+        item.chamado_numero ? `Chamado: ${item.chamado_numero}` : null,
+        fornecedor ? `Fornecedor: ${fornecedor}` : null,
+        "Já está na fila de Aprovações.",
+      ].filter(Boolean).join("\n"));
+    } catch {
+      setToast("Erro ao lançar a compra.");
+    }
+    setProcessando(null);
+    setTimeout(() => setToast(null), 5000);
   }
 
   async function confirmarNF(item: Item, admLojaId: string, tipo: string, previa?: PreviaNF) {
@@ -222,9 +274,13 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
           <div className="space-y-4">
             <h2 className="text-[13px] font-bold text-[#6c757d] uppercase tracking-wide">
-              Boletos e faturas ({boletos.length})
+              Boletos e faturas ({boletos.length + chamados.length})
             </h2>
-            {boletos.length === 0 ? (
+            {chamados.map((item) => (
+              <ChamadoCard key={item.id} item={item} lojas={lojas} processando={processando === item.id}
+                onConfirmarChamado={confirmarChamado} onRejeitar={rejeitar} />
+            ))}
+            {boletos.length === 0 && chamados.length === 0 ? (
               <div className="card text-center py-10 text-[13px] text-[#adb5bd]">Nenhum boleto esperando revisão.</div>
             ) : boletos.map((item) => (
               <ItemCard key={item.id} item={item} lojas={lojas} processando={processando === item.id}
@@ -255,6 +311,99 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
 }
 
 type PreviaNF = { empresa: string };
+
+function ChamadoCard({ item, lojas, processando, onConfirmarChamado, onRejeitar }: {
+  item: Item; lojas: Loja[]; processando: boolean;
+  onConfirmarChamado: (item: Item, lojaId: string) => void;
+  onRejeitar: (item: Item) => void;
+}) {
+  const [lojaId, setLojaId] = useState("");
+  const [busca, setBusca] = useState("");
+  const pendente = item.observacao?.startsWith("Pendente de conferência");
+  const lojasFiltradas = busca.trim()
+    ? lojas.filter((l) => l.codigo.toLowerCase().includes(busca.toLowerCase())).slice(0, 30)
+    : lojas.slice(0, 30);
+  const lojaSel = lojas.find((l) => l.id === lojaId);
+  const emissao = item.emissao_dia && item.emissao_mes && item.emissao_ano
+    ? `${String(item.emissao_dia).padStart(2, "0")}/${String(item.emissao_mes).padStart(2, "0")}/${item.emissao_ano}` : "—";
+  const cnpj = item.cnpj_detectado
+    ? item.cnpj_detectado.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2}).*/, "$1.$2.$3/$4-$5") : "—";
+  const linhas: [string, string][] = [
+    ["Fornecedor (NF)", item.fornecedor_detectado ?? "—"],
+    ["CNPJ", cnpj],
+    ["Nº da nota", item.numero_documento_detectado ?? "—"],
+    ["Valor", item.valor_detectado != null ? money(item.valor_detectado) : "—"],
+    ["Emissão", emissao],
+  ];
+
+  return (
+    <div className="card p-4">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-[#f3e5f5] text-[#6a1b9a]">CHAMADO GLPI</span>
+          <p className="text-[13px] text-[#6c757d] truncate" title={item.nome_arquivo}>
+            {item.chamado_numero ? `Chamado ${item.chamado_numero}` : item.nome_arquivo}{item.chamado_rotulo ? ` · ${item.chamado_rotulo}` : ""}
+          </p>
+        </div>
+        {item.drive_web_view_link && (
+          <a href={item.drive_web_view_link} target="_blank" rel="noreferrer" className="text-[12px] text-info shrink-0 hover:underline">Abrir pasta</a>
+        )}
+      </div>
+
+      <dl className="border border-linha rounded-lg divide-y divide-linha2 mb-3">
+        {linhas.map(([r, v]) => (
+          <div key={r} className="flex items-center justify-between gap-3 px-3 py-2">
+            <dt className="text-[12px] text-[#6c757d] shrink-0">{r}</dt>
+            <dd className={`text-[12.5px] font-semibold text-right truncate ${v === "—" ? "text-[#adb5bd]" : "text-[#1a1a1a]"}`}>{v}</dd>
+          </div>
+        ))}
+      </dl>
+
+      {item.codigo_barras_detectado && (
+        <div className="border border-linha rounded-lg px-3 py-2 mb-3">
+          <div className="text-[11px] text-[#6c757d] mb-0.5">Código de barras (boleto)</div>
+          <div className="text-[11px] font-mono text-[#1a1a1a] break-all">{item.codigo_barras_detectado}</div>
+        </div>
+      )}
+
+      {pendente && (
+        <p className="text-[12px] font-medium text-alerr bg-alerr-bg rounded-md px-3 py-2 mb-3">⚠️ {item.observacao}</p>
+      )}
+
+      <label className="block mb-3">
+        <span className="text-[11px] text-[#6c757d]">Lançar na loja</span>
+        {lojaSel ? (
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-[13px] font-semibold">{lojaSel.codigo}</span>
+            <button onClick={() => { setLojaId(""); setBusca(""); }} className="text-[12px] text-info hover:underline">trocar</button>
+          </div>
+        ) : (
+          <>
+            <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar loja pelo código…"
+              className="w-full mt-1 border border-linha rounded-lg px-3 py-2 text-[13px]" />
+            {busca.trim() && (
+              <div className="mt-1 max-h-40 overflow-auto border border-linha rounded-lg divide-y divide-linha2">
+                {lojasFiltradas.map((l) => (
+                  <button key={l.id} onClick={() => { setLojaId(l.id); setBusca(""); }}
+                    className="block w-full text-left px-3 py-2 text-[12.5px] hover:bg-[#f8f9fa]">{l.codigo}</button>
+                ))}
+                {lojasFiltradas.length === 0 && <div className="px-3 py-2 text-[12px] text-[#adb5bd]">Nenhuma loja.</div>}
+              </div>
+            )}
+          </>
+        )}
+      </label>
+
+      <div className="flex gap-2 justify-end">
+        <button onClick={() => onConfirmarChamado(item, lojaId)} disabled={!lojaId || processando}
+          className="btn-primario disabled:opacity-40">
+          {processando ? "Lançando..." : "Lançar compra"}
+        </button>
+        <button onClick={() => onRejeitar(item)} disabled={processando} className="btn-secundario">Descartar</button>
+      </div>
+    </div>
+  );
+}
 
 function NotaFiscalCard({ item, lojas, processando, onConfirmarNF, onRejeitar, onReclassificar }: {
   item: Item; lojas: Loja[]; processando: boolean;
