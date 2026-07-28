@@ -1,0 +1,22 @@
+diff --git a/lib/importar-caixa-entrada.ts b/lib/importar-caixa-entrada.ts
+index 1f632f8..fa78879 100644
+--- a/lib/importar-caixa-entrada.ts
++++ b/lib/importar-caixa-entrada.ts
+@@ -30,15 +30,13 @@ export async function importarCaixaEntradaDrive() {
+   const idsJaImportados = new Set((jaImportados ?? []).map((r) => r.drive_file_id));
+   const novos = arquivos.filter((a) => !idsJaImportados.has(a.id));
+ 
+-  if (novos.length === 0) {
+-    return { ok: true as const, novos: 0, mensagem: "Nenhum arquivo novo na pasta." };
+-  }
+-
+   const lojasNormalizadas = (lojas ?? []).map((l) => ({ id: l.id, codigo: l.codigo, norm: normalizar(l.codigo) }));
+ 
+   let processados = 0;
+   const erros: string[] = [];
+ 
++  // Não sai cedo se não houver arquivo solto novo: o fluxo GLPI (pasta
++  // Compras) roda de qualquer jeito, independente dos arquivos da raiz.
+   for (const arquivo of novos) {
+     try {
+       const buffer = await baixarArquivoDoDrive(arquivo.id);
