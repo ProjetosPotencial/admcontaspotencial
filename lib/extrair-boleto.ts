@@ -49,13 +49,24 @@ export async function extrairDadosBoleto(buffer: Buffer, nomeArquivo: string, mi
   const anthropic = new Anthropic({ apiKey });
   const resposta = await anthropic.messages.create({
     model: "claude-sonnet-5",
-    max_tokens: 450,
+    max_tokens: 700,
     messages: [{ role: "user", content: [conteudoArquivo, { type: "text", text: PROMPT }] }] as any,
   });
 
   const bloco = resposta.content.find((b) => b.type === "text");
   const texto = bloco && "text" in bloco ? bloco.text.trim() : "{}";
-  const json = JSON.parse(texto.replace(/^```json\s*|\s*```$/g, ""));
+  const limpo = texto.replace(/^```json\s*|\s*```$/g, "");
+  let json: any;
+  try {
+    json = JSON.parse(limpo);
+  } catch {
+    // Resposta cortada/estranha: não derruba a leitura. Tenta pegar o
+    // primeiro objeto JSON completo; se não der, devolve documento inválido
+    // (o chamado ainda vira card, marcado como ilegível).
+    const m = limpo.match(/\{[\s\S]*\}/);
+    try { json = m ? JSON.parse(m[0]) : {}; } catch { json = {}; }
+    if (typeof json.parece_documento_valido !== "boolean") json.parece_documento_valido = false;
+  }
 
   const classe: "boleto" | "nota_fiscal" | null =
     json.classe_documento === "boleto" || json.classe_documento === "nota_fiscal" ? json.classe_documento : null;

@@ -170,20 +170,27 @@ export async function importarCaixaEntradaDrive() {
       try {
         const pdfs = ch.arquivos.filter((a) => a.mimeType === "application/pdf" || /\.pdf$/i.test(a.name));
         let nf: any = null, boleto: any = null;
+        let falhaLeitura = false;
         for (const pdf of pdfs) {
-          const buf = await baixarArquivoDoDrive(pdf.id);
-          const ex = await extrairDadosBoleto(buf, pdf.name, pdf.mimeType);
-          docsChamado++;
-          if (!nf && ex.classe_documento === "nota_fiscal") nf = ex;
-          else if (!boleto && (ex.codigo_barras || ex.classe_documento === "boleto")) boleto = ex;
-          else if (!nf && (ex.fornecedor || ex.numero_documento)) nf = ex; // sobra que parece nota
+          try {
+            const buf = await baixarArquivoDoDrive(pdf.id);
+            const ex = await extrairDadosBoleto(buf, pdf.name, pdf.mimeType);
+            docsChamado++;
+            if (!nf && ex.classe_documento === "nota_fiscal") nf = ex;
+            else if (!boleto && (ex.codigo_barras || ex.classe_documento === "boleto")) boleto = ex;
+            else if (!nf && (ex.fornecedor || ex.numero_documento)) nf = ex; // sobra que parece nota
+          } catch (errArq: any) {
+            // um PDF ruim não derruba o chamado; marca leitura falha e segue
+            falhaLeitura = true;
+            erros.push(`Chamado ${ch.chamadoNumero ?? ch.pastaId} / ${pdf.name}: ${errArq?.message ?? "erro na leitura"}`);
+          }
         }
 
         // Cria o card com o que houver. Só é problema se não veio NENHUM PDF
         // legível. Pendente de conferência quando falta a NF, falta o boleto,
         // ou algum documento veio ilegível — mas o chamado sempre aparece.
         const semDocumento = pdfs.length === 0 || (!nf && !boleto);
-        const ilegivel = (nf && !nf.parece_documento_valido) || (boleto && !boleto.parece_documento_valido);
+        const ilegivel = falhaLeitura || (nf && !nf.parece_documento_valido) || (boleto && !boleto.parece_documento_valido);
         const pendente = semDocumento || !nf || !boleto || ilegivel;
         if (pendente) pendentesConf++;
 
