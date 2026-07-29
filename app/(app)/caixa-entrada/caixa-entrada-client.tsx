@@ -13,6 +13,7 @@ type Item = {
   competencia_ano?: number | null; competencia_mes?: number | null;
   classe_documento?: "boleto" | "nota_fiscal" | "chamado" | null;
   chamado_numero?: string | null; chamado_rotulo?: string | null;
+  requerente?: string | null;
   beneficiario?: string | null;
   fornecedor_detectado?: string | null; cnpj_detectado?: string | null;
   numero_documento_detectado?: string | null;
@@ -342,7 +343,7 @@ function ChamadoCard({ item, lojas, processando, onConfirmarChamado, onRejeitar 
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-[#f3e5f5] text-[#6a1b9a]">CHAMADO GLPI</span>
           <p className="text-[13px] text-[#6c757d] truncate" title={item.nome_arquivo}>
-            {item.chamado_numero ? `Chamado ${item.chamado_numero}` : item.nome_arquivo}{item.chamado_rotulo ? ` · ${item.chamado_rotulo}` : ""}
+            {item.chamado_numero ? `Chamado ${item.chamado_numero}` : item.nome_arquivo}{item.chamado_rotulo ? ` · ${item.chamado_rotulo}` : ""}{item.requerente ? ` · Requerente: ${item.requerente}` : ""}
           </p>
         </div>
         {item.drive_web_view_link && (

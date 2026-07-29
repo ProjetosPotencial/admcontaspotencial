@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { listarArquivosNaPasta, baixarArquivoDoDrive, listarChamadosGLPI } from "@/lib/google-drive";
+import { buscarDadosChamado } from "@/lib/glpi";
 import { extrairDadosBoleto } from "@/lib/extrair-boleto";
 import { lerNomeArquivo, casarLoja } from "@/lib/ler-nome-arquivo";
 
@@ -201,6 +202,9 @@ export async function importarCaixaEntradaDrive() {
             ].filter(Boolean).join("; ")}.`
           : null;
 
+        // enriquece com dados do GLPI (requerente) — best-effort, não derruba
+        const dadosGlpi = ch.chamadoNumero ? await buscarDadosChamado(ch.chamadoNumero) : null;
+
         await supabase.from("caixa_entrada_boletos").insert({
           drive_file_id: ch.pastaId,
           nome_arquivo: `Chamado ${ch.chamadoNumero ?? "?"}${ch.lojaTexto ? " — " + ch.lojaTexto : ""}`,
@@ -209,6 +213,7 @@ export async function importarCaixaEntradaDrive() {
           chamado_numero: ch.chamadoNumero,
           chamado_pasta_id: ch.pastaId,
           chamado_rotulo: ch.lojaTexto,
+          requerente: dadosGlpi?.requerente ?? null,
           tipo_detectado: "compra",
           fornecedor_detectado: nf?.fornecedor ?? null,
           cnpj_detectado: nf?.cnpj ?? null,
