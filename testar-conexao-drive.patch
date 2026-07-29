@@ -1,0 +1,182 @@
+diff --git a/app/(app)/configuracoes/page.tsx b/app/(app)/configuracoes/page.tsx
+index 3ca546c..77511bc 100644
+--- a/app/(app)/configuracoes/page.tsx
++++ b/app/(app)/configuracoes/page.tsx
+@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
+ import MenuAdminClient from "./menu-admin-client";
+ import CalendarioAdminClient from "./calendario-admin-client";
+ import TestarSlackButton from "./testar-slack-button";
++import TestarDriveButton from "./testar-drive-button";
+ import TrocarSenhaForm from "./trocar-senha-form";
+ import { podeAcessar, SemPermissao } from "@/lib/permissoes";
+ 
+@@ -91,6 +92,14 @@ export default async function ConfiguracoesPage() {
+           </div>
+         )}
+ 
++        {ehAdmin && (
++          <div className="mt-8">
++            <h2 className="text-[16px] font-semibold text-[#1a1a1a] mb-1">Conexão com o Google Drive</h2>
++            <p className="text-[13px] text-[#6c757d] mb-4">Verifica se o sistema consegue acessar o Drive, mostra com qual conta está conectado e se as pastas de entrada e saída estão acessíveis. Não faz upload nem varredura — só testa.</p>
++            <TestarDriveButton />
++          </div>
++        )}
++
+         {ehAdmin && (
+           <div className="mt-8">
+             <h2 className="text-[16px] font-semibold text-[#1a1a1a] mb-1">Notificação diária no Slack</h2>
+diff --git a/app/(app)/configuracoes/testar-drive-button.tsx b/app/(app)/configuracoes/testar-drive-button.tsx
+new file mode 100644
+index 0000000..932cfef
+--- /dev/null
++++ b/app/(app)/configuracoes/testar-drive-button.tsx
+@@ -0,0 +1,64 @@
++"use client";
++
++import { useState } from "react";
++
++type Check = { nome: string; ok: boolean; detalhe: string };
++
++export default function TestarDriveButton() {
++  const [rodando, setRodando] = useState(false);
++  const [checks, setChecks] = useState<Check[] | null>(null);
++  const [erroGeral, setErroGeral] = useState<string | null>(null);
++  const [conta, setConta] = useState<string | null>(null);
++
++  async function testar() {
++    setRodando(true);
++    setChecks(null);
++    setErroGeral(null);
++    setConta(null);
++    try {
++      const resp = await fetch("/api/testar-drive", { method: "POST" });
++      const json = await resp.json();
++      if (!resp.ok && !json.checks) {
++        setErroGeral(json.error ?? "Erro ao testar.");
++      } else {
++        setChecks(json.checks ?? null);
++        setConta(json.contaEmail ?? null);
++      }
++    } catch {
++      setErroGeral("Não foi possível chamar a rota. Confere se o deploy mais recente já está no ar.");
++    }
++    setRodando(false);
++  }
++
++  return (
++    <div className="card p-5">
++      <button onClick={testar} disabled={rodando} className="btn-primario disabled:opacity-50">
++        {rodando ? "Testando..." : "Testar conexão com o Drive"}
++      </button>
++
++      {erroGeral && (
++        <div className="mt-3 text-[13px] rounded-md px-3 py-2.5 bg-alerr-bg text-alerr">{erroGeral}</div>
++      )}
++
++      {conta && (
++        <div className="mt-3 text-[13px] rounded-md px-3 py-2.5 bg-info-bg text-info">
++          Conectado como <strong>{conta}</strong> — confira se é a conta Google que você espera.
++        </div>
++      )}
++
++      {checks && (
++        <div className="mt-3 border border-linha rounded-lg divide-y divide-linha2">
++          {checks.map((c) => (
++            <div key={c.nome} className="flex items-start justify-between gap-3 px-3 py-2">
++              <div className="min-w-0">
++                <div className="text-[12.5px] font-medium text-[#1a1a1a]">{c.nome}</div>
++                <div className={`text-[11.5px] break-all ${c.ok ? "text-[#6c757d]" : "text-alerr"}`}>{c.detalhe}</div>
++              </div>
++              <span className={`text-[13px] shrink-0 ${c.ok ? "text-ok" : "text-alerr"}`}>{c.ok ? "✓" : "✕"}</span>
++            </div>
++          ))}
++        </div>
++      )}
++    </div>
++  );
++}
+diff --git a/app/api/testar-drive/route.ts b/app/api/testar-drive/route.ts
+new file mode 100644
+index 0000000..2534871
+--- /dev/null
++++ b/app/api/testar-drive/route.ts
+@@ -0,0 +1,24 @@
++import { NextResponse } from "next/server";
++import { createClient } from "@/lib/supabase/server";
++import { testarConexaoDrive } from "@/lib/google-drive";
++
++export const runtime = "nodejs";
++export const dynamic = "force-dynamic";
++
++export async function POST() {
++  const supabase = createClient();
++  const { data: { session } } = await supabase.auth.getSession();
++  if (!session) return NextResponse.json({ error: "Você precisa estar logado." }, { status: 401 });
++
++  const { data: perfil } = await supabase.from("perfis").select("papel").eq("id", session.user.id).single();
++  if (perfil?.papel !== "admin" && perfil?.papel !== "gestor") {
++    return NextResponse.json({ error: "Só gestor ou admin podem testar." }, { status: 403 });
++  }
++
++  try {
++    const r = await testarConexaoDrive();
++    return NextResponse.json(r);
++  } catch (err: any) {
++    return NextResponse.json({ ok: false, error: err?.message ?? "Erro ao testar o Drive." }, { status: 500 });
++  }
++}
+diff --git a/lib/google-drive.ts b/lib/google-drive.ts
+index 6dc493f..f234954 100644
+--- a/lib/google-drive.ts
++++ b/lib/google-drive.ts
+@@ -300,3 +300,50 @@ export async function listarChamadosGLPI(raizId: string): Promise<ChamadoGLPI[]>
+   }
+   return resultado;
+ }
++
++/**
++ * Teste de diagnóstico da conexão com o Drive. Não faz upload nem varredura:
++ * só confirma se as variáveis existem, se a credencial autentica (e COMO QUAL
++ * conta), e se as duas pastas (entrada e saída) são acessíveis por ela.
++ * Devolve um relatório item a item pra aparecer na tela de Configurações.
++ */
++export async function testarConexaoDrive() {
++  const checks: { nome: string; ok: boolean; detalhe: string }[] = [];
++
++  const envs = [
++    "GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_OAUTH_REDIRECT_URI",
++    "GOOGLE_OAUTH_REFRESH_TOKEN", "GOOGLE_DRIVE_INBOX_FOLDER_ID", "GOOGLE_DRIVE_FOLDER_ID",
++  ];
++  for (const e of envs) {
++    checks.push({ nome: e, ok: !!process.env[e], detalhe: process.env[e] ? "configurada" : "FALTANDO" });
++  }
++
++  let contaEmail: string | null = null;
++  try {
++    const drive = getDrive();
++    const about = await drive.about.get({ fields: "user(emailAddress,displayName)" });
++    contaEmail = about.data.user?.emailAddress ?? null;
++    checks.push({ nome: "Autenticação no Drive", ok: true, detalhe: `Conectado como ${contaEmail ?? "conta desconhecida"}` });
++  } catch (err: any) {
++    const g = err?.response?.data;
++    const msg = g?.error ? `${g.error}${g.error_description ? " — " + g.error_description : ""}` : (err?.message ?? "erro desconhecido");
++    checks.push({ nome: "Autenticação no Drive", ok: false, detalhe: msg });
++    return { ok: false, contaEmail, checks }; // sem autenticar, não dá pra testar as pastas
++  }
++
++  for (const [nome, id] of [
++    ["Pasta de ENTRADA (varredura)", process.env.GOOGLE_DRIVE_INBOX_FOLDER_ID],
++    ["Pasta de SAÍDA (upload)", process.env.GOOGLE_DRIVE_FOLDER_ID],
++  ] as const) {
++    if (!id) { checks.push({ nome, ok: false, detalhe: "ID não configurado" }); continue; }
++    try {
++      const drive = getDrive();
++      const f = await drive.files.get({ fileId: id, fields: "id,name", supportsAllDrives: true });
++      checks.push({ nome, ok: true, detalhe: `"${f.data.name}" acessível` });
++    } catch (err: any) {
++      checks.push({ nome, ok: false, detalhe: err?.message ?? "não acessível — a pasta pode ser de outra conta Google" });
++    }
++  }
++
++  return { ok: checks.every((c) => c.ok), contaEmail, checks };
++}

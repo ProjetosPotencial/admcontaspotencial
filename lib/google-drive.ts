@@ -236,3 +236,50 @@ export async function listarChamadosGLPI(raizId: string): Promise<ChamadoGLPI[]>
   }
   return resultado;
 }
+
+/**
+ * Teste de diagnóstico da conexão com o Drive. Não faz upload nem varredura:
+ * só confirma se as variáveis existem, se a credencial autentica (e COMO QUAL
+ * conta), e se as duas pastas (entrada e saída) são acessíveis por ela.
+ * Devolve um relatório item a item pra aparecer na tela de Configurações.
+ */
+export async function testarConexaoDrive() {
+  const checks: { nome: string; ok: boolean; detalhe: string }[] = [];
+
+  const envs = [
+    "GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_OAUTH_REDIRECT_URI",
+    "GOOGLE_OAUTH_REFRESH_TOKEN", "GOOGLE_DRIVE_INBOX_FOLDER_ID", "GOOGLE_DRIVE_FOLDER_ID",
+  ];
+  for (const e of envs) {
+    checks.push({ nome: e, ok: !!process.env[e], detalhe: process.env[e] ? "configurada" : "FALTANDO" });
+  }
+
+  let contaEmail: string | null = null;
+  try {
+    const drive = getDrive();
+    const about = await drive.about.get({ fields: "user(emailAddress,displayName)" });
+    contaEmail = about.data.user?.emailAddress ?? null;
+    checks.push({ nome: "Autenticação no Drive", ok: true, detalhe: `Conectado como ${contaEmail ?? "conta desconhecida"}` });
+  } catch (err: any) {
+    const g = err?.response?.data;
+    const msg = g?.error ? `${g.error}${g.error_description ? " — " + g.error_description : ""}` : (err?.message ?? "erro desconhecido");
+    checks.push({ nome: "Autenticação no Drive", ok: false, detalhe: msg });
+    return { ok: false, contaEmail, checks }; // sem autenticar, não dá pra testar as pastas
+  }
+
+  for (const [nome, id] of [
+    ["Pasta de ENTRADA (varredura)", process.env.GOOGLE_DRIVE_INBOX_FOLDER_ID],
+    ["Pasta de SAÍDA (upload)", process.env.GOOGLE_DRIVE_FOLDER_ID],
+  ] as const) {
+    if (!id) { checks.push({ nome, ok: false, detalhe: "ID não configurado" }); continue; }
+    try {
+      const drive = getDrive();
+      const f = await drive.files.get({ fileId: id, fields: "id,name", supportsAllDrives: true });
+      checks.push({ nome, ok: true, detalhe: `"${f.data.name}" acessível` });
+    } catch (err: any) {
+      checks.push({ nome, ok: false, detalhe: err?.message ?? "não acessível — a pasta pode ser de outra conta Google" });
+    }
+  }
+
+  return { ok: checks.every((c) => c.ok), contaEmail, checks };
+}

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import MenuAdminClient from "./menu-admin-client";
 import CalendarioAdminClient from "./calendario-admin-client";
 import TestarSlackButton from "./testar-slack-button";
+import TestarDriveButton from "./testar-drive-button";
 import TrocarSenhaForm from "./trocar-senha-form";
 import { podeAcessar, SemPermissao } from "@/lib/permissoes";
 
@@ -88,6 +89,14 @@ export default async function ConfiguracoesPage() {
             <h2 className="text-[16px] font-semibold text-[#1a1a1a] mb-1">Menu do sistema</h2>
             <p className="text-[13px] text-[#6c757d] mb-4">Quem vê cada item, por papel mínimo. Só administradores acessam isto.</p>
             <MenuAdminClient itens={(menuItens ?? []) as any[]} />
+          </div>
+        )}
+
+        {ehAdmin && (
+          <div className="mt-8">
+            <h2 className="text-[16px] font-semibold text-[#1a1a1a] mb-1">Conexão com o Google Drive</h2>
+            <p className="text-[13px] text-[#6c757d] mb-4">Verifica se o sistema consegue acessar o Drive, mostra com qual conta está conectado e se as pastas de entrada e saída estão acessíveis. Não faz upload nem varredura — só testa.</p>
+            <TestarDriveButton />
           </div>
         )}
 
