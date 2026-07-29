@@ -1,0 +1,29 @@
+diff --git a/app/(app)/contas/contas-client.tsx b/app/(app)/contas/contas-client.tsx
+index 43c9c0b..8ed7a41 100644
+--- a/app/(app)/contas/contas-client.tsx
++++ b/app/(app)/contas/contas-client.tsx
+@@ -239,9 +239,15 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
+       // salvo, e ela continua acessível pelo filtro de status "Encerrada")
+       const st = fStatus === "todos" ? c.status !== "encerrado" : c.status === fStatus;
+       const sit = situacaoPorConta[c.id] ?? "pendente";
++      const diaHoje = new Date().getDate();
+       const si =
+         fSituacao === "todos" ? true
+         : fSituacao === "atrasada" ? estaAtrasada(sit, c.dia_vencimento, mes, ano, undefined, cal)
++        : fSituacao === "a_vencer" ? (
++            sit === "pendente" && c.dia_vencimento != null &&
++            c.dia_vencimento >= diaHoje && c.dia_vencimento <= diaHoje + 7 &&
++            !estaAtrasada(sit, c.dia_vencimento, mes, ano, undefined, cal)
++          )
+         : sit === fSituacao;
+       const q =
+         buscaDebounced === "" ||
+@@ -346,7 +352,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
+           <select value={fSituacao} onChange={(e) => setFSituacao(e.target.value)}
+             className="h-10 bg-white border border-linha rounded-md px-3 text-[13px] text-[#1a1a1a] min-w-[170px]">
+             <option value="todos">Qualquer situação</option>
+-            <option value="pendente">Em aberto</option><option value="atrasada">Atrasadas</option><option value="lancado">Aguardando pagamento</option><option value="pago">Pagas</option>
++            <option value="pendente">Em aberto</option><option value="a_vencer">A vencer (7 dias)</option><option value="atrasada">Atrasadas</option><option value="lancado">Aguardando pagamento</option><option value="pago">Pagas</option>
+           </select>
+           {temFiltro && (
+             <button onClick={limparFiltros} className="flex items-center gap-1.5 text-[13px] text-[#6c757d] hover:text-alerr font-medium">
