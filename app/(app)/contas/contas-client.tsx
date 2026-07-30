@@ -452,6 +452,8 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
   const supabase = createClient();
   const router = useRouter();
   const T = TIPOS[conta.tipo];
+  const ehCompraNF = conta.tipo === "compra" || conta.tipo === "nota_fiscal";
+  const fmtCnpj = (c?: string | null) => (c ? c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2}).*/, "$1.$2.$3/$4-$5") : "—");
   const [lancs, setLancs] = useState<Lancamento[]>([]);
   const [mesHover, setMesHover] = useState<number | null>(null);
   const [login, setLogin] = useState<string | null>(null);
@@ -1043,12 +1045,21 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
             )}
           </div>
           {!editandoDetalhes ? (
+            ehCompraNF ? (
+            <div className="grid grid-cols-2 gap-y-3.5 mb-6">
+              <Campo label="Fornecedor" valor={detFornecedor || "—"} />
+              {conta.tipo === "compra" && <Campo label="Nº do chamado" valor={conta.chamado_numero || "—"} mono />}
+              <Campo label="Nº da nota fiscal" valor={conta.numero_nf || "—"} mono />
+              <Campo label="Origem" valor="SIGA POTENCIAL" />
+            </div>
+            ) : (
             <div className="grid grid-cols-2 gap-y-3.5 mb-6">
               <Campo label="Fornecedor" valor={detFornecedor || "—"} />
               <Campo label="Vencimento" valor={detVenc ? `dia ${detVenc}` : "—"} />
               <Campo label={CAMPOS_TIPO[conta.tipo]?.labelIdentificador ?? "Código da conta"} valor={detIdent || "—"} mono />
               <Campo label="Origem" valor={ORIGENS[detOrigem]} />
             </div>
+            )
           ) : (
             <div className="mb-6 space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -1183,7 +1194,20 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
             )}
           </div>
 
-          <div className="pt-5 border-t border-linha">
+          {ehCompraNF && (
+            <div className="pt-5 border-t border-linha mb-1">
+              <div className="text-[14px] font-semibold text-[#1a1a1a] mb-1">Dados da nota fiscal</div>
+              <p className="text-[11.5px] text-[#adb5bd] mb-3">Lidos automaticamente da NF. Confira e ajuste na Caixa de Entrada antes de lançar, se precisar.</p>
+              <div className="grid grid-cols-2 gap-y-3.5 gap-x-3 mb-6">
+                <Campo label="Remetente" valor={conta.fornecedor_nome || "—"} />
+                <Campo label="CNPJ do remetente" valor={fmtCnpj(conta.remetente_cnpj)} mono />
+                <Campo label="Destinatário" valor={conta.destinatario_razao || "—"} />
+                <Campo label="CNPJ do destinatário" valor={fmtCnpj(conta.destinatario_cnpj)} mono />
+              </div>
+            </div>
+          )}
+
+          <div className={`pt-5 border-t border-linha ${ehCompraNF ? "hidden" : ""}`}>
             <div className="flex items-center justify-between mb-4">
               <div className="text-[14px] font-semibold text-[#1a1a1a]">Credenciais</div>
               <button onClick={() => { setEditandoCred((v) => !v); setNovoLogin(login ?? ""); setNovaSenha(""); }}

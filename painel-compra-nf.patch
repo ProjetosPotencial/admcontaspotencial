@@ -1,0 +1,155 @@
+diff --git a/app/(app)/caixa-entrada/caixa-entrada-client.tsx b/app/(app)/caixa-entrada/caixa-entrada-client.tsx
+index 2783736..f747257 100644
+--- a/app/(app)/caixa-entrada/caixa-entrada-client.tsx
++++ b/app/(app)/caixa-entrada/caixa-entrada-client.tsx
+@@ -14,6 +14,7 @@ type Item = {
+   classe_documento?: "boleto" | "nota_fiscal" | "chamado" | null;
+   chamado_numero?: string | null; chamado_rotulo?: string | null;
+   requerente?: string | null;
++  destinatario_detectado?: string | null; destinatario_cnpj_detectado?: string | null;
+   beneficiario?: string | null;
+   fornecedor_detectado?: string | null; cnpj_detectado?: string | null;
+   numero_documento_detectado?: string | null;
+@@ -110,6 +111,15 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
+         contaId = nova.id;
+       }
+ 
++      // grava os dados da NF/chamado na conta (reflete o último lançamento)
++      await supabase.from("contas").update({
++        chamado_numero: item.chamado_numero ?? null,
++        numero_nf: item.numero_documento_detectado ?? null,
++        remetente_cnpj: item.cnpj_detectado ?? null,
++        destinatario_razao: item.destinatario_detectado ?? null,
++        destinatario_cnpj: item.destinatario_cnpj_detectado ?? null,
++      }).eq("id", contaId);
++
+       const agora = new Date();
+       const { data: { user } } = await supabase.auth.getUser();
+       const { data: lanc, error } = await supabase.from("lancamentos").upsert({
+@@ -196,6 +206,14 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
+         contaId = nova.id;
+       }
+ 
++      // grava os dados da NF na conta (reflete o último lançamento)
++      await supabase.from("contas").update({
++        numero_nf: item.numero_documento_detectado ?? null,
++        remetente_cnpj: item.cnpj_detectado ?? null,
++        destinatario_razao: item.destinatario_detectado ?? null,
++        destinatario_cnpj: item.destinatario_cnpj_detectado ?? null,
++      }).eq("id", contaId);
++
+       const agora = new Date();
+       const { data: { user } } = await supabase.auth.getUser();
+       const { data: lanc, error } = await supabase.from("lancamentos").upsert({
+diff --git a/app/(app)/caixa-entrada/page.tsx b/app/(app)/caixa-entrada/page.tsx
+index 13ed2ce..1066bfb 100644
+--- a/app/(app)/caixa-entrada/page.tsx
++++ b/app/(app)/caixa-entrada/page.tsx
+@@ -11,7 +11,7 @@ export default async function CaixaEntradaPage() {
+   const [{ data: pendentes }, { data: lojas }] = await Promise.all([
+     supabase
+       .from("caixa_entrada_boletos")
+-      .select("id, nome_arquivo, drive_web_view_link, valor_detectado, codigo_barras_detectado, tipo_detectado, loja_sugerida_id, loja_sugerida_texto, conta_sugerida_id, confianca, status, observacao, importado_em, competencia_ano, competencia_mes, classe_documento, fornecedor_detectado, cnpj_detectado, numero_documento_detectado, emissao_ano, emissao_mes, emissao_dia, duplicada, chamado_numero, chamado_rotulo, beneficiario, requerente")
++      .select("id, nome_arquivo, drive_web_view_link, valor_detectado, codigo_barras_detectado, tipo_detectado, loja_sugerida_id, loja_sugerida_texto, conta_sugerida_id, confianca, status, observacao, importado_em, competencia_ano, competencia_mes, classe_documento, fornecedor_detectado, cnpj_detectado, numero_documento_detectado, emissao_ano, emissao_mes, emissao_dia, duplicada, chamado_numero, chamado_rotulo, beneficiario, requerente, destinatario_detectado, destinatario_cnpj_detectado")
+       .eq("status", "pendente")
+       .order("importado_em", { ascending: false }),
+     supabase.from("lojas").select("id, codigo, coban, cnpj, cidade, uf, responsavel, contato, setor, empresa, empresas ( nome, razao_social, cnpj )").eq("status", "ativo").order("codigo"),
+diff --git a/app/(app)/contas/contas-client.tsx b/app/(app)/contas/contas-client.tsx
+index 8ed7a41..d482daf 100644
+--- a/app/(app)/contas/contas-client.tsx
++++ b/app/(app)/contas/contas-client.tsx
+@@ -452,6 +452,8 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
+   const supabase = createClient();
+   const router = useRouter();
+   const T = TIPOS[conta.tipo];
++  const ehCompraNF = conta.tipo === "compra" || conta.tipo === "nota_fiscal";
++  const fmtCnpj = (c?: string | null) => (c ? c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2}).*/, "$1.$2.$3/$4-$5") : "—");
+   const [lancs, setLancs] = useState<Lancamento[]>([]);
+   const [mesHover, setMesHover] = useState<number | null>(null);
+   const [login, setLogin] = useState<string | null>(null);
+@@ -1043,12 +1045,21 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
+             )}
+           </div>
+           {!editandoDetalhes ? (
++            ehCompraNF ? (
++            <div className="grid grid-cols-2 gap-y-3.5 mb-6">
++              <Campo label="Fornecedor" valor={detFornecedor || "—"} />
++              {conta.tipo === "compra" && <Campo label="Nº do chamado" valor={conta.chamado_numero || "—"} mono />}
++              <Campo label="Nº da nota fiscal" valor={conta.numero_nf || "—"} mono />
++              <Campo label="Origem" valor="SIGA POTENCIAL" />
++            </div>
++            ) : (
+             <div className="grid grid-cols-2 gap-y-3.5 mb-6">
+               <Campo label="Fornecedor" valor={detFornecedor || "—"} />
+               <Campo label="Vencimento" valor={detVenc ? `dia ${detVenc}` : "—"} />
+               <Campo label={CAMPOS_TIPO[conta.tipo]?.labelIdentificador ?? "Código da conta"} valor={detIdent || "—"} mono />
+               <Campo label="Origem" valor={ORIGENS[detOrigem]} />
+             </div>
++            )
+           ) : (
+             <div className="mb-6 space-y-3">
+               <div className="grid grid-cols-2 gap-3">
+@@ -1183,7 +1194,20 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
+             )}
+           </div>
+ 
+-          <div className="pt-5 border-t border-linha">
++          {ehCompraNF && (
++            <div className="pt-5 border-t border-linha mb-1">
++              <div className="text-[14px] font-semibold text-[#1a1a1a] mb-1">Dados da nota fiscal</div>
++              <p className="text-[11.5px] text-[#adb5bd] mb-3">Lidos automaticamente da NF. Confira e ajuste na Caixa de Entrada antes de lançar, se precisar.</p>
++              <div className="grid grid-cols-2 gap-y-3.5 gap-x-3 mb-6">
++                <Campo label="Remetente" valor={conta.fornecedor_nome || "—"} />
++                <Campo label="CNPJ do remetente" valor={fmtCnpj(conta.remetente_cnpj)} mono />
++                <Campo label="Destinatário" valor={conta.destinatario_razao || "—"} />
++                <Campo label="CNPJ do destinatário" valor={fmtCnpj(conta.destinatario_cnpj)} mono />
++              </div>
++            </div>
++          )}
++
++          <div className={`pt-5 border-t border-linha ${ehCompraNF ? "hidden" : ""}`}>
+             <div className="flex items-center justify-between mb-4">
+               <div className="text-[14px] font-semibold text-[#1a1a1a]">Credenciais</div>
+               <button onClick={() => { setEditandoCred((v) => !v); setNovoLogin(login ?? ""); setNovaSenha(""); }}
+diff --git a/app/(app)/contas/page.tsx b/app/(app)/contas/page.tsx
+index 8dd0007..058fe73 100644
+--- a/app/(app)/contas/page.tsx
++++ b/app/(app)/contas/page.tsx
+@@ -30,7 +30,7 @@ export default async function ContasPage() {
+   ] = await Promise.all([
+     supabase
+       .from("contas")
+-      .select("id, tipo, fornecedor_nome, identificador, dia_vencimento, origem, cnpj_cpf, insc_cod_mat, portal_link, eh_rateio, rateio_divisor, observacoes, status, data_encerramento, motivo_encerramento, loja_id, lojas ( codigo, coban, empresas ( nome ) )")
++      .select("id, tipo, fornecedor_nome, identificador, dia_vencimento, origem, cnpj_cpf, insc_cod_mat, portal_link, eh_rateio, rateio_divisor, observacoes, status, data_encerramento, motivo_encerramento, chamado_numero, numero_nf, remetente_cnpj, destinatario_razao, destinatario_cnpj, loja_id, lojas ( codigo, coban, empresas ( nome ) )")
+       .eq("situacao_cadastro", "aprovada")
+       .order("dia_vencimento", { ascending: true, nullsFirst: false }),
+     supabase.from("lancamentos").select("conta_id, situacao").eq("ano", ano).eq("mes", mes),
+diff --git a/lib/importar-caixa-entrada.ts b/lib/importar-caixa-entrada.ts
+index c0586c4..dd672d3 100644
+--- a/lib/importar-caixa-entrada.ts
++++ b/lib/importar-caixa-entrada.ts
+@@ -85,6 +85,8 @@ export async function importarCaixaEntradaDrive() {
+           tipo_detectado: extraido.tipo_conta,
+           fornecedor_detectado: extraido.fornecedor,
+           cnpj_detectado: extraido.cnpj,
++          destinatario_detectado: extraido.destinatario,
++          destinatario_cnpj_detectado: extraido.destinatario_cnpj,
+           numero_documento_detectado: extraido.numero_documento,
+           codigo_barras_detectado: extraido.codigo_barras,
+           emissao_ano: extraido.data_emissao?.ano ?? null,
+diff --git a/lib/types.ts b/lib/types.ts
+index 5b0f436..e0b5250 100644
+--- a/lib/types.ts
++++ b/lib/types.ts
+@@ -45,6 +45,11 @@ export type Conta = {
+   rateio_divisor: number | null;
+   observacoes: string | null;
+   status: string;
++  chamado_numero?: string | null;
++  numero_nf?: string | null;
++  remetente_cnpj?: string | null;
++  destinatario_razao?: string | null;
++  destinatario_cnpj?: string | null;
+   loja_id: string;
+   lojas: { codigo: string; coban: string; empresas: { nome: string } | null } | null;
+ };

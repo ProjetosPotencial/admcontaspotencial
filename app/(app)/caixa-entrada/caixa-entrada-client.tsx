@@ -14,6 +14,7 @@ type Item = {
   classe_documento?: "boleto" | "nota_fiscal" | "chamado" | null;
   chamado_numero?: string | null; chamado_rotulo?: string | null;
   requerente?: string | null;
+  destinatario_detectado?: string | null; destinatario_cnpj_detectado?: string | null;
   beneficiario?: string | null;
   fornecedor_detectado?: string | null; cnpj_detectado?: string | null;
   numero_documento_detectado?: string | null;
@@ -105,6 +106,15 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
         contaId = nova.id;
       }
 
+      // grava os dados da NF/chamado na conta (reflete o último lançamento)
+      await supabase.from("contas").update({
+        chamado_numero: item.chamado_numero ?? null,
+        numero_nf: item.numero_documento_detectado ?? null,
+        remetente_cnpj: item.cnpj_detectado ?? null,
+        destinatario_razao: item.destinatario_detectado ?? null,
+        destinatario_cnpj: item.destinatario_cnpj_detectado ?? null,
+      }).eq("id", contaId);
+
       const agora = new Date();
       const { data: { user } } = await supabase.auth.getUser();
       const { data: lanc, error } = await supabase.from("lancamentos").upsert({
@@ -178,6 +188,14 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
         if (errConta || !nova) { setToast("Não foi possível criar a conta."); setProcessando(null); return; }
         contaId = nova.id;
       }
+
+      // grava os dados da NF na conta (reflete o último lançamento)
+      await supabase.from("contas").update({
+        numero_nf: item.numero_documento_detectado ?? null,
+        remetente_cnpj: item.cnpj_detectado ?? null,
+        destinatario_razao: item.destinatario_detectado ?? null,
+        destinatario_cnpj: item.destinatario_cnpj_detectado ?? null,
+      }).eq("id", contaId);
 
       const agora = new Date();
       const { data: { user } } = await supabase.auth.getUser();

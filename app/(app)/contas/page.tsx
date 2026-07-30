@@ -30,7 +30,7 @@ export default async function ContasPage() {
   ] = await Promise.all([
     supabase
       .from("contas")
-      .select("id, tipo, fornecedor_nome, identificador, dia_vencimento, origem, cnpj_cpf, insc_cod_mat, portal_link, eh_rateio, rateio_divisor, observacoes, status, data_encerramento, motivo_encerramento, loja_id, lojas ( codigo, coban, empresas ( nome ) )")
+      .select("id, tipo, fornecedor_nome, identificador, dia_vencimento, origem, cnpj_cpf, insc_cod_mat, portal_link, eh_rateio, rateio_divisor, observacoes, status, data_encerramento, motivo_encerramento, chamado_numero, numero_nf, remetente_cnpj, destinatario_razao, destinatario_cnpj, loja_id, lojas ( codigo, coban, empresas ( nome ) )")
       .eq("situacao_cadastro", "aprovada")
       .order("dia_vencimento", { ascending: true, nullsFirst: false }),
     supabase.from("lancamentos").select("conta_id, situacao").eq("ano", ano).eq("mes", mes),

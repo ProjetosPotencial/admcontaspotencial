@@ -85,6 +85,8 @@ export async function importarCaixaEntradaDrive() {
           tipo_detectado: extraido.tipo_conta,
           fornecedor_detectado: extraido.fornecedor,
           cnpj_detectado: extraido.cnpj,
+          destinatario_detectado: extraido.destinatario,
+          destinatario_cnpj_detectado: extraido.destinatario_cnpj,
           numero_documento_detectado: extraido.numero_documento,
           codigo_barras_detectado: extraido.codigo_barras,
           emissao_ano: extraido.data_emissao?.ano ?? null,
