@@ -217,6 +217,8 @@ export async function importarCaixaEntradaDrive() {
           tipo_detectado: "compra",
           fornecedor_detectado: nf?.fornecedor ?? null,
           cnpj_detectado: nf?.cnpj ?? null,
+          destinatario_detectado: nf?.destinatario ?? null,
+          destinatario_cnpj_detectado: nf?.destinatario_cnpj ?? null,
           numero_documento_detectado: nf?.numero_documento ?? null,
           emissao_ano: nf?.data_emissao?.ano ?? null,
           emissao_mes: nf?.data_emissao?.mes ?? null,
