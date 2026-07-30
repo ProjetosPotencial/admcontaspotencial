@@ -312,7 +312,9 @@ export async function importarCaixaEntradaDrive() {
             try {
               const buf = await baixarArquivoDoDrive(pdf.id);
               const ext = await extrairDadosBoleto(buf, pdf.name, pdf.mimeType);
-              if (ext?.classe_documento === "nota_fiscal") notas.push({ ext, pdf });
+              // aceita como NF se a IA classificou nota_fiscal OU se leu número da NF / chave de acesso
+              const pareceNota = ext?.classe_documento === "nota_fiscal" || !!ext?.chave_acesso || !!ext?.numero_documento;
+              if (ext && pareceNota) notas.push({ ext, pdf });
             } catch { /* arquivo ilegível: ignora, não derruba */ }
           }
 
