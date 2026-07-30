@@ -13,11 +13,13 @@ const PROMPT = `Esse arquivo é um documento financeiro brasileiro que pode ser 
 8. "tipo_conta": categoria, um destes: "agua","energia","telefone","iptu","condominio","aluguel","imposto" (ISS/ISSQN/IRRF e tributos), "custo_geral" (serviços, honorários, software, materiais e qualquer outro). null se incerto.
 9. "loja_mencionada": se o documento citar claramente uma loja/unidade/endereço, extraia esse texto. null se não. (NF de custo de empresa normalmente não cita loja.)
 10. "parece_documento_valido": true se for de fato um boleto/fatura OU uma nota fiscal de verdade. false se for foto qualquer, documento em branco, print de conversa ou arquivo ilegível.
+11. "destinatario": a razão social do DESTINATÁRIO/TOMADOR da nota (a empresa que RECEBEU, normalmente uma empresa do Grupo Potencial, ex: "POTENCIAL LOTERIAS LTDA"). Só para nota fiscal. null se não achar.
+12. "destinatario_cnpj": o CNPJ do destinatário/tomador, só dígitos. null se não achar.
 
 Responda SOMENTE com JSON válido, sem texto antes/depois, nesse formato:
-{"classe_documento":"nota_fiscal","valor":1877.00,"fornecedor":"MESSANO ADVOGADOS","cnpj":"12345678000199","codigo_barras":null,"numero_documento":"4521","data":{"dia":7,"mes":7,"ano":2026},"tipo_conta":"custo_geral","loja_mencionada":null,"parece_documento_valido":true}
+{"classe_documento":"nota_fiscal","valor":1877.00,"fornecedor":"MESSANO ADVOGADOS","cnpj":"12345678000199","codigo_barras":null,"numero_documento":"4521","data":{"dia":7,"mes":7,"ano":2026},"tipo_conta":"custo_geral","loja_mencionada":null,"parece_documento_valido":true,"destinatario":"POTENCIAL LOTERIAS LTDA","destinatario_cnpj":"08191494000140"}
 
-Se não for possível ler com confiança: {"classe_documento":null,"valor":null,"fornecedor":null,"cnpj":null,"codigo_barras":null,"numero_documento":null,"data":null,"tipo_conta":null,"loja_mencionada":null,"parece_documento_valido":false}. Nunca invente número.`;
+Se não for possível ler com confiança: {"classe_documento":null,"valor":null,"fornecedor":null,"cnpj":null,"codigo_barras":null,"numero_documento":null,"data":null,"tipo_conta":null,"loja_mencionada":null,"parece_documento_valido":false,"destinatario":null,"destinatario_cnpj":null}. Nunca invente número.`;
 
 export type ExtracaoBoleto = {
   classe_documento: "boleto" | "nota_fiscal" | null;
@@ -31,6 +33,8 @@ export type ExtracaoBoleto = {
   codigo_barras_fecha_matematicamente: boolean;
   tipo_conta: string | null;
   loja_mencionada: string | null;
+  destinatario: string | null;
+  destinatario_cnpj: string | null;
   dia_vencimento: number | null;
   data_emissao: { dia: number; mes: number; ano: number } | null;
 };
@@ -100,6 +104,8 @@ export async function extrairDadosBoleto(buffer: Buffer, nomeArquivo: string, mi
     codigo_barras_fecha_matematicamente: fechaMatematicamente,
     tipo_conta: json.tipo_conta || null,
     loja_mencionada: json.loja_mencionada || null,
+    destinatario: json.destinatario ? String(json.destinatario).trim() : null,
+    destinatario_cnpj: json.destinatario_cnpj ? String(json.destinatario_cnpj).replace(/\D/g, "") : null,
     dia_vencimento: diaVencimento,
     data_emissao: dataEmissao,
   };
