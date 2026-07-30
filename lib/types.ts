@@ -50,6 +50,7 @@ export type Conta = {
   remetente_cnpj?: string | null;
   destinatario_razao?: string | null;
   destinatario_cnpj?: string | null;
+  chave_acesso?: string | null;
   loja_id: string;
   lojas: { codigo: string; coban: string; empresas: { nome: string } | null } | null;
 };

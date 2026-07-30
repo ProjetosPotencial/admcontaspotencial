@@ -1226,12 +1226,20 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
               </div>
               <p className="text-[11.5px] text-[#adb5bd] mb-3">Lidos automaticamente da NF. Ajuste aqui se a leitura vier errada.</p>
               {!editandoNf ? (
-                <div className="grid grid-cols-2 gap-y-3.5 gap-x-3 mb-6">
+                <>
+                <div className="grid grid-cols-2 gap-y-3.5 gap-x-3 mb-3">
                   <Campo label="Remetente" valor={conta.fornecedor_nome || "—"} />
                   <Campo label="CNPJ do remetente" valor={fmtCnpj(nfRemetenteCnpj || conta.remetente_cnpj)} mono />
                   <Campo label="Destinatário" valor={nfDestRazao || conta.destinatario_razao || "—"} />
                   <Campo label="CNPJ do destinatário" valor={fmtCnpj(nfDestCnpj || conta.destinatario_cnpj)} mono />
                 </div>
+                {conta.chave_acesso && (
+                  <div className="mb-6">
+                    <div className="text-[11px] text-[#adb5bd] font-medium mb-0.5">Chave de acesso</div>
+                    <div className="text-[11px] font-mono text-[#1a1a1a] break-all">{conta.chave_acesso}</div>
+                  </div>
+                )}
+                </>
               ) : (
                 <div className="space-y-3 mb-6">
                   <label className="block">

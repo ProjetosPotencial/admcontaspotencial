@@ -15,6 +15,7 @@ type Item = {
   chamado_numero?: string | null; chamado_rotulo?: string | null;
   requerente?: string | null;
   destinatario_detectado?: string | null; destinatario_cnpj_detectado?: string | null;
+  chave_acesso?: string | null;
   beneficiario?: string | null;
   fornecedor_detectado?: string | null; cnpj_detectado?: string | null;
   numero_documento_detectado?: string | null;
@@ -113,6 +114,7 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
         remetente_cnpj: item.cnpj_detectado ?? null,
         destinatario_razao: item.destinatario_detectado ?? null,
         destinatario_cnpj: item.destinatario_cnpj_detectado ?? null,
+        chave_acesso: item.chave_acesso ?? null,
       }).eq("id", contaId);
 
       const agora = new Date();
@@ -195,6 +197,7 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
         remetente_cnpj: item.cnpj_detectado ?? null,
         destinatario_razao: item.destinatario_detectado ?? null,
         destinatario_cnpj: item.destinatario_cnpj_detectado ?? null,
+        chave_acesso: item.chave_acesso ?? null,
       }).eq("id", contaId);
 
       const agora = new Date();

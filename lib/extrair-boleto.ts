@@ -3,6 +3,8 @@ import { codigoBarrasFechaMatematicamente } from "@/lib/validar-codigo-barras";
 
 const PROMPT = `Esse arquivo é um documento financeiro brasileiro que pode ser (a) um BOLETO/FATURA DE CONSUMO (água, energia, telefone, IPTU, condomínio) ou (b) uma NOTA FISCAL (NF-e de produto ou NFS-e de serviço: honorários, softwares, serviços prestados, materiais). Primeiro identifique qual é, depois extraia os campos.
 
+PRECISÃO (muito importante): leia o documento com atenção e transcreva números EXATAMENTE, dígito a dígito, sem arredondar nem inventar. Para valores, use o VALOR TOTAL da nota/fatura (não subtotais, não retenções). Se um campo específico estiver ilegível ou ausente, use null — nunca chute. Confira CNPJs e a chave de acesso caractere a caractere.
+
 1. "classe_documento": "boleto" se for boleto bancário ou fatura de consumo com linha digitável; "nota_fiscal" se for nota fiscal (tem número da NF, emitente com CNPJ, discriminação de produto/serviço); null se não der pra dizer.
 2. "valor": o valor total a pagar/da nota, em reais, como número (ex: 118.95). null se não ler com confiança.
 3. "fornecedor": a razão social de QUEM EMITIU a nota — o EMITENTE / PRESTADOR DE SERVIÇOS. Em NFS-e aparece como "EMITENTE DA NFS-e" ou "PRESTADOR DE SERVIÇOS". É o lado que NÃO é a empresa do Grupo Potencial. Ex: "MESSANO ADVOGADOS", "TATI DOS CARTUCHOS LTDA", "SANEPAR". null se não achar.
@@ -15,11 +17,12 @@ const PROMPT = `Esse arquivo é um documento financeiro brasileiro que pode ser 
 10. "parece_documento_valido": true se for de fato um boleto/fatura OU uma nota fiscal de verdade. false se for foto qualquer, documento em branco, print de conversa ou arquivo ilegível.
 11. "destinatario": a razão social de QUEM RECEBEU a nota — quase sempre uma empresa do Grupo Potencial (o nome começa com "POTENCIAL", ex: "POTENCIAL LOTERIAS LTDA", "POTENCIAL EXPRESSO PAY LTDA"). Em NFS-e (nota de serviço) esse lado aparece como "TOMADOR DO SERVIÇO", "TOMADOR DE SERVIÇOS" ou "DADOS DO TOMADOR". Em NF-e de produto é o "DESTINATÁRIO". REGRA PRÁTICA IMPORTANTE: identifique os DOIS lados da nota (emitente/prestador e destinatário/tomador); o lado cujo nome é uma empresa "POTENCIAL ..." é o DESTINATÁRIO, e o outro lado é o "fornecedor". Nunca troque os dois. Só para nota fiscal. null se realmente não achar.
 12. "destinatario_cnpj": o CNPJ do destinatário/tomador — o CNPJ que aparece junto do nome da empresa Potencial, só dígitos (ex: "08191494005533"). null se não achar.
+13. "chave_acesso": a CHAVE DE ACESSO da nota fiscal eletrônica — 44 dígitos, aparece rotulada como "Chave de Acesso" (geralmente no topo da DANFE/DANFSe, perto do código QR). Transcreva só os dígitos, exatamente. null se não houver ou for boleto.
 
 Responda SOMENTE com JSON válido, sem texto antes/depois, nesse formato:
-{"classe_documento":"nota_fiscal","valor":1877.00,"fornecedor":"MESSANO ADVOGADOS","cnpj":"12345678000199","codigo_barras":null,"numero_documento":"4521","data":{"dia":7,"mes":7,"ano":2026},"tipo_conta":"custo_geral","loja_mencionada":null,"parece_documento_valido":true,"destinatario":"POTENCIAL LOTERIAS LTDA","destinatario_cnpj":"08191494000140"}
+{"classe_documento":"nota_fiscal","valor":1877.00,"fornecedor":"MESSANO ADVOGADOS","cnpj":"12345678000199","codigo_barras":null,"numero_documento":"4521","data":{"dia":7,"mes":7,"ano":2026},"tipo_conta":"custo_geral","loja_mencionada":null,"parece_documento_valido":true,"destinatario":"POTENCIAL LOTERIAS LTDA","destinatario_cnpj":"08191494000140","chave_acesso":"35150612345678000199550010000004521123456789"}
 
-Se não for possível ler com confiança: {"classe_documento":null,"valor":null,"fornecedor":null,"cnpj":null,"codigo_barras":null,"numero_documento":null,"data":null,"tipo_conta":null,"loja_mencionada":null,"parece_documento_valido":false,"destinatario":null,"destinatario_cnpj":null}. Nunca invente número.`;
+Se não for possível ler com confiança: {"classe_documento":null,"valor":null,"fornecedor":null,"cnpj":null,"codigo_barras":null,"numero_documento":null,"data":null,"tipo_conta":null,"loja_mencionada":null,"parece_documento_valido":false,"destinatario":null,"destinatario_cnpj":null,"chave_acesso":null}. Nunca invente número.`;
 
 export type ExtracaoBoleto = {
   classe_documento: "boleto" | "nota_fiscal" | null;
@@ -35,6 +38,7 @@ export type ExtracaoBoleto = {
   loja_mencionada: string | null;
   destinatario: string | null;
   destinatario_cnpj: string | null;
+  chave_acesso: string | null;
   dia_vencimento: number | null;
   data_emissao: { dia: number; mes: number; ano: number } | null;
 };
@@ -106,6 +110,7 @@ export async function extrairDadosBoleto(buffer: Buffer, nomeArquivo: string, mi
     loja_mencionada: json.loja_mencionada || null,
     destinatario: json.destinatario ? String(json.destinatario).trim() : null,
     destinatario_cnpj: json.destinatario_cnpj ? String(json.destinatario_cnpj).replace(/\D/g, "") : null,
+    chave_acesso: json.chave_acesso ? String(json.chave_acesso).replace(/\D/g, "") || null : null,
     dia_vencimento: diaVencimento,
     data_emissao: dataEmissao,
   };
