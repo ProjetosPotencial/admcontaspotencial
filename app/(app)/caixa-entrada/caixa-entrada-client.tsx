@@ -16,6 +16,7 @@ type Item = {
   requerente?: string | null;
   destinatario_detectado?: string | null; destinatario_cnpj_detectado?: string | null;
   chave_acesso?: string | null;
+  conta_existente_id?: string | null;
   beneficiario?: string | null;
   fornecedor_detectado?: string | null; cnpj_detectado?: string | null;
   numero_documento_detectado?: string | null;
@@ -23,7 +24,12 @@ type Item = {
   duplicada?: boolean | null;
 };
 
-type Loja = { id: string; codigo: string; empresas?: { nome: string | null } | null };
+type Loja = {
+  id: string; codigo: string;
+  coban?: string | null; cnpj?: string | null; cidade?: string | null; uf?: string | null;
+  responsavel?: string | null; contato?: string | null; setor?: string | null; empresa?: string | null;
+  empresas?: { nome: string | null; razao_social?: string | null; cnpj?: string | null } | null;
+};
 
 /** Dados que a janela de confirmação mostra antes de lançar de verdade. */
 type Previa = {
@@ -129,6 +135,18 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
       await supabase.from("caixa_entrada_boletos").update({
         status: "confirmado", revisado_por: user?.id ?? null, revisado_em: agora.toISOString(), lancamento_criado_id: lanc.id,
       }).eq("id", item.id);
+
+      // notifica o Slack (não bloqueia o fluxo se falhar)
+      fetch("/api/notificar-chamado-slack", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chamado: item.chamado_numero,
+          lojaId,
+          numeroNf: item.numero_documento_detectado,
+          pdfLink: item.drive_web_view_link,
+        }),
+      }).catch(() => {});
 
       setItens((lista) => lista.filter((i) => i.id !== item.id));
       setToast([
@@ -271,6 +289,36 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
     setTimeout(() => setToast(null), 5000);
   }
 
+  async function substituirLancamento(item: Item) {
+    if (!item.conta_existente_id) return;
+    setProcessando(item.id);
+    const contaId = item.conta_existente_id;
+    // atualiza os dados da NF na conta existente
+    await supabase.from("contas").update({
+      numero_nf: item.numero_documento_detectado ?? null,
+      remetente_cnpj: item.cnpj_detectado ?? null,
+      destinatario_razao: item.destinatario_detectado ?? null,
+      destinatario_cnpj: item.destinatario_cnpj_detectado ?? null,
+      chave_acesso: item.chave_acesso ?? null,
+    }).eq("id", contaId);
+    // atualiza o valor do último lançamento e registra histórico
+    const { data: lancs } = await supabase.from("lancamentos").select("id").eq("conta_id", contaId).order("lancado_em", { ascending: false }).limit(1);
+    if (lancs?.[0]?.id) {
+      if (item.valor_detectado != null) await supabase.from("lancamentos").update({ valor: item.valor_detectado }).eq("id", lancs[0].id);
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from("lancamento_historico").insert({
+        lancamento_id: lancs[0].id, de: "—",
+        para: item.numero_documento_detectado ? `NF ${item.numero_documento_detectado}` : "dados atualizados",
+        comentario: `Substituição por reenvio do chamado ${item.chamado_numero ?? ""}`.trim(),
+        quem: user?.id ?? null, em: new Date().toISOString(),
+      });
+    }
+    await supabase.from("caixa_entrada_boletos").update({ status: "confirmado", revisado_em: new Date().toISOString() }).eq("id", item.id);
+    setItens((lista) => lista.filter((i) => i.id !== item.id));
+    setToast("Lançamento substituído com sucesso.");
+    setProcessando(null);
+  }
+
   async function rejeitar(item: Item) {
     setProcessando(item.id);
     const { data: { user } } = await supabase.auth.getUser();
@@ -301,7 +349,8 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
             {chamados.map((item) => (
               <ChamadoCard key={item.id} item={item} lojas={lojas} processando={processando === item.id}
                 onConfirmarChamado={confirmarChamado} onRejeitar={rejeitar}
-                onEditado={(id, patch) => setItens((lista) => lista.map((i) => (i.id === id ? { ...i, ...patch } : i)))} />
+                onEditado={(id, patch) => setItens((lista) => lista.map((i) => (i.id === id ? { ...i, ...patch } : i)))}
+                onSubstituir={substituirLancamento} />
             ))}
             {boletos.length === 0 && chamados.length === 0 ? (
               <div className="card text-center py-10 text-[13px] text-[#adb5bd]">Nenhum boleto esperando revisão.</div>
@@ -335,11 +384,12 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
 
 type PreviaNF = { empresa: string };
 
-function ChamadoCard({ item, lojas, processando, onConfirmarChamado, onRejeitar, onEditado }: {
+function ChamadoCard({ item, lojas, processando, onConfirmarChamado, onRejeitar, onEditado, onSubstituir }: {
   item: Item; lojas: Loja[]; processando: boolean;
   onConfirmarChamado: (item: Item, lojaId: string) => void;
   onRejeitar: (item: Item) => void;
   onEditado: (id: string, patch: Partial<Item>) => void;
+  onSubstituir: (item: Item) => void;
 }) {
   const [lojaId, setLojaId] = useState("");
   const [busca, setBusca] = useState("");
@@ -469,11 +519,49 @@ function ChamadoCard({ item, lojas, processando, onConfirmarChamado, onRejeitar,
         )}
       </label>
 
+      {lojaSel && (() => {
+        const empresa = lojaSel.empresas?.razao_social || lojaSel.empresas?.nome || lojaSel.empresa || null;
+        const cnpjLoja = lojaSel.empresas?.cnpj || lojaSel.cnpj || null;
+        const local = [lojaSel.cidade, lojaSel.uf].filter(Boolean).join(" / ") || null;
+        const info: [string, string | null][] = [
+          ["Empresa", empresa],
+          ["CNPJ", cnpjLoja],
+          ["COBAN", lojaSel.coban ?? null],
+          ["Cidade/UF", local],
+          ["Responsável", lojaSel.responsavel ?? null],
+        ];
+        const visiveis = info.filter(([, v]) => v);
+        if (visiveis.length === 0) return null;
+        return (
+          <div className="border border-linha rounded-lg divide-y divide-linha2 mb-3 bg-[#f8f9fa]">
+            {visiveis.map(([r, v]) => (
+              <div key={r} className="flex items-center justify-between gap-3 px-3 py-1.5">
+                <dt className="text-[11.5px] text-[#6c757d] shrink-0">{r}</dt>
+                <dd className="text-[12px] font-medium text-right truncate text-[#1a1a1a]">{v}</dd>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
       <div className="flex gap-2 justify-end">
-        <button onClick={() => onConfirmarChamado(item, lojaId)} disabled={!lojaId || processando}
-          className="btn-primario disabled:opacity-40">
-          {processando ? "Lançando..." : "Lançar compra"}
-        </button>
+        {item.conta_existente_id ? (
+          <>
+            <button onClick={() => onSubstituir(item)} disabled={processando}
+              className="btn-primario disabled:opacity-40">
+              {processando ? "Substituindo..." : "Substituir existente"}
+            </button>
+            <button onClick={() => onConfirmarChamado(item, lojaId)} disabled={!lojaId || processando}
+              className="btn-secundario disabled:opacity-40" title={!lojaId ? "Escolha a loja para criar novo" : ""}>
+              Criar novo
+            </button>
+          </>
+        ) : (
+          <button onClick={() => onConfirmarChamado(item, lojaId)} disabled={!lojaId || processando}
+            className="btn-primario disabled:opacity-40">
+            {processando ? "Lançando..." : "Lançar compra"}
+          </button>
+        )}
         <button onClick={() => onRejeitar(item)} disabled={processando} className="btn-secundario">Descartar</button>
       </div>
     </div>

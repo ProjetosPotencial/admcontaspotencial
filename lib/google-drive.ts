@@ -206,11 +206,25 @@ async function coletarArquivosRecursivo(
 
 export async function listarChamadosGLPI(raizId: string): Promise<ChamadoGLPI[]> {
   const nomeCompras = process.env.GLPI_COMPRAS_FOLDER_NAME ?? "Compras";
-  const subpastasRaiz = await listarSubpastas(raizId);
-  const pastaCompras = subpastasRaiz.find((p) => p.name.trim().toLowerCase() === nomeCompras.toLowerCase());
-  if (!pastaCompras) return []; // sem pasta "Compras" ainda, nada de GLPI a processar
+  return listarChamadosEmSubpasta(raizId, nomeCompras);
+}
 
-  const chamadosPastas = await listarSubpastas(pastaCompras.id);
+/**
+ * Varre a pasta "Compras Reenvio" (dentro de Boletos-Entrada), com a mesma
+ * estrutura Chamado NNNNN. Usada para reprocessar/atualizar chamados já
+ * importados: o usuário cria a pasta do chamado aqui e o sistema relê.
+ */
+export async function listarReenviosGLPI(raizId: string): Promise<ChamadoGLPI[]> {
+  const nome = process.env.GLPI_REENVIO_FOLDER_NAME ?? "Compras Reenvio";
+  return listarChamadosEmSubpasta(raizId, nome);
+}
+
+async function listarChamadosEmSubpasta(raizId: string, nomeSubpasta: string): Promise<ChamadoGLPI[]> {
+  const subpastasRaiz = await listarSubpastas(raizId);
+  const base = subpastasRaiz.find((p) => p.name.trim().toLowerCase() === nomeSubpasta.toLowerCase());
+  if (!base) return []; // subpasta ainda não existe, nada a processar
+
+  const chamadosPastas = await listarSubpastas(base.id);
   const resultado: ChamadoGLPI[] = [];
 
   for (const pastaChamado of chamadosPastas) {
@@ -219,14 +233,11 @@ export async function listarChamadosGLPI(raizId: string): Promise<ChamadoGLPI[]>
 
     const subs = await listarSubpastas(pastaChamado.id);
 
-    // arquivos soltos direto no chamado (sem pasta de loja/rótulo)
     const soltos = await listarArquivosNaPasta(pastaChamado.id);
     if (soltos.length > 0) {
       resultado.push({ pastaId: pastaChamado.id, chamadoNumero, lojaTexto: null, arquivos: soltos });
     }
 
-    // cada subpasta de 1º nível (rótulo/loja) vira um agrupamento; recolhe
-    // TODOS os arquivos abaixo dela, em qualquer profundidade.
     for (const sub of subs) {
       const arquivos = await coletarArquivosRecursivo(sub.id);
       if (arquivos.length > 0) {

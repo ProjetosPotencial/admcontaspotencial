@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { listarArquivosNaPasta, baixarArquivoDoDrive, listarChamadosGLPI } from "@/lib/google-drive";
+import { listarArquivosNaPasta, baixarArquivoDoDrive, listarChamadosGLPI, listarReenviosGLPI } from "@/lib/google-drive";
 import { buscarDadosChamado } from "@/lib/glpi";
 import { extrairDadosBoleto } from "@/lib/extrair-boleto";
 import { lerNomeArquivo, casarLoja } from "@/lib/ler-nome-arquivo";
@@ -290,6 +290,103 @@ export async function importarCaixaEntradaDrive() {
     }
   } catch (err: any) {
     erros.push(`Varredura GLPI: ${err?.message ?? "erro"}`);
+  }
+
+  // ===== Compras Reenvio: reprocessa chamados que o usuário colocou pra reenvio =====
+  let reenviosProcessados = 0, reenviosAtualizados = 0, reenviosNovos = 0;
+  try {
+    const reenvios = await listarReenviosGLPI(pastaId);
+    if (reenvios.length > 0) {
+      const { data: feitos } = await supabase.from("reenvio_processados").select("pasta_id, assinatura");
+      const feitosMap = new Map((feitos ?? []).map((r: any) => [r.pasta_id, r.assinatura]));
+
+      for (const ch of reenvios) {
+        try {
+          const pdfs = ch.arquivos.filter((a) => a.mimeType === "application/pdf" || /\.pdf$/i.test(a.name));
+          const assinatura = pdfs.map((p) => p.id).sort().join(",");
+          if (feitosMap.get(ch.pastaId) === assinatura) continue; // nada mudou nessa pasta de reenvio
+
+          // lê TODAS as NFs desta pasta de reenvio
+          const notas: any[] = [];
+          for (const pdf of pdfs) {
+            try {
+              const buf = await baixarArquivoDoDrive(pdf.id);
+              const ext = await extrairDadosBoleto(buf, pdf.name, pdf.mimeType);
+              if (ext?.classe_documento === "nota_fiscal") notas.push({ ext, pdf });
+            } catch { /* arquivo ilegível: ignora, não derruba */ }
+          }
+
+          const dadosGlpi = ch.chamadoNumero ? await buscarDadosChamado(ch.chamadoNumero) : null;
+
+          for (const { ext, pdf } of notas) {
+            // procura conta já existente pela chave, ou por CNPJ + número da NF
+            let existente: any = null;
+            if (ext.chave_acesso) {
+              const r = await supabase.from("contas").select("id").eq("chave_acesso", ext.chave_acesso).maybeSingle();
+              existente = r.data;
+            }
+            if (!existente && ext.cnpj && ext.numero_documento) {
+              const r = await supabase.from("contas").select("id").eq("remetente_cnpj", ext.cnpj).eq("numero_nf", ext.numero_documento).maybeSingle();
+              existente = r.data;
+            }
+
+            // chamado_pasta_id sintético por NF, pra não colidir no índice único
+            const idSintetico = `${ch.pastaId}#${ext.chave_acesso ?? ext.numero_documento ?? Math.random().toString(36).slice(2)}`;
+            const baseCard = {
+              drive_web_view_link: `https://drive.google.com/drive/folders/${ch.pastaId}`,
+              classe_documento: "chamado",
+              chamado_numero: ch.chamadoNumero,
+              chamado_pasta_id: idSintetico,
+              drive_file_id: idSintetico,
+              chamado_rotulo: ch.lojaTexto,
+              requerente: dadosGlpi?.requerente ?? null,
+              tipo_detectado: "compra",
+              fornecedor_detectado: ext.fornecedor ?? null,
+              cnpj_detectado: ext.cnpj ?? null,
+              destinatario_detectado: ext.destinatario ?? null,
+              destinatario_cnpj_detectado: ext.destinatario_cnpj ?? null,
+              chave_acesso: ext.chave_acesso ?? null,
+              numero_documento_detectado: ext.numero_documento ?? null,
+              emissao_ano: ext.data_emissao?.ano ?? null,
+              emissao_mes: ext.data_emissao?.mes ?? null,
+              emissao_dia: ext.data_emissao?.dia ?? null,
+              valor_detectado: ext.valor ?? null,
+              confianca: "media",
+            };
+
+            if (existente) {
+              // NF já existe → NÃO atualiza sozinho. Cria um card pra o usuário
+              // escolher: substituir o lançamento existente ou criar um novo.
+              await supabase.from("caixa_entrada_boletos").insert({
+                ...baseCard,
+                nome_arquivo: `Reenvio · Chamado ${ch.chamadoNumero ?? "?"} · NF ${ext.numero_documento ?? ""} (já existe)`.trim(),
+                conta_existente_id: existente.id,
+                duplicada: true,
+                observacao: `Atenção: essa NF já está lançada. Escolha substituir ou criar novo (chamado ${ch.chamadoNumero ?? ""}).`.trim(),
+              });
+              reenviosAtualizados++;
+            } else {
+              // NF nova → card normal de reenvio, para revisão e lançamento
+              await supabase.from("caixa_entrada_boletos").insert({
+                ...baseCard,
+                nome_arquivo: `Reenvio · Chamado ${ch.chamadoNumero ?? "?"} · NF ${ext.numero_documento ?? ""}`.trim(),
+                observacao: `Reenvio: nova NF do chamado ${ch.chamadoNumero ?? ""}`.trim(),
+              });
+              reenviosNovos++;
+            }
+          }
+
+          await supabase.from("reenvio_processados").upsert({
+            pasta_id: ch.pastaId, assinatura, chamado_numero: ch.chamadoNumero, em: new Date().toISOString(),
+          });
+          reenviosProcessados++;
+        } catch (err: any) {
+          erros.push(`Reenvio ${ch.chamadoNumero ?? ch.pastaId}: ${err?.message ?? "erro"}`);
+        }
+      }
+    }
+  } catch (err: any) {
+    erros.push(`Varredura Reenvio: ${err?.message ?? "erro"}`);
   }
 
   // log da rodada
