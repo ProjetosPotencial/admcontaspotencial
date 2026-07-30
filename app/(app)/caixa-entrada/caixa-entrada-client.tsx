@@ -297,7 +297,8 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
             </h2>
             {chamados.map((item) => (
               <ChamadoCard key={item.id} item={item} lojas={lojas} processando={processando === item.id}
-                onConfirmarChamado={confirmarChamado} onRejeitar={rejeitar} />
+                onConfirmarChamado={confirmarChamado} onRejeitar={rejeitar}
+                onEditado={(id, patch) => setItens((lista) => lista.map((i) => (i.id === id ? { ...i, ...patch } : i)))} />
             ))}
             {boletos.length === 0 && chamados.length === 0 ? (
               <div className="card text-center py-10 text-[13px] text-[#adb5bd]">Nenhum boleto esperando revisão.</div>
@@ -331,13 +332,37 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
 
 type PreviaNF = { empresa: string };
 
-function ChamadoCard({ item, lojas, processando, onConfirmarChamado, onRejeitar }: {
+function ChamadoCard({ item, lojas, processando, onConfirmarChamado, onRejeitar, onEditado }: {
   item: Item; lojas: Loja[]; processando: boolean;
   onConfirmarChamado: (item: Item, lojaId: string) => void;
   onRejeitar: (item: Item) => void;
+  onEditado: (id: string, patch: Partial<Item>) => void;
 }) {
   const [lojaId, setLojaId] = useState("");
   const [busca, setBusca] = useState("");
+  const [editandoNf, setEditandoNf] = useState(false);
+  const [salvandoNf, setSalvandoNf] = useState(false);
+  const [efFornecedor, setEfFornecedor] = useState(item.fornecedor_detectado ?? "");
+  const [efCnpj, setEfCnpj] = useState(item.cnpj_detectado ?? "");
+  const [efNumero, setEfNumero] = useState(item.numero_documento_detectado ?? "");
+  const [efDest, setEfDest] = useState(item.destinatario_detectado ?? "");
+  const [efDestCnpj, setEfDestCnpj] = useState(item.destinatario_cnpj_detectado ?? "");
+
+  async function salvarNfCaixa() {
+    setSalvandoNf(true);
+    const supabase = createClient();
+    const patch = {
+      fornecedor_detectado: efFornecedor.trim() || null,
+      cnpj_detectado: efCnpj.replace(/\D/g, "") || null,
+      numero_documento_detectado: efNumero.trim() || null,
+      destinatario_detectado: efDest.trim() || null,
+      destinatario_cnpj_detectado: efDestCnpj.replace(/\D/g, "") || null,
+    };
+    await supabase.from("caixa_entrada_boletos").update(patch).eq("id", item.id);
+    onEditado(item.id, patch);
+    setSalvandoNf(false);
+    setEditandoNf(false);
+  }
   const pendente = item.observacao?.startsWith("Pendente de conferência");
   const lojasFiltradas = busca.trim()
     ? lojas.filter((l) => l.codigo.toLowerCase().includes(busca.toLowerCase())).slice(0, 30)
@@ -369,6 +394,13 @@ function ChamadoCard({ item, lojas, processando, onConfirmarChamado, onRejeitar 
         )}
       </div>
 
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[11px] text-[#6c757d] font-medium">Dados da nota</span>
+        <button onClick={() => { setEditandoNf((v) => !v); setEfFornecedor(item.fornecedor_detectado ?? ""); setEfCnpj(item.cnpj_detectado ?? ""); setEfNumero(item.numero_documento_detectado ?? ""); setEfDest(item.destinatario_detectado ?? ""); setEfDestCnpj(item.destinatario_cnpj_detectado ?? ""); }}
+          className="text-[11.5px] text-info hover:underline">{editandoNf ? "cancelar" : "editar"}</button>
+      </div>
+
+      {!editandoNf ? (
       <dl className="border border-linha rounded-lg divide-y divide-linha2 mb-3">
         {linhas.map(([r, v]) => (
           <div key={r} className="flex items-center justify-between gap-3 px-3 py-2">
@@ -376,7 +408,28 @@ function ChamadoCard({ item, lojas, processando, onConfirmarChamado, onRejeitar 
             <dd className={`text-[12.5px] font-semibold text-right truncate ${v === "—" ? "text-[#adb5bd]" : "text-[#1a1a1a]"}`}>{v}</dd>
           </div>
         ))}
+        {(item.destinatario_detectado || item.destinatario_cnpj_detectado) && (
+          <div className="flex items-center justify-between gap-3 px-3 py-2">
+            <dt className="text-[12px] text-[#6c757d] shrink-0">Destinatário</dt>
+            <dd className="text-[12.5px] font-semibold text-right truncate text-[#1a1a1a]">{item.destinatario_detectado ?? "—"}</dd>
+          </div>
+        )}
       </dl>
+      ) : (
+      <div className="border border-linha rounded-lg p-3 mb-3 space-y-2.5">
+        <label className="block"><div className="text-[11px] text-[#6c757d] mb-1">Fornecedor (remetente)</div>
+          <input value={efFornecedor} onChange={(e) => setEfFornecedor(e.target.value)} className="input-padrao w-full" /></label>
+        <label className="block"><div className="text-[11px] text-[#6c757d] mb-1">CNPJ do remetente</div>
+          <input value={efCnpj} onChange={(e) => setEfCnpj(e.target.value)} className="input-padrao w-full font-mono" /></label>
+        <label className="block"><div className="text-[11px] text-[#6c757d] mb-1">Nº da nota</div>
+          <input value={efNumero} onChange={(e) => setEfNumero(e.target.value)} className="input-padrao w-full font-mono" /></label>
+        <label className="block"><div className="text-[11px] text-[#6c757d] mb-1">Destinatário / Tomador</div>
+          <input value={efDest} onChange={(e) => setEfDest(e.target.value)} className="input-padrao w-full" /></label>
+        <label className="block"><div className="text-[11px] text-[#6c757d] mb-1">CNPJ do destinatário</div>
+          <input value={efDestCnpj} onChange={(e) => setEfDestCnpj(e.target.value)} className="input-padrao w-full font-mono" /></label>
+        <button onClick={salvarNfCaixa} disabled={salvandoNf} className="btn-primario disabled:opacity-50">{salvandoNf ? "Salvando..." : "Salvar dados da nota"}</button>
+      </div>
+      )}
 
       {item.codigo_barras_detectado && (
         <div className="border border-linha rounded-lg px-3 py-2 mb-3">

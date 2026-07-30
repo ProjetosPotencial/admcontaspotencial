@@ -470,6 +470,12 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
   const [novoPortalLink, setNovoPortalLink] = useState(conta.portal_link ?? "");
   const [salvarComoPadrao, setSalvarComoPadrao] = useState(false);
   const [salvandoPortal, setSalvandoPortal] = useState(false);
+  const [editandoNf, setEditandoNf] = useState(false);
+  const [salvandoNf, setSalvandoNf] = useState(false);
+  const [nfNumero, setNfNumero] = useState(conta.numero_nf ?? "");
+  const [nfRemetenteCnpj, setNfRemetenteCnpj] = useState(conta.remetente_cnpj ?? "");
+  const [nfDestRazao, setNfDestRazao] = useState(conta.destinatario_razao ?? "");
+  const [nfDestCnpj, setNfDestCnpj] = useState(conta.destinatario_cnpj ?? "");
   const [editandoDetalhes, setEditandoDetalhes] = useState(false);
   const [salvandoDetalhes, setSalvandoDetalhes] = useState(false);
   const [detFornecedor, setDetFornecedor] = useState(conta.fornecedor_nome ?? "");
@@ -691,6 +697,23 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
     setSalvandoDetalhes(false);
     if (error) { setErroDetalhes("Não foi possível salvar as alterações."); return; }
     setEditandoDetalhes(false);
+  }
+
+  async function salvarNf() {
+    setSalvandoNf(true);
+    const patch = {
+      numero_nf: nfNumero.trim() || null,
+      remetente_cnpj: nfRemetenteCnpj.replace(/\D/g, "") || null,
+      destinatario_razao: nfDestRazao.trim() || null,
+      destinatario_cnpj: nfDestCnpj.replace(/\D/g, "") || null,
+    };
+    await supabase.from("contas").update(patch).eq("id", conta.id);
+    conta.numero_nf = patch.numero_nf;
+    conta.remetente_cnpj = patch.remetente_cnpj;
+    conta.destinatario_razao = patch.destinatario_razao;
+    conta.destinatario_cnpj = patch.destinatario_cnpj;
+    setSalvandoNf(false);
+    setEditandoNf(false);
   }
 
   async function salvarPortal() {
@@ -1049,7 +1072,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
             <div className="grid grid-cols-2 gap-y-3.5 mb-6">
               <Campo label="Fornecedor" valor={detFornecedor || "—"} />
               {conta.tipo === "compra" && <Campo label="Nº do chamado" valor={conta.chamado_numero || "—"} mono />}
-              <Campo label="Nº da nota fiscal" valor={conta.numero_nf || "—"} mono />
+              <Campo label="Nº da nota fiscal" valor={(nfNumero || conta.numero_nf) || "—"} mono />
               <Campo label="Origem" valor="SIGA POTENCIAL" />
             </div>
             ) : (
@@ -1098,7 +1121,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
             </div>
           )}
 
-          <div className="pb-5 mb-5 border-b border-linha">
+          <div className={`pb-5 mb-5 border-b border-linha ${ehCompraNF ? "hidden" : ""}`}>
             <div className="text-[11px] text-[#adb5bd] font-medium mb-2">Portal do fornecedor</div>
             {!editandoPortal ? (
               portalLink ? (
@@ -1196,14 +1219,42 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
 
           {ehCompraNF && (
             <div className="pt-5 border-t border-linha mb-1">
-              <div className="text-[14px] font-semibold text-[#1a1a1a] mb-1">Dados da nota fiscal</div>
-              <p className="text-[11.5px] text-[#adb5bd] mb-3">Lidos automaticamente da NF. Confira e ajuste na Caixa de Entrada antes de lançar, se precisar.</p>
-              <div className="grid grid-cols-2 gap-y-3.5 gap-x-3 mb-6">
-                <Campo label="Remetente" valor={conta.fornecedor_nome || "—"} />
-                <Campo label="CNPJ do remetente" valor={fmtCnpj(conta.remetente_cnpj)} mono />
-                <Campo label="Destinatário" valor={conta.destinatario_razao || "—"} />
-                <Campo label="CNPJ do destinatário" valor={fmtCnpj(conta.destinatario_cnpj)} mono />
+              <div className="flex items-center justify-between mb-1">
+                <div className="text-[14px] font-semibold text-[#1a1a1a]">Dados da nota fiscal</div>
+                <button onClick={() => { setEditandoNf((v) => !v); setNfNumero(conta.numero_nf ?? ""); setNfRemetenteCnpj(conta.remetente_cnpj ?? ""); setNfDestRazao(conta.destinatario_razao ?? ""); setNfDestCnpj(conta.destinatario_cnpj ?? ""); }}
+                  className="text-amarelo text-[12px] font-semibold hover:underline">{editandoNf ? "Cancelar" : "Editar"}</button>
               </div>
+              <p className="text-[11.5px] text-[#adb5bd] mb-3">Lidos automaticamente da NF. Ajuste aqui se a leitura vier errada.</p>
+              {!editandoNf ? (
+                <div className="grid grid-cols-2 gap-y-3.5 gap-x-3 mb-6">
+                  <Campo label="Remetente" valor={conta.fornecedor_nome || "—"} />
+                  <Campo label="CNPJ do remetente" valor={fmtCnpj(nfRemetenteCnpj || conta.remetente_cnpj)} mono />
+                  <Campo label="Destinatário" valor={nfDestRazao || conta.destinatario_razao || "—"} />
+                  <Campo label="CNPJ do destinatário" valor={fmtCnpj(nfDestCnpj || conta.destinatario_cnpj)} mono />
+                </div>
+              ) : (
+                <div className="space-y-3 mb-6">
+                  <label className="block">
+                    <div className="text-[11px] text-[#adb5bd] font-medium mb-1">Nº da nota fiscal</div>
+                    <input value={nfNumero} onChange={(e) => setNfNumero(e.target.value)} className="input-padrao w-full font-mono" />
+                  </label>
+                  <label className="block">
+                    <div className="text-[11px] text-[#adb5bd] font-medium mb-1">CNPJ do remetente</div>
+                    <input value={nfRemetenteCnpj} onChange={(e) => setNfRemetenteCnpj(e.target.value)} className="input-padrao w-full font-mono" />
+                  </label>
+                  <label className="block">
+                    <div className="text-[11px] text-[#adb5bd] font-medium mb-1">Destinatário (razão social)</div>
+                    <input value={nfDestRazao} onChange={(e) => setNfDestRazao(e.target.value)} className="input-padrao w-full" />
+                  </label>
+                  <label className="block">
+                    <div className="text-[11px] text-[#adb5bd] font-medium mb-1">CNPJ do destinatário</div>
+                    <input value={nfDestCnpj} onChange={(e) => setNfDestCnpj(e.target.value)} className="input-padrao w-full font-mono" />
+                  </label>
+                  <button onClick={salvarNf} disabled={salvandoNf} className="btn-primario disabled:opacity-50">
+                    {salvandoNf ? "Salvando..." : "Salvar dados da NF"}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

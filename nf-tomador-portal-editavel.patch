@@ -1,0 +1,220 @@
+diff --git a/app/(app)/caixa-entrada/caixa-entrada-client.tsx b/app/(app)/caixa-entrada/caixa-entrada-client.tsx
+index f747257..22d4183 100644
+--- a/app/(app)/caixa-entrada/caixa-entrada-client.tsx
++++ b/app/(app)/caixa-entrada/caixa-entrada-client.tsx
+@@ -314,7 +314,8 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
+             </h2>
+             {chamados.map((item) => (
+               <ChamadoCard key={item.id} item={item} lojas={lojas} processando={processando === item.id}
+-                onConfirmarChamado={confirmarChamado} onRejeitar={rejeitar} />
++                onConfirmarChamado={confirmarChamado} onRejeitar={rejeitar}
++                onEditado={(id, patch) => setItens((lista) => lista.map((i) => (i.id === id ? { ...i, ...patch } : i)))} />
+             ))}
+             {boletos.length === 0 && chamados.length === 0 ? (
+               <div className="card text-center py-10 text-[13px] text-[#adb5bd]">Nenhum boleto esperando revisão.</div>
+@@ -348,13 +349,37 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
+ 
+ type PreviaNF = { empresa: string };
+ 
+-function ChamadoCard({ item, lojas, processando, onConfirmarChamado, onRejeitar }: {
++function ChamadoCard({ item, lojas, processando, onConfirmarChamado, onRejeitar, onEditado }: {
+   item: Item; lojas: Loja[]; processando: boolean;
+   onConfirmarChamado: (item: Item, lojaId: string) => void;
+   onRejeitar: (item: Item) => void;
++  onEditado: (id: string, patch: Partial<Item>) => void;
+ }) {
+   const [lojaId, setLojaId] = useState("");
+   const [busca, setBusca] = useState("");
++  const [editandoNf, setEditandoNf] = useState(false);
++  const [salvandoNf, setSalvandoNf] = useState(false);
++  const [efFornecedor, setEfFornecedor] = useState(item.fornecedor_detectado ?? "");
++  const [efCnpj, setEfCnpj] = useState(item.cnpj_detectado ?? "");
++  const [efNumero, setEfNumero] = useState(item.numero_documento_detectado ?? "");
++  const [efDest, setEfDest] = useState(item.destinatario_detectado ?? "");
++  const [efDestCnpj, setEfDestCnpj] = useState(item.destinatario_cnpj_detectado ?? "");
++
++  async function salvarNfCaixa() {
++    setSalvandoNf(true);
++    const supabase = createClient();
++    const patch = {
++      fornecedor_detectado: efFornecedor.trim() || null,
++      cnpj_detectado: efCnpj.replace(/\D/g, "") || null,
++      numero_documento_detectado: efNumero.trim() || null,
++      destinatario_detectado: efDest.trim() || null,
++      destinatario_cnpj_detectado: efDestCnpj.replace(/\D/g, "") || null,
++    };
++    await supabase.from("caixa_entrada_boletos").update(patch).eq("id", item.id);
++    onEditado(item.id, patch);
++    setSalvandoNf(false);
++    setEditandoNf(false);
++  }
+   const pendente = item.observacao?.startsWith("Pendente de conferência");
+   const lojasFiltradas = busca.trim()
+     ? lojas.filter((l) => l.codigo.toLowerCase().includes(busca.toLowerCase())).slice(0, 30)
+@@ -386,6 +411,13 @@ function ChamadoCard({ item, lojas, processando, onConfirmarChamado, onRejeitar
+         )}
+       </div>
+ 
++      <div className="flex items-center justify-between mb-1.5">
++        <span className="text-[11px] text-[#6c757d] font-medium">Dados da nota</span>
++        <button onClick={() => { setEditandoNf((v) => !v); setEfFornecedor(item.fornecedor_detectado ?? ""); setEfCnpj(item.cnpj_detectado ?? ""); setEfNumero(item.numero_documento_detectado ?? ""); setEfDest(item.destinatario_detectado ?? ""); setEfDestCnpj(item.destinatario_cnpj_detectado ?? ""); }}
++          className="text-[11.5px] text-info hover:underline">{editandoNf ? "cancelar" : "editar"}</button>
++      </div>
++
++      {!editandoNf ? (
+       <dl className="border border-linha rounded-lg divide-y divide-linha2 mb-3">
+         {linhas.map(([r, v]) => (
+           <div key={r} className="flex items-center justify-between gap-3 px-3 py-2">
+@@ -393,7 +425,28 @@ function ChamadoCard({ item, lojas, processando, onConfirmarChamado, onRejeitar
+             <dd className={`text-[12.5px] font-semibold text-right truncate ${v === "—" ? "text-[#adb5bd]" : "text-[#1a1a1a]"}`}>{v}</dd>
+           </div>
+         ))}
++        {(item.destinatario_detectado || item.destinatario_cnpj_detectado) && (
++          <div className="flex items-center justify-between gap-3 px-3 py-2">
++            <dt className="text-[12px] text-[#6c757d] shrink-0">Destinatário</dt>
++            <dd className="text-[12.5px] font-semibold text-right truncate text-[#1a1a1a]">{item.destinatario_detectado ?? "—"}</dd>
++          </div>
++        )}
+       </dl>
++      ) : (
++      <div className="border border-linha rounded-lg p-3 mb-3 space-y-2.5">
++        <label className="block"><div className="text-[11px] text-[#6c757d] mb-1">Fornecedor (remetente)</div>
++          <input value={efFornecedor} onChange={(e) => setEfFornecedor(e.target.value)} className="input-padrao w-full" /></label>
++        <label className="block"><div className="text-[11px] text-[#6c757d] mb-1">CNPJ do remetente</div>
++          <input value={efCnpj} onChange={(e) => setEfCnpj(e.target.value)} className="input-padrao w-full font-mono" /></label>
++        <label className="block"><div className="text-[11px] text-[#6c757d] mb-1">Nº da nota</div>
++          <input value={efNumero} onChange={(e) => setEfNumero(e.target.value)} className="input-padrao w-full font-mono" /></label>
++        <label className="block"><div className="text-[11px] text-[#6c757d] mb-1">Destinatário / Tomador</div>
++          <input value={efDest} onChange={(e) => setEfDest(e.target.value)} className="input-padrao w-full" /></label>
++        <label className="block"><div className="text-[11px] text-[#6c757d] mb-1">CNPJ do destinatário</div>
++          <input value={efDestCnpj} onChange={(e) => setEfDestCnpj(e.target.value)} className="input-padrao w-full font-mono" /></label>
++        <button onClick={salvarNfCaixa} disabled={salvandoNf} className="btn-primario disabled:opacity-50">{salvandoNf ? "Salvando..." : "Salvar dados da nota"}</button>
++      </div>
++      )}
+ 
+       {item.codigo_barras_detectado && (
+         <div className="border border-linha rounded-lg px-3 py-2 mb-3">
+diff --git a/app/(app)/contas/contas-client.tsx b/app/(app)/contas/contas-client.tsx
+index d482daf..279678e 100644
+--- a/app/(app)/contas/contas-client.tsx
++++ b/app/(app)/contas/contas-client.tsx
+@@ -470,6 +470,12 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
+   const [novoPortalLink, setNovoPortalLink] = useState(conta.portal_link ?? "");
+   const [salvarComoPadrao, setSalvarComoPadrao] = useState(false);
+   const [salvandoPortal, setSalvandoPortal] = useState(false);
++  const [editandoNf, setEditandoNf] = useState(false);
++  const [salvandoNf, setSalvandoNf] = useState(false);
++  const [nfNumero, setNfNumero] = useState(conta.numero_nf ?? "");
++  const [nfRemetenteCnpj, setNfRemetenteCnpj] = useState(conta.remetente_cnpj ?? "");
++  const [nfDestRazao, setNfDestRazao] = useState(conta.destinatario_razao ?? "");
++  const [nfDestCnpj, setNfDestCnpj] = useState(conta.destinatario_cnpj ?? "");
+   const [editandoDetalhes, setEditandoDetalhes] = useState(false);
+   const [salvandoDetalhes, setSalvandoDetalhes] = useState(false);
+   const [detFornecedor, setDetFornecedor] = useState(conta.fornecedor_nome ?? "");
+@@ -693,6 +699,23 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
+     setEditandoDetalhes(false);
+   }
+ 
++  async function salvarNf() {
++    setSalvandoNf(true);
++    const patch = {
++      numero_nf: nfNumero.trim() || null,
++      remetente_cnpj: nfRemetenteCnpj.replace(/\D/g, "") || null,
++      destinatario_razao: nfDestRazao.trim() || null,
++      destinatario_cnpj: nfDestCnpj.replace(/\D/g, "") || null,
++    };
++    await supabase.from("contas").update(patch).eq("id", conta.id);
++    conta.numero_nf = patch.numero_nf;
++    conta.remetente_cnpj = patch.remetente_cnpj;
++    conta.destinatario_razao = patch.destinatario_razao;
++    conta.destinatario_cnpj = patch.destinatario_cnpj;
++    setSalvandoNf(false);
++    setEditandoNf(false);
++  }
++
+   async function salvarPortal() {
+     const link = novoPortalLink.trim();
+     if (!link) return;
+@@ -1049,7 +1072,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
+             <div className="grid grid-cols-2 gap-y-3.5 mb-6">
+               <Campo label="Fornecedor" valor={detFornecedor || "—"} />
+               {conta.tipo === "compra" && <Campo label="Nº do chamado" valor={conta.chamado_numero || "—"} mono />}
+-              <Campo label="Nº da nota fiscal" valor={conta.numero_nf || "—"} mono />
++              <Campo label="Nº da nota fiscal" valor={(nfNumero || conta.numero_nf) || "—"} mono />
+               <Campo label="Origem" valor="SIGA POTENCIAL" />
+             </div>
+             ) : (
+@@ -1098,7 +1121,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
+             </div>
+           )}
+ 
+-          <div className="pb-5 mb-5 border-b border-linha">
++          <div className={`pb-5 mb-5 border-b border-linha ${ehCompraNF ? "hidden" : ""}`}>
+             <div className="text-[11px] text-[#adb5bd] font-medium mb-2">Portal do fornecedor</div>
+             {!editandoPortal ? (
+               portalLink ? (
+@@ -1196,14 +1219,42 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
+ 
+           {ehCompraNF && (
+             <div className="pt-5 border-t border-linha mb-1">
+-              <div className="text-[14px] font-semibold text-[#1a1a1a] mb-1">Dados da nota fiscal</div>
+-              <p className="text-[11.5px] text-[#adb5bd] mb-3">Lidos automaticamente da NF. Confira e ajuste na Caixa de Entrada antes de lançar, se precisar.</p>
+-              <div className="grid grid-cols-2 gap-y-3.5 gap-x-3 mb-6">
+-                <Campo label="Remetente" valor={conta.fornecedor_nome || "—"} />
+-                <Campo label="CNPJ do remetente" valor={fmtCnpj(conta.remetente_cnpj)} mono />
+-                <Campo label="Destinatário" valor={conta.destinatario_razao || "—"} />
+-                <Campo label="CNPJ do destinatário" valor={fmtCnpj(conta.destinatario_cnpj)} mono />
++              <div className="flex items-center justify-between mb-1">
++                <div className="text-[14px] font-semibold text-[#1a1a1a]">Dados da nota fiscal</div>
++                <button onClick={() => { setEditandoNf((v) => !v); setNfNumero(conta.numero_nf ?? ""); setNfRemetenteCnpj(conta.remetente_cnpj ?? ""); setNfDestRazao(conta.destinatario_razao ?? ""); setNfDestCnpj(conta.destinatario_cnpj ?? ""); }}
++                  className="text-amarelo text-[12px] font-semibold hover:underline">{editandoNf ? "Cancelar" : "Editar"}</button>
+               </div>
++              <p className="text-[11.5px] text-[#adb5bd] mb-3">Lidos automaticamente da NF. Ajuste aqui se a leitura vier errada.</p>
++              {!editandoNf ? (
++                <div className="grid grid-cols-2 gap-y-3.5 gap-x-3 mb-6">
++                  <Campo label="Remetente" valor={conta.fornecedor_nome || "—"} />
++                  <Campo label="CNPJ do remetente" valor={fmtCnpj(nfRemetenteCnpj || conta.remetente_cnpj)} mono />
++                  <Campo label="Destinatário" valor={nfDestRazao || conta.destinatario_razao || "—"} />
++                  <Campo label="CNPJ do destinatário" valor={fmtCnpj(nfDestCnpj || conta.destinatario_cnpj)} mono />
++                </div>
++              ) : (
++                <div className="space-y-3 mb-6">
++                  <label className="block">
++                    <div className="text-[11px] text-[#adb5bd] font-medium mb-1">Nº da nota fiscal</div>
++                    <input value={nfNumero} onChange={(e) => setNfNumero(e.target.value)} className="input-padrao w-full font-mono" />
++                  </label>
++                  <label className="block">
++                    <div className="text-[11px] text-[#adb5bd] font-medium mb-1">CNPJ do remetente</div>
++                    <input value={nfRemetenteCnpj} onChange={(e) => setNfRemetenteCnpj(e.target.value)} className="input-padrao w-full font-mono" />
++                  </label>
++                  <label className="block">
++                    <div className="text-[11px] text-[#adb5bd] font-medium mb-1">Destinatário (razão social)</div>
++                    <input value={nfDestRazao} onChange={(e) => setNfDestRazao(e.target.value)} className="input-padrao w-full" />
++                  </label>
++                  <label className="block">
++                    <div className="text-[11px] text-[#adb5bd] font-medium mb-1">CNPJ do destinatário</div>
++                    <input value={nfDestCnpj} onChange={(e) => setNfDestCnpj(e.target.value)} className="input-padrao w-full font-mono" />
++                  </label>
++                  <button onClick={salvarNf} disabled={salvandoNf} className="btn-primario disabled:opacity-50">
++                    {salvandoNf ? "Salvando..." : "Salvar dados da NF"}
++                  </button>
++                </div>
++              )}
+             </div>
+           )}
+ 
+diff --git a/lib/extrair-boleto.ts b/lib/extrair-boleto.ts
+index d5e9d4c..56d9642 100644
+--- a/lib/extrair-boleto.ts
++++ b/lib/extrair-boleto.ts
+@@ -13,8 +13,8 @@ const PROMPT = `Esse arquivo é um documento financeiro brasileiro que pode ser
+ 8. "tipo_conta": categoria, um destes: "agua","energia","telefone","iptu","condominio","aluguel","imposto" (ISS/ISSQN/IRRF e tributos), "custo_geral" (serviços, honorários, software, materiais e qualquer outro). null se incerto.
+ 9. "loja_mencionada": se o documento citar claramente uma loja/unidade/endereço, extraia esse texto. null se não. (NF de custo de empresa normalmente não cita loja.)
+ 10. "parece_documento_valido": true se for de fato um boleto/fatura OU uma nota fiscal de verdade. false se for foto qualquer, documento em branco, print de conversa ou arquivo ilegível.
+-11. "destinatario": a razão social do DESTINATÁRIO/TOMADOR da nota (a empresa que RECEBEU, normalmente uma empresa do Grupo Potencial, ex: "POTENCIAL LOTERIAS LTDA"). Só para nota fiscal. null se não achar.
+-12. "destinatario_cnpj": o CNPJ do destinatário/tomador, só dígitos. null se não achar.
++11. "destinatario": a razão social do DESTINATÁRIO da nota (a empresa que RECEBEU, normalmente uma empresa do Grupo Potencial, ex: "POTENCIAL LOTERIAS LTDA", "POTENCIAL EXPRESSO PAY LTDA"). ATENÇÃO: em NOTA DE SERVIÇO (NFS-e) esse campo aparece como "TOMADOR DE SERVIÇOS" ou "Tomador" — use o tomador como destinatário. Em NF-e de produto é o "DESTINATÁRIO/REMETENTE". Só para nota fiscal. null se não achar.
++12. "destinatario_cnpj": o CNPJ do destinatário/tomador de serviços, só dígitos. null se não achar.
+ 
+ Responda SOMENTE com JSON válido, sem texto antes/depois, nesse formato:
+ {"classe_documento":"nota_fiscal","valor":1877.00,"fornecedor":"MESSANO ADVOGADOS","cnpj":"12345678000199","codigo_barras":null,"numero_documento":"4521","data":{"dia":7,"mes":7,"ano":2026},"tipo_conta":"custo_geral","loja_mencionada":null,"parece_documento_valido":true,"destinatario":"POTENCIAL LOTERIAS LTDA","destinatario_cnpj":"08191494000140"}

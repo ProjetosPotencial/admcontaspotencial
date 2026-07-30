@@ -13,8 +13,8 @@ const PROMPT = `Esse arquivo é um documento financeiro brasileiro que pode ser 
 8. "tipo_conta": categoria, um destes: "agua","energia","telefone","iptu","condominio","aluguel","imposto" (ISS/ISSQN/IRRF e tributos), "custo_geral" (serviços, honorários, software, materiais e qualquer outro). null se incerto.
 9. "loja_mencionada": se o documento citar claramente uma loja/unidade/endereço, extraia esse texto. null se não. (NF de custo de empresa normalmente não cita loja.)
 10. "parece_documento_valido": true se for de fato um boleto/fatura OU uma nota fiscal de verdade. false se for foto qualquer, documento em branco, print de conversa ou arquivo ilegível.
-11. "destinatario": a razão social do DESTINATÁRIO/TOMADOR da nota (a empresa que RECEBEU, normalmente uma empresa do Grupo Potencial, ex: "POTENCIAL LOTERIAS LTDA"). Só para nota fiscal. null se não achar.
-12. "destinatario_cnpj": o CNPJ do destinatário/tomador, só dígitos. null se não achar.
+11. "destinatario": a razão social do DESTINATÁRIO da nota (a empresa que RECEBEU, normalmente uma empresa do Grupo Potencial, ex: "POTENCIAL LOTERIAS LTDA", "POTENCIAL EXPRESSO PAY LTDA"). ATENÇÃO: em NOTA DE SERVIÇO (NFS-e) esse campo aparece como "TOMADOR DE SERVIÇOS" ou "Tomador" — use o tomador como destinatário. Em NF-e de produto é o "DESTINATÁRIO/REMETENTE". Só para nota fiscal. null se não achar.
+12. "destinatario_cnpj": o CNPJ do destinatário/tomador de serviços, só dígitos. null se não achar.
 
 Responda SOMENTE com JSON válido, sem texto antes/depois, nesse formato:
 {"classe_documento":"nota_fiscal","valor":1877.00,"fornecedor":"MESSANO ADVOGADOS","cnpj":"12345678000199","codigo_barras":null,"numero_documento":"4521","data":{"dia":7,"mes":7,"ano":2026},"tipo_conta":"custo_geral","loja_mencionada":null,"parece_documento_valido":true,"destinatario":"POTENCIAL LOTERIAS LTDA","destinatario_cnpj":"08191494000140"}
