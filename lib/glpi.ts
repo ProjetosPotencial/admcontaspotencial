@@ -92,3 +92,62 @@ export async function buscarDadosChamado(numero: string): Promise<DadosChamadoGL
     await encerrarSessao(s);
   }
 }
+
+/**
+ * Teste de diagnóstico da conexão com o GLPI (para a tela de Configurações).
+ * Diferente do fluxo normal, aqui capturamos o ERRO real de cada etapa:
+ * variáveis, initSession (autenticação) e leitura da sessão. Nunca lança.
+ */
+export async function testarConexaoGLPI() {
+  const checks: { nome: string; ok: boolean; detalhe: string }[] = [];
+  const url = baseUrl();
+  const appToken = process.env.GLPI_APP_TOKEN;
+  const userToken = process.env.GLPI_USER_TOKEN;
+
+  checks.push({ nome: "GLPI_API_URL", ok: !!url, detalhe: url ?? "FALTANDO" });
+  checks.push({ nome: "GLPI_APP_TOKEN", ok: !!appToken, detalhe: appToken ? "configurada" : "FALTANDO" });
+  checks.push({ nome: "GLPI_USER_TOKEN", ok: !!userToken, detalhe: userToken ? "configurada" : "FALTANDO" });
+  if (!url || !appToken || !userToken) return { ok: false, checks };
+
+  // 1) initSession — autenticação com App-Token + User-Token
+  let sessionToken: string | null = null;
+  try {
+    const r = await fetch(`${url}/initSession`, {
+      headers: { "Content-Type": "application/json", "App-Token": appToken, "Authorization": `user_token ${userToken}` },
+    });
+    const txt = await r.text();
+    let body: any = null; try { body = JSON.parse(txt); } catch { /* texto puro */ }
+    if (r.ok && body?.session_token) {
+      sessionToken = body.session_token;
+      checks.push({ nome: "Autenticação (initSession)", ok: true, detalhe: "Sessão iniciada com sucesso" });
+    } else {
+      // erros v1 vêm como ["ERROR_CODE","mensagem"]
+      const msg = Array.isArray(body) ? body.filter(Boolean).join(" — ") : (body?.[1] || txt || `HTTP ${r.status}`);
+      checks.push({ nome: "Autenticação (initSession)", ok: false, detalhe: `HTTP ${r.status}: ${String(msg).slice(0, 200)}` });
+      return { ok: false, checks };
+    }
+  } catch (err: any) {
+    checks.push({ nome: "Autenticação (initSession)", ok: false, detalhe: err?.message ?? "erro de rede" });
+    return { ok: false, checks };
+  }
+
+  // 2) leitura da sessão — confirma que dá pra consultar de verdade
+  try {
+    const r = await fetch(`${url}/getFullSession`, {
+      headers: { "Content-Type": "application/json", "App-Token": appToken, "Session-Token": sessionToken! },
+    });
+    if (r.ok) {
+      const j = await r.json().catch(() => null);
+      const nome = j?.session?.glpifriendlyname || j?.session?.glpiname || "usuário de serviço";
+      checks.push({ nome: "Leitura da sessão", ok: true, detalhe: `Conectado como ${nome}` });
+    } else {
+      checks.push({ nome: "Leitura da sessão", ok: false, detalhe: `HTTP ${r.status}` });
+    }
+  } catch (err: any) {
+    checks.push({ nome: "Leitura da sessão", ok: false, detalhe: err?.message ?? "erro" });
+  }
+
+  try { await fetch(`${url}/killSession`, { headers: { "App-Token": appToken, "Session-Token": sessionToken! } }); } catch { /* ignora */ }
+
+  return { ok: checks.every((c) => c.ok), checks };
+}

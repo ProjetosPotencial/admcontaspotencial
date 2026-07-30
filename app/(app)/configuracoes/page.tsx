@@ -3,6 +3,7 @@ import MenuAdminClient from "./menu-admin-client";
 import CalendarioAdminClient from "./calendario-admin-client";
 import TestarSlackButton from "./testar-slack-button";
 import TestarDriveButton from "./testar-drive-button";
+import TestarGlpiButton from "./testar-glpi-button";
 import TrocarSenhaForm from "./trocar-senha-form";
 import { podeAcessar, SemPermissao } from "@/lib/permissoes";
 
@@ -97,6 +98,14 @@ export default async function ConfiguracoesPage() {
             <h2 className="text-[16px] font-semibold text-[#1a1a1a] mb-1">Conexão com o Google Drive</h2>
             <p className="text-[13px] text-[#6c757d] mb-4">Verifica se o sistema consegue acessar o Drive, mostra com qual conta está conectado e se as pastas de entrada e saída estão acessíveis. Não faz upload nem varredura — só testa.</p>
             <TestarDriveButton />
+          </div>
+        )}
+
+        {ehAdmin && (
+          <div className="mt-8">
+            <h2 className="text-[16px] font-semibold text-[#1a1a1a] mb-1">Conexão com o GLPI</h2>
+            <p className="text-[13px] text-[#6c757d] mb-4">Verifica se o sistema autentica na API do GLPI (App-Token + User-Token) e consegue ler a sessão. Mostra o erro exato se falhar — útil pra confirmar os tokens e a liberação de IP do cliente de API.</p>
+            <TestarGlpiButton />
           </div>
         )}
 
