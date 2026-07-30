@@ -5,16 +5,16 @@ const PROMPT = `Esse arquivo é um documento financeiro brasileiro que pode ser 
 
 1. "classe_documento": "boleto" se for boleto bancário ou fatura de consumo com linha digitável; "nota_fiscal" se for nota fiscal (tem número da NF, emitente com CNPJ, discriminação de produto/serviço); null se não der pra dizer.
 2. "valor": o valor total a pagar/da nota, em reais, como número (ex: 118.95). null se não ler com confiança.
-3. "fornecedor": a razão social de quem emitiu (o prestador/fornecedor/empresa cobradora). Ex: "MESSANO ADVOGADOS", "SANEPAR". null se não achar.
+3. "fornecedor": a razão social de QUEM EMITIU a nota — o EMITENTE / PRESTADOR DE SERVIÇOS. Em NFS-e aparece como "EMITENTE DA NFS-e" ou "PRESTADOR DE SERVIÇOS". É o lado que NÃO é a empresa do Grupo Potencial. Ex: "MESSANO ADVOGADOS", "TATI DOS CARTUCHOS LTDA", "SANEPAR". null se não achar.
 4. "cnpj": o CNPJ do emitente, só dígitos (ex: "08191494000140"). null se não achar. (Boletos de consumo geralmente não têm; NF sempre tem.)
 5. "codigo_barras": a linha digitável de PAGAMENTO (boleto), quando existir — inclusive numa nota fiscal que vem com boleto anexo. É o número longo tipo "34191.79001 01043.510047 ...". NÃO confunda com a chave de acesso da NF-e (44 dígitos, que serve pra validar a nota, não pra pagar): se só houver a chave de acesso e nenhuma linha digitável de boleto, use null. Sem linha digitável, use null.
-6. "numero_documento": o número da NF (só para nota fiscal). null para boleto.
+6. "numero_documento": o número da nota (só para nota fiscal). Em NFS-e é o "Número da NFS-e" / "Número da Nota" (ex: 82, 00002479). null para boleto.
 7. "data": a data de referência como {"dia":D,"mes":M,"ano":A}. Para BOLETO use o VENCIMENTO; para NOTA FISCAL use a DATA DE EMISSÃO. Use null se não ler.
 8. "tipo_conta": categoria, um destes: "agua","energia","telefone","iptu","condominio","aluguel","imposto" (ISS/ISSQN/IRRF e tributos), "custo_geral" (serviços, honorários, software, materiais e qualquer outro). null se incerto.
 9. "loja_mencionada": se o documento citar claramente uma loja/unidade/endereço, extraia esse texto. null se não. (NF de custo de empresa normalmente não cita loja.)
 10. "parece_documento_valido": true se for de fato um boleto/fatura OU uma nota fiscal de verdade. false se for foto qualquer, documento em branco, print de conversa ou arquivo ilegível.
-11. "destinatario": a razão social do DESTINATÁRIO da nota (a empresa que RECEBEU, normalmente uma empresa do Grupo Potencial, ex: "POTENCIAL LOTERIAS LTDA", "POTENCIAL EXPRESSO PAY LTDA"). ATENÇÃO: em NOTA DE SERVIÇO (NFS-e) esse campo aparece como "TOMADOR DE SERVIÇOS" ou "Tomador" — use o tomador como destinatário. Em NF-e de produto é o "DESTINATÁRIO/REMETENTE". Só para nota fiscal. null se não achar.
-12. "destinatario_cnpj": o CNPJ do destinatário/tomador de serviços, só dígitos. null se não achar.
+11. "destinatario": a razão social de QUEM RECEBEU a nota — quase sempre uma empresa do Grupo Potencial (o nome começa com "POTENCIAL", ex: "POTENCIAL LOTERIAS LTDA", "POTENCIAL EXPRESSO PAY LTDA"). Em NFS-e (nota de serviço) esse lado aparece como "TOMADOR DO SERVIÇO", "TOMADOR DE SERVIÇOS" ou "DADOS DO TOMADOR". Em NF-e de produto é o "DESTINATÁRIO". REGRA PRÁTICA IMPORTANTE: identifique os DOIS lados da nota (emitente/prestador e destinatário/tomador); o lado cujo nome é uma empresa "POTENCIAL ..." é o DESTINATÁRIO, e o outro lado é o "fornecedor". Nunca troque os dois. Só para nota fiscal. null se realmente não achar.
+12. "destinatario_cnpj": o CNPJ do destinatário/tomador — o CNPJ que aparece junto do nome da empresa Potencial, só dígitos (ex: "08191494005533"). null se não achar.
 
 Responda SOMENTE com JSON válido, sem texto antes/depois, nesse formato:
 {"classe_documento":"nota_fiscal","valor":1877.00,"fornecedor":"MESSANO ADVOGADOS","cnpj":"12345678000199","codigo_barras":null,"numero_documento":"4521","data":{"dia":7,"mes":7,"ano":2026},"tipo_conta":"custo_geral","loja_mencionada":null,"parece_documento_valido":true,"destinatario":"POTENCIAL LOTERIAS LTDA","destinatario_cnpj":"08191494000140"}
