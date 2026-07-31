@@ -1104,18 +1104,18 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
           </div>
           {!editandoDetalhes ? (
             ehCompraNF ? (
-            <div className="grid grid-cols-2 gap-y-3.5 mb-6">
-              <Campo label="Fornecedor" valor={detFornecedor || "—"} />
-              {conta.tipo === "compra" && <Campo label="Nº do chamado" valor={conta.chamado_numero || "—"} mono />}
-              <Campo label="Nº da nota fiscal" valor={(nfNumero || conta.numero_nf) || "—"} mono />
-              <Campo label="Origem" valor="SIGA POTENCIAL" />
+            <div className="grid grid-cols-2 gap-y-4 gap-x-3 mb-6">
+              <CampoIcone icone="fornecedor" label="Fornecedor" valor={detFornecedor || "—"} />
+              {conta.tipo === "compra" && <CampoIcone icone="tag" label="Nº do chamado" valor={conta.chamado_numero || "—"} mono />}
+              <CampoIcone icone="documento" label="Nº da nota fiscal" valor={(nfNumero || conta.numero_nf) || "—"} mono />
+              <CampoIcone icone="globo" label="Origem" valor="SIGA POTENCIAL" />
             </div>
             ) : (
-            <div className="grid grid-cols-2 gap-y-3.5 mb-6">
-              <Campo label="Fornecedor" valor={detFornecedor || "—"} />
-              <Campo label="Vencimento" valor={detVenc ? `dia ${detVenc}` : "—"} />
-              <Campo label={CAMPOS_TIPO[conta.tipo]?.labelIdentificador ?? "Código da conta"} valor={detIdent || "—"} mono />
-              <Campo label="Origem" valor={ORIGENS[detOrigem]} />
+            <div className="grid grid-cols-2 gap-y-4 gap-x-3 mb-6">
+              <CampoIcone icone="fornecedor" label="Fornecedor" valor={detFornecedor || "—"} />
+              <CampoIcone icone="calendario" label="Vencimento" valor={detVenc ? `dia ${detVenc}` : "—"} />
+              <CampoIcone icone="documento" label={CAMPOS_TIPO[conta.tipo]?.labelIdentificador ?? "Código da conta"} valor={detIdent || "—"} mono />
+              <CampoIcone icone="globo" label="Origem" valor={ORIGENS[detOrigem]} />
             </div>
             )
           ) : (
@@ -1666,6 +1666,26 @@ function Campo({ label, valor, mono }: { label: string; valor: string; mono?: bo
     <div>
       <div className="text-[12px] text-[#adb5bd] font-medium mb-0.5">{label}</div>
       <div className={`text-[13px] font-semibold text-[#1a1a1a] ${mono ? "font-mono !font-normal" : ""}`}>{valor}</div>
+    </div>
+  );
+}
+
+const ICONES_CAMPO: Record<string, React.ReactNode> = {
+  fornecedor: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18M4 21V7l8-4 8 4v14M9 21v-4h6v4M9 10h.01M15 10h.01M9 13h.01M15 13h.01"/></svg>,
+  calendario: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>,
+  tag: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><path d="M7 7h.01"/></svg>,
+  documento: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>,
+  globo: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
+};
+
+function CampoIcone({ icone, label, valor, mono }: { icone: keyof typeof ICONES_CAMPO; label: string; valor: string; mono?: boolean }) {
+  return (
+    <div className="flex items-start gap-2.5">
+      <div className="w-8 h-8 rounded-lg bg-[#FFF6E0] text-amb flex items-center justify-center shrink-0 mt-0.5">{ICONES_CAMPO[icone]}</div>
+      <div className="min-w-0">
+        <div className="text-[12px] text-[#adb5bd] font-medium mb-0.5">{label}</div>
+        <div className={`text-[13px] font-semibold text-[#1a1a1a] break-words ${mono ? "font-mono !font-normal" : ""}`}>{valor}</div>
+      </div>
     </div>
   );
 }
