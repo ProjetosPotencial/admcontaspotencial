@@ -22,9 +22,9 @@ export type ResultadoConferencia = {
   erro?: string | null;            // motivo, quando a conferência não roda (diagnóstico)
 };
 
-const PROMPT_CONFERENCIA = `Você recebe a imagem de um documento financeiro brasileiro (boleto ou nota fiscal). Extraia SOMENTE estes campos e responda APENAS um JSON, sem texto ou markdown:
-{"valor": number|null, "cnpj": "somente dígitos do CNPJ do EMITENTE/fornecedor"|null, "numero_documento": "número da NF"|null, "chave_acesso": "44 dígitos da chave de acesso"|null}
-Transcreva os números exatamente, dígito a dígito. Use o VALOR TOTAL. null se não achar.`;
+const PROMPT_CONFERENCIA = `Olhe esta imagem de um comprovante e me ajude a conferir a digitação. Responda APENAS com um objeto JSON (sem texto antes ou depois) com o que você consegue ler:
+{"valor": número do valor total (ou null), "cnpj": só os dígitos do CNPJ de quem emitiu (ou null), "numero_documento": número do documento/nota (ou null), "chave_acesso": os 44 dígitos da chave, se houver (ou null)}
+Se não conseguir ler algum campo, use null nele. Responda só o JSON.`;
 
 async function lerComNvidia(imagemBase64: string, mime: string): Promise<{ campos: CamposNota | null; erro: string | null }> {
   const apiKey = process.env.NVIDIA_API_KEY;
