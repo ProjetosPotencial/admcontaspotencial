@@ -73,6 +73,9 @@ export default function TestarLeituraIaButton() {
           {/* Conferência (NVIDIA) */}
           <div>
             <div className="text-[12px] font-semibold text-[#1a1a1a] mb-2">Conferência (NVIDIA)</div>
+            <div className="text-[11px] text-[#adb5bd] mb-2 break-all">
+              modelo: {res.nvidia_modelo} · chave: {res.nvidia_configurada ? "presente" : "ausente"} · código novo: {res.tem_campo_conferencia ? "sim" : "não (deploy antigo em cache)"}
+            </div>
             {!res.nvidia_configurada ? (
               <div className="text-[12.5px] rounded-md px-3 py-2.5 bg-alerr-bg text-alerr">NVIDIA_API_KEY não configurada.</div>
             ) : !conf ? (

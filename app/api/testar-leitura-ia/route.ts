@@ -22,6 +22,10 @@ export async function POST(req: Request) {
       arquivo: file.name,
       duracao_ms: ms,
       nvidia_configurada: !!process.env.NVIDIA_API_KEY,
+      nvidia_modelo: process.env.NVIDIA_MODEL ?? "(padrão) meta/llama-3.2-90b-vision-instruct",
+      // diagnóstico: a extração trouxe o campo conferencia? (indica se o código novo está no ar)
+      tem_campo_conferencia: Object.prototype.hasOwnProperty.call(extracao, "conferencia"),
+      conferencia_bruta: (extracao as any).conferencia ?? null,
       extracao,
     });
   } catch (e: any) {
