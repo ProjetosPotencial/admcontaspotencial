@@ -136,6 +136,13 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
         status: "confirmado", revisado_por: user?.id ?? null, revisado_em: agora.toISOString(), lancamento_criado_id: lanc.id,
       }).eq("id", item.id);
 
+      // registra a compra individual (histórico soma por mês e lista cada compra da loja)
+      await supabase.from("compra_detalhe").insert({
+        conta_id: contaId, loja_id: lojaId, fornecedor_nome: fornecedor,
+        valor: item.valor_detectado, ano, mes, dia: item.emissao_dia ?? null,
+        chamado_numero: item.chamado_numero ?? null, numero_nf: item.numero_documento_detectado ?? null,
+      });
+
       // notifica o Slack (não bloqueia o fluxo se falhar)
       fetch("/api/notificar-chamado-slack", {
         method: "POST",
@@ -229,6 +236,12 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
       await supabase.from("caixa_entrada_boletos").update({
         status: "confirmado", revisado_por: user?.id ?? null, revisado_em: agora.toISOString(), lancamento_criado_id: lanc.id,
       }).eq("id", item.id);
+
+      await supabase.from("compra_detalhe").insert({
+        conta_id: contaId, loja_id: admLojaId, fornecedor_nome: fornecedor,
+        valor: item.valor_detectado, ano, mes, dia: item.emissao_dia ?? null,
+        chamado_numero: item.chamado_numero ?? null, numero_nf: item.numero_documento_detectado ?? null,
+      });
 
       setItens((lista) => lista.filter((i) => i.id !== item.id));
       setToast([

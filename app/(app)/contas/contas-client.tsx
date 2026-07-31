@@ -406,8 +406,16 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
                   <FornecedorCell contaId={c.id} nome={c.fornecedor_nome} />
                   {c.eh_rateio && <span className="text-[10px] font-mono text-amb border border-amarelo rounded px-1 ml-1.5">RATEIO</span>}
                 </td>
-                <td className="px-4"><VencimentoCell contaId={c.id} dia={c.dia_vencimento} ano={ano} mes={mes} situacao={situacaoPorConta[c.id]} /></td>
-                <td className="px-4 text-[13px]"><OrigemCell contaId={c.id} origem={c.origem} /></td>
+                <td className="px-4">
+                  {(c.tipo === "compra" || c.tipo === "nota_fiscal")
+                    ? <span className="text-[13px] font-mono text-[#1a1a1a]">{c.chamado_numero ? `#${c.chamado_numero}` : (c.numero_nf ? `NF ${c.numero_nf}` : "—")}</span>
+                    : <VencimentoCell contaId={c.id} dia={c.dia_vencimento} ano={ano} mes={mes} situacao={situacaoPorConta[c.id]} />}
+                </td>
+                <td className="px-4 text-[13px]">
+                  {(c.tipo === "compra" || c.tipo === "nota_fiscal")
+                    ? <span className="badge bg-info-bg text-info">SIGA POTENCIAL</span>
+                    : <OrigemCell contaId={c.id} origem={c.origem} />}
+                </td>
                 <td className="px-4 text-[13px]"><StatusBadge status={c.status} /></td>
                 <td className="px-4 text-right">
                   <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#adb5bd" strokeWidth="1.6" className="inline group-hover:stroke-amarelo"><path d="M7.5 4.5l6 5.5-6 5.5" /></svg>
@@ -455,6 +463,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
   const ehCompraNF = conta.tipo === "compra" || conta.tipo === "nota_fiscal";
   const fmtCnpj = (c?: string | null) => (c ? c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2}).*/, "$1.$2.$3/$4-$5") : "—");
   const [lancs, setLancs] = useState<Lancamento[]>([]);
+  const [comprasLoja, setComprasLoja] = useState<any[] | null>(null);
   const [mesHover, setMesHover] = useState<number | null>(null);
   const [login, setLogin] = useState<string | null>(null);
   const [senha, setSenha] = useState<string | null>(null);
@@ -581,6 +590,13 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
 
   useEffect(() => {
     carregarLancamentos();
+    if (ehCompraNF && conta.loja_id) {
+      supabase.from("compra_detalhe")
+        .select("valor, ano, mes, dia, fornecedor_nome, chamado_numero, numero_nf, criado_em")
+        .eq("loja_id", conta.loja_id).eq("ano", ANO_ATUAL)
+        .order("mes", { ascending: false }).order("dia", { ascending: false })
+        .then(({ data }) => setComprasLoja((data ?? []) as any[]));
+    }
     supabase.from("credenciais_login").select("login").eq("conta_id", conta.id).maybeSingle()
       .then(({ data }) => setLogin((data as any)?.login ?? null));
     setPortalLink(conta.portal_link ?? null);
@@ -707,7 +723,21 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
       destinatario_razao: nfDestRazao.trim() || null,
       destinatario_cnpj: nfDestCnpj.replace(/\D/g, "") || null,
     };
+    const mudou = patch.numero_nf !== (conta.numero_nf ?? null) || patch.remetente_cnpj !== (conta.remetente_cnpj ?? null)
+      || patch.destinatario_razao !== (conta.destinatario_razao ?? null) || patch.destinatario_cnpj !== (conta.destinatario_cnpj ?? null);
     await supabase.from("contas").update(patch).eq("id", conta.id);
+    // registra no histórico do lançamento (rastreabilidade: quem, quando, o quê)
+    if (mudou && lancamentoAtual?.id) {
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from("lancamento_historico").insert({
+        lancamento_id: lancamentoAtual.id,
+        de: conta.destinatario_razao ?? conta.numero_nf ?? "—",
+        para: patch.destinatario_razao ?? patch.numero_nf ?? "—",
+        comentario: "Dados da nota fiscal atualizados manualmente",
+        quem: user?.id ?? null,
+        em: new Date().toISOString(),
+      });
+    }
     conta.numero_nf = patch.numero_nf;
     conta.remetente_cnpj = patch.remetente_cnpj;
     conta.destinatario_razao = patch.destinatario_razao;
@@ -1035,6 +1065,11 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
 
   const valores = lancs.filter((l) => l.valor != null).map((l) => Number(l.valor));
   const maxv = Math.max(...valores, 1);
+  // Compra/NF: soma por mês das compras da loja (todos os fornecedores)
+  const somaMesCompra = (mi: number) => (comprasLoja ?? []).filter((c) => c.mes === mi + 1).reduce((s, c) => s + Number(c.valor || 0), 0);
+  const comprasPorMes = Array.from({ length: 12 }, (_, mi) => somaMesCompra(mi));
+  const maxCompra = Math.max(...comprasPorMes, 1);
+  const temHistoricoCompra = (comprasLoja ?? []).length > 0;
 
   return (
     <>
@@ -1551,20 +1586,22 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
 
           <div className="pt-5 mt-5 border-t border-linha">
             <div className="flex items-center justify-between mb-4">
-              <div className="text-[14px] font-semibold text-[#1a1a1a]">Histórico mensal (R$)</div>
+              <div className="text-[14px] font-semibold text-[#1a1a1a]">{ehCompraNF ? "Compras da loja por mês (R$)" : "Histórico mensal (R$)"}</div>
               <span className="text-[12px] text-[#6c757d]">Últimos 12 meses</span>
             </div>
-            {valores.length === 0 ? (
+            {(ehCompraNF ? !temHistoricoCompra : valores.length === 0) ? (
               <div className="h-[140px] flex flex-col items-center justify-center text-center gap-1 rounded-md bg-[#f8f9fa] border border-dashed border-linha">
                 <span className="text-[12.5px] font-semibold text-[#6c757d]">Sem histórico ainda</span>
-                <span className="text-[11px] text-[#adb5bd]">Os lançamentos desta conta aparecem aqui.</span>
+                <span className="text-[11px] text-[#adb5bd]">{ehCompraNF ? "As compras desta loja aparecem aqui." : "Os lançamentos desta conta aparecem aqui."}</span>
               </div>
             ) : (
               <div className="flex items-stretch gap-1 h-[140px]">
                 {Array.from({ length: 12 }).map((_, mi) => {
-                  const l = lancs.find((x) => x.mes === mi + 1);
-                  const v = l?.valor != null ? Number(l.valor) : null;
-                  const h = v != null ? Math.max((v / maxv) * 100, 3) : 3;
+                  const v = ehCompraNF
+                    ? (comprasPorMes[mi] > 0 ? comprasPorMes[mi] : null)
+                    : (() => { const l = lancs.find((x) => x.mes === mi + 1); return l?.valor != null ? Number(l.valor) : null; })();
+                  const teto = ehCompraNF ? maxCompra : maxv;
+                  const h = v != null ? Math.max((v / teto) * 100, 3) : 3;
                   const ativo = mesHover === mi;
                   return (
                     <div key={mi} className="flex-1 flex flex-col relative"
@@ -1573,7 +1610,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-10 whitespace-nowrap rounded-md bg-white border border-linha shadow-lg px-2.5 py-1.5 pointer-events-none">
                           <div className="text-[10px] text-[#adb5bd]">{MES[mi]}/{ANO_ATUAL}</div>
                           <div className="text-[12px] font-semibold" style={{ color: v != null ? "#B8860B" : "#adb5bd" }}>
-                            {v != null ? money(v) : "Sem lançamento"}
+                            {v != null ? money(v) : ehCompraNF ? "Sem compras" : "Sem lançamento"}
                           </div>
                         </div>
                       )}
@@ -1584,6 +1621,26 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {ehCompraNF && temHistoricoCompra && (
+              <div className="mt-5">
+                <div className="text-[12px] font-semibold text-[#6c757d] mb-2">Compras da loja</div>
+                <div className="border border-linha rounded-lg divide-y divide-linha2 max-h-[220px] overflow-auto">
+                  {(comprasLoja ?? []).map((c, i) => (
+                    <div key={i} className="flex items-center justify-between gap-3 px-3 py-2">
+                      <div className="min-w-0">
+                        <div className="text-[12.5px] font-medium text-[#1a1a1a] truncate">{c.fornecedor_nome || "—"}</div>
+                        <div className="text-[10.5px] text-[#adb5bd]">
+                          {c.dia ? String(c.dia).padStart(2, "0") + "/" : ""}{String(c.mes).padStart(2, "0")}/{c.ano}
+                          {c.chamado_numero ? ` · #${c.chamado_numero}` : ""}{c.numero_nf ? ` · NF ${c.numero_nf}` : ""}
+                        </div>
+                      </div>
+                      <div className="text-[12.5px] font-semibold text-[#1a1a1a] shrink-0">{c.valor != null ? money(Number(c.valor)) : "—"}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
