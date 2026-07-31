@@ -19,15 +19,16 @@ export type ResultadoConferencia = {
   concorda: boolean;               // os campos-chave batem?
   divergencias: string[];          // quais campos divergiram
   lidoNvidia: CamposNota | null;   // o que a NVIDIA leu (para auditoria)
+  erro?: string | null;            // motivo, quando a conferência não roda (diagnóstico)
 };
 
 const PROMPT_CONFERENCIA = `Você recebe a imagem de um documento financeiro brasileiro (boleto ou nota fiscal). Extraia SOMENTE estes campos e responda APENAS um JSON, sem texto ou markdown:
 {"valor": number|null, "cnpj": "somente dígitos do CNPJ do EMITENTE/fornecedor"|null, "numero_documento": "número da NF"|null, "chave_acesso": "44 dígitos da chave de acesso"|null}
 Transcreva os números exatamente, dígito a dígito. Use o VALOR TOTAL. null se não achar.`;
 
-async function lerComNvidia(imagemBase64: string, mime: string): Promise<CamposNota | null> {
+async function lerComNvidia(imagemBase64: string, mime: string): Promise<{ campos: CamposNota | null; erro: string | null }> {
   const apiKey = process.env.NVIDIA_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) return { campos: null, erro: "NVIDIA_API_KEY não configurada" };
   const model = process.env.NVIDIA_MODEL ?? "meta/llama-3.2-90b-vision-instruct";
 
   try {
@@ -47,21 +48,27 @@ async function lerComNvidia(imagemBase64: string, mime: string): Promise<CamposN
         }],
       }),
     });
-    if (!resp.ok) return null;
+    if (!resp.ok) {
+      const corpo = await resp.text().catch(() => "");
+      return { campos: null, erro: `NVIDIA ${resp.status} (modelo "${model}"): ${corpo.slice(0, 300)}` };
+    }
     const data = await resp.json();
     const texto: string = data?.choices?.[0]?.message?.content ?? "";
     const limpo = texto.replace(/^```json\s*|\s*```$/g, "").trim();
     const m = limpo.match(/\{[\s\S]*\}/);
-    if (!m) return null;
+    if (!m) return { campos: null, erro: `NVIDIA respondeu sem JSON: ${texto.slice(0, 200)}` };
     const j = JSON.parse(m[0]);
     return {
-      valor: j.valor != null ? Number(j.valor) : null,
-      cnpj: j.cnpj ? String(j.cnpj).replace(/\D/g, "") : null,
-      numero_documento: j.numero_documento ? String(j.numero_documento).trim() : null,
-      chave_acesso: j.chave_acesso ? String(j.chave_acesso).replace(/\D/g, "") || null : null,
+      campos: {
+        valor: j.valor != null ? Number(j.valor) : null,
+        cnpj: j.cnpj ? String(j.cnpj).replace(/\D/g, "") : null,
+        numero_documento: j.numero_documento ? String(j.numero_documento).trim() : null,
+        chave_acesso: j.chave_acesso ? String(j.chave_acesso).replace(/\D/g, "") || null : null,
+      },
+      erro: null,
     };
-  } catch {
-    return null;
+  } catch (e: any) {
+    return { campos: null, erro: `Falha ao chamar a NVIDIA (modelo "${model}"): ${e?.message ?? "erro"}` };
   }
 }
 
@@ -72,8 +79,8 @@ export async function conferirComNvidia(
   mime: string,
   anthropic: CamposNota,
 ): Promise<ResultadoConferencia> {
-  const nvidia = await lerComNvidia(imagemBase64, mime);
-  if (!nvidia) return { conferido: false, concorda: false, divergencias: [], lidoNvidia: null };
+  const { campos: nvidia, erro } = await lerComNvidia(imagemBase64, mime);
+  if (!nvidia) return { conferido: false, concorda: false, divergencias: [], lidoNvidia: null, erro };
 
   const div: string[] = [];
   const igualNum = (a: number | null, b: number | null) =>
@@ -86,5 +93,5 @@ export async function conferirComNvidia(
   if (!igualTxt(anthropic.numero_documento, nvidia.numero_documento)) div.push("número da NF");
   if (anthropic.chave_acesso && nvidia.chave_acesso && anthropic.chave_acesso !== nvidia.chave_acesso) div.push("chave de acesso");
 
-  return { conferido: true, concorda: div.length === 0, divergencias: div, lidoNvidia: nvidia };
+  return { conferido: true, concorda: div.length === 0, divergencias: div, lidoNvidia: nvidia, erro: null };
 }

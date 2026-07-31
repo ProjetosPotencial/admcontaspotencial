@@ -78,8 +78,10 @@ export default function TestarLeituraIaButton() {
             ) : !conf ? (
               <div className="text-[12.5px] rounded-md px-3 py-2.5 bg-alerr-bg text-alerr">A conferência não rodou (verifique o modelo/rota).</div>
             ) : !conf.conferido ? (
-              <div className="text-[12.5px] rounded-md px-3 py-2.5 bg-amarelo-bg text-amb">
-                A NVIDIA não conseguiu ler. Se for PDF, provavelmente a rasterização (pdfjs/canvas) falhou.
+              <div className="text-[12.5px] rounded-md px-3 py-2.5 bg-amarelo-bg text-amb break-all">
+                {conf.erro
+                  ? `A NVIDIA não conferiu. Motivo: ${conf.erro}`
+                  : "A NVIDIA não conseguiu ler. Se for PDF, provavelmente a rasterização (pdfjs/canvas) falhou."}
               </div>
             ) : (
               <>
