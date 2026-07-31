@@ -1105,17 +1105,17 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
           {!editandoDetalhes ? (
             ehCompraNF ? (
             <div className="grid grid-cols-2 gap-y-4 gap-x-3 mb-6">
-              <CampoIcone icone="fornecedor" label="Fornecedor" valor={detFornecedor || "—"} />
-              {conta.tipo === "compra" && <CampoIcone icone="tag" label="Nº do chamado" valor={conta.chamado_numero || "—"} mono />}
-              <CampoIcone icone="documento" label="Nº da nota fiscal" valor={(nfNumero || conta.numero_nf) || "—"} mono />
-              <CampoIcone icone="globo" label="Origem" valor="SIGA POTENCIAL" />
+              <CampoIcone icone={<TipoIcon tipo={conta.tipo} size={16} />} label="Fornecedor" valor={detFornecedor || "—"} />
+              {conta.tipo === "compra" && <CampoIcone icone={ICONES_CAMPO.tag} label="Nº do chamado" valor={conta.chamado_numero || "—"} mono />}
+              <CampoIcone icone={ICONES_CAMPO.documento} label="Nº da nota fiscal" valor={(nfNumero || conta.numero_nf) || "—"} mono />
+              <CampoIcone icone={ICONES_CAMPO.globo} label="Origem" valor="SIGA POTENCIAL" />
             </div>
             ) : (
             <div className="grid grid-cols-2 gap-y-4 gap-x-3 mb-6">
-              <CampoIcone icone="fornecedor" label="Fornecedor" valor={detFornecedor || "—"} />
-              <CampoIcone icone="calendario" label="Vencimento" valor={detVenc ? `dia ${detVenc}` : "—"} />
-              <CampoIcone icone="documento" label={CAMPOS_TIPO[conta.tipo]?.labelIdentificador ?? "Código da conta"} valor={detIdent || "—"} mono />
-              <CampoIcone icone="globo" label="Origem" valor={ORIGENS[detOrigem]} />
+              <CampoIcone icone={<TipoIcon tipo={conta.tipo} size={16} />} label="Fornecedor" valor={detFornecedor || "—"} />
+              <CampoIcone icone={ICONES_CAMPO.calendario} label="Vencimento" valor={detVenc ? `dia ${detVenc}` : "—"} />
+              <CampoIcone icone={ICONES_CAMPO.documento} label={CAMPOS_TIPO[conta.tipo]?.labelIdentificador ?? "Código da conta"} valor={detIdent || "—"} mono />
+              <CampoIcone icone={ICONES_CAMPO.globo} label="Origem" valor={ORIGENS[detOrigem]} />
             </div>
             )
           ) : (
@@ -1373,7 +1373,14 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
                     {lancamentoAtual.comprovante_drive_url && (
                       <a href={lancamentoAtual.comprovante_drive_url} target="_blank" rel="noreferrer"
                         className="flex items-center gap-1.5 text-[12px] font-semibold text-[#6c757d] hover:underline">
-                        <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M6 2l6 10.5H2.5L8 2z" /><path d="M9 12.5l3 5.5h6l-3-5.5" /><path d="M12 2l6 10.5-3 5.5" /></svg>
+                        <svg width="14" height="14" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H0c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+                          <path d="M43.65 25L29.9 1.2c-1.35.8-2.5 1.9-3.3 3.3L1.2 48.5C.4 49.9 0 51.45 0 53h27.5z" fill="#00ac47"/>
+                          <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75L86.1 57.3c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 11.5z" fill="#ea4335"/>
+                          <path d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+                          <path d="M59.8 53H27.5L13.75 76.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+                          <path d="M73.4 26.5L60.75 4.5c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25l16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+                        </svg>
                         Ver no Drive
                       </a>
                     )}
@@ -1678,10 +1685,10 @@ const ICONES_CAMPO: Record<string, React.ReactNode> = {
   globo: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
 };
 
-function CampoIcone({ icone, label, valor, mono }: { icone: keyof typeof ICONES_CAMPO; label: string; valor: string; mono?: boolean }) {
+function CampoIcone({ icone, label, valor, mono }: { icone: React.ReactNode; label: string; valor: string; mono?: boolean }) {
   return (
     <div className="flex items-start gap-2.5">
-      <div className="w-8 h-8 rounded-lg bg-[#FFF6E0] text-amb flex items-center justify-center shrink-0 mt-0.5">{ICONES_CAMPO[icone]}</div>
+      <div className="w-8 h-8 rounded-lg bg-[#FFF6E0] text-amb flex items-center justify-center shrink-0 mt-0.5">{icone}</div>
       <div className="min-w-0">
         <div className="text-[12px] text-[#adb5bd] font-medium mb-0.5">{label}</div>
         <div className={`text-[13px] font-semibold text-[#1a1a1a] break-words ${mono ? "font-mono !font-normal" : ""}`}>{valor}</div>

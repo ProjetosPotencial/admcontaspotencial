@@ -38,6 +38,34 @@ const PATHS: Record<string, React.ReactNode> = {
       <path d="M12 3v2.4M12 18.6V21M21 12h-2.4M5.4 12H3M18.1 5.9l-1.7 1.7M7.6 16.4l-1.7 1.7M18.1 18.1l-1.7-1.7M7.6 7.6L5.9 5.9" />
     </>
   ),
+  internet: (
+    <>
+      <path d="M2 8.5a15 15 0 0120 0" />
+      <path d="M5 12a10 10 0 0114 0" />
+      <path d="M8.5 15.5a5 5 0 017 0" />
+      <circle cx="12" cy="19" r="0.6" fill="currentColor" />
+    </>
+  ),
+  compra: (
+    <>
+      <circle cx="9" cy="20" r="1" />
+      <circle cx="18" cy="20" r="1" />
+      <path d="M2 3h2l2.5 13h11l2-8H6" />
+    </>
+  ),
+  nota_fiscal: (
+    <>
+      <path d="M5 3h10l4 4v14H5z" />
+      <path d="M15 3v4h4" />
+      <path d="M8 12h8M8 15h8M8 9h3" />
+    </>
+  ),
+  imposto: (
+    <>
+      <path d="M5 3h14v18l-2.5-1.5L14 21l-2.5-1.5L9 21l-2.5-1.5L4 21V3z" />
+      <path d="M8.5 8h7M8.5 12h7M8.5 15.5h4" />
+    </>
+  ),
 };
 
 export default function TipoIcon({ tipo, size = 20, color = "currentColor", strokeWidth = 1.7 }: {
