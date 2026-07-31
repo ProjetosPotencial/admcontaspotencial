@@ -41,6 +41,7 @@ export type ExtracaoBoleto = {
   chave_acesso: string | null;
   dia_vencimento: number | null;
   data_emissao: { dia: number; mes: number; ano: number } | null;
+  conferencia?: import("./conferir-nvidia").ResultadoConferencia | null;
 };
 
 export async function extrairDadosBoleto(buffer: Buffer, nomeArquivo: string, mimeType: string): Promise<ExtracaoBoleto> {
@@ -96,7 +97,7 @@ export async function extrairDadosBoleto(buffer: Buffer, nomeArquivo: string, mi
     ? { dia: d.dia, mes: d.mes, ano: d.ano }
     : null;
 
-  return {
+  const resultado = {
     classe_documento: classe,
     valor: typeof json.valor === "number" ? json.valor : null,
     fornecedor: json.fornecedor ? String(json.fornecedor).trim() : null,
@@ -113,5 +114,35 @@ export async function extrairDadosBoleto(buffer: Buffer, nomeArquivo: string, mi
     chave_acesso: json.chave_acesso ? String(json.chave_acesso).replace(/\D/g, "") || null : null,
     dia_vencimento: diaVencimento,
     data_emissao: dataEmissao,
+    conferencia: null as import("./conferir-nvidia").ResultadoConferencia | null,
   };
+
+  // Segunda leitura pela NVIDIA (best-effort) — confere valor/CNPJ/nº/chave.
+  // Só roda se a chave estiver configurada; qualquer erro é silencioso.
+  if (process.env.NVIDIA_API_KEY) {
+    try {
+      const { conferirComNvidia } = await import("./conferir-nvidia");
+      let imgBase64: string | null = null;
+      let imgMime = "image/png";
+      if (isPdf) {
+        const { pdfPrimeiraPaginaPng } = await import("./pdf-para-imagem");
+        const png = await pdfPrimeiraPaginaPng(buffer);
+        if (png) imgBase64 = png.toString("base64");
+      } else {
+        imgBase64 = base64;
+        imgMime = mimeType || "image/jpeg";
+      }
+      if (imgBase64) {
+        resultado.conferencia = await conferirComNvidia(imgBase64, imgMime, {
+          valor: resultado.valor, cnpj: resultado.cnpj,
+          numero_documento: resultado.numero_documento, chave_acesso: resultado.chave_acesso,
+        });
+        console.log("[conferencia-nvidia]", nomeArquivo, JSON.stringify(resultado.conferencia));
+      } else if (isPdf) {
+        console.log("[conferencia-nvidia]", nomeArquivo, "PDF não rasterizado (pdfjs/canvas indisponível?)");
+      }
+    } catch { /* conferência é opcional; não derruba a leitura */ }
+  }
+
+  return resultado;
 }
