@@ -124,10 +124,12 @@ export async function extrairDadosBoleto(buffer: Buffer, nomeArquivo: string, mi
       const { conferirComNvidia } = await import("./conferir-nvidia");
       let imgBase64: string | null = null;
       let imgMime = "image/png";
+      let motivoImg: string | null = null;
       if (isPdf) {
         const { pdfPrimeiraPaginaPng } = await import("./pdf-para-imagem");
-        const png = await pdfPrimeiraPaginaPng(buffer);
-        if (png) imgBase64 = png.toString("base64");
+        const r = await pdfPrimeiraPaginaPng(buffer);
+        if (r.png) imgBase64 = r.png.toString("base64");
+        else motivoImg = `Falha ao rasterizar o PDF: ${r.erro ?? "desconhecido"}`;
       } else {
         imgBase64 = base64;
         imgMime = mimeType || "image/jpeg";
@@ -137,11 +139,13 @@ export async function extrairDadosBoleto(buffer: Buffer, nomeArquivo: string, mi
           valor: resultado.valor, cnpj: resultado.cnpj,
           numero_documento: resultado.numero_documento, chave_acesso: resultado.chave_acesso,
         });
-        console.log("[conferencia-nvidia]", nomeArquivo, JSON.stringify(resultado.conferencia));
-      } else if (isPdf) {
-        console.log("[conferencia-nvidia]", nomeArquivo, "PDF não rasterizado (pdfjs/canvas indisponível?)");
+      } else {
+        resultado.conferencia = { conferido: false, concorda: false, divergencias: [], lidoNvidia: null, erro: motivoImg ?? "Imagem indisponível para conferência" };
       }
-    } catch { /* conferência é opcional; não derruba a leitura */ }
+      console.log("[conferencia-nvidia]", nomeArquivo, JSON.stringify(resultado.conferencia));
+    } catch (e: any) {
+      resultado.conferencia = { conferido: false, concorda: false, divergencias: [], lidoNvidia: null, erro: `Exceção na conferência: ${e?.message ?? "erro"}` };
+    }
   }
 
   return resultado;
