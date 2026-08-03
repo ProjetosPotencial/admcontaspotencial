@@ -464,6 +464,27 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
   const fmtCnpj = (c?: string | null) => (c ? c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2}).*/, "$1.$2.$3/$4-$5") : "—");
   const [lancs, setLancs] = useState<Lancamento[]>([]);
   const [comprasLoja, setComprasLoja] = useState<any[] | null>(null);
+  const [movendoNeg, setMovendoNeg] = useState(false);
+  const [negCriada, setNegCriada] = useState(false);
+
+  async function moverParaNegociacao() {
+    setMovendoNeg(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const valorOriginal = (lancamentoAtual as any)?.valor ?? (conta as any).valor ?? null;
+    const { error } = await supabase.from("negociacoes").insert({
+      conta_id: conta.id,
+      loja_id: conta.loja_id,
+      tipo: conta.tipo,
+      fornecedor_nome: conta.fornecedor_nome,
+      valor_original: valorOriginal,
+      valor_atualizado: valorOriginal,
+      status: "aberta",
+      prioridade: "media",
+      criado_por: user?.id ?? null,
+    });
+    setMovendoNeg(false);
+    if (!error) setNegCriada(true);
+  }
   const [mesHover, setMesHover] = useState<number | null>(null);
   const [login, setLogin] = useState<string | null>(null);
   const [senha, setSenha] = useState<string | null>(null);
@@ -1218,9 +1239,19 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
                 </button>
               </div>
             ) : !encerrando ? (
-              <button onClick={abrirEncerramento} className="text-[12px] text-alerr font-semibold hover:underline">
-                Encerrar essa conta
-              </button>
+              <div className="flex items-center gap-4">
+                {negCriada ? (
+                  <span className="text-[12px] font-semibold text-ok">✓ Negociação criada</span>
+                ) : (
+                  <button onClick={moverParaNegociacao} disabled={movendoNeg}
+                    className="text-[12px] font-semibold text-amb hover:underline disabled:opacity-50">
+                    {movendoNeg ? "Movendo..." : "Mover para Negociação"}
+                  </button>
+                )}
+                <button onClick={abrirEncerramento} className="text-[12px] text-alerr font-semibold hover:underline">
+                  Encerrar essa conta
+                </button>
+              </div>
             ) : (
               <div className="bg-off rounded-md p-3.5">
                 <div className="text-[12.5px] font-semibold text-[#1a1a1a] mb-3">Encerrar conta</div>
