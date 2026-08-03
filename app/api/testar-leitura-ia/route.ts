@@ -14,7 +14,7 @@ export async function POST(req: Request) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const inicio = Date.now();
-    const extracao = await extrairDadosBoleto(buffer, file.name, file.type || "application/pdf");
+    const extracao = await extrairDadosBoleto(buffer, file.name, file.type || "application/pdf", true);
     const ms = Date.now() - inicio;
 
     return NextResponse.json({

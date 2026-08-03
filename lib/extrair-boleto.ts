@@ -44,7 +44,7 @@ export type ExtracaoBoleto = {
   conferencia?: import("./conferir-nvidia").ResultadoConferencia | null;
 };
 
-export async function extrairDadosBoleto(buffer: Buffer, nomeArquivo: string, mimeType: string): Promise<ExtracaoBoleto> {
+export async function extrairDadosBoleto(buffer: Buffer, nomeArquivo: string, mimeType: string, conferirNvidia = false): Promise<ExtracaoBoleto> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY não configurada.");
 
@@ -119,7 +119,7 @@ export async function extrairDadosBoleto(buffer: Buffer, nomeArquivo: string, mi
 
   // Segunda leitura pela NVIDIA (best-effort) — confere valor/CNPJ/nº/chave.
   // Só roda se a chave estiver configurada; qualquer erro é silencioso.
-  if (process.env.NVIDIA_API_KEY) {
+  if (conferirNvidia && process.env.NVIDIA_API_KEY) {
     try {
       const { conferirComNvidia } = await import("./conferir-nvidia");
       let imgBase64: string | null = null;
