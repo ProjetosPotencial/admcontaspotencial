@@ -15,7 +15,7 @@ export default async function FornecedoresPage() {
   const { ano, mes } = obterPeriodoSelecionado();
 
   const [{ data: fornecedores }, { data: contas }, { data: lancMes }] = await Promise.all([
-    supabase.from("fornecedores").select("id, nome, tipo_padrao, portal_padrao").order("nome"),
+    supabase.from("fornecedores").select("id, nome, tipo_padrao, portal_padrao, logo_url").order("nome"),
     supabase.from("contas").select("fornecedor_nome, status, tipo").eq("situacao_cadastro", "aprovada"),
     supabase.from("lancamentos").select("valor, contas!inner ( fornecedor_nome )").eq("ano", ano).eq("mes", mes).not("valor", "is", null),
   ]);

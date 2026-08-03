@@ -5,8 +5,47 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TIPOS } from "@/lib/types";
 import { useDebounce } from "@/lib/hooks/useDebounce";
+import LogoFornecedor from "@/components/logo-fornecedor";
 
-type Fornecedor = { id: string; nome: string; tipo_padrao: string | null; portal_padrao: string | null };
+type Fornecedor = { id: string; nome: string; tipo_padrao: string | null; portal_padrao: string | null; logo_url: string | null };
+
+function LogoCell({ fornecedorId, nome, logoAtual }: { fornecedorId: string; nome: string; logoAtual: string | null }) {
+  const supabase = createClient();
+  const router = useRouter();
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState(false);
+
+  async function onArquivo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEnviando(true); setErro(false);
+    try {
+      const ext = (file.name.split(".").pop() || "png").toLowerCase();
+      const caminho = `${fornecedorId}.${ext}`;
+      const { error: erroUp } = await supabase.storage.from("logos").upload(caminho, file, { upsert: true, contentType: file.type });
+      if (erroUp) throw erroUp;
+      const { data } = supabase.storage.from("logos").getPublicUrl(caminho);
+      const url = `${data.publicUrl}?v=${Date.now()}`; // quebra cache ao trocar
+      const { error: erroDb } = await supabase.from("fornecedores").update({ logo_url: url }).eq("id", fornecedorId);
+      if (erroDb) throw erroDb;
+      router.refresh();
+    } catch {
+      setErro(true);
+    }
+    setEnviando(false);
+    e.target.value = "";
+  }
+
+  return (
+    <label className="cursor-pointer inline-flex items-center gap-2 group" title="Enviar logo">
+      <LogoFornecedor nome={nome} url={logoAtual} size={34} />
+      <span className="text-[11px] text-info font-semibold opacity-0 group-hover:opacity-100 transition">
+        {enviando ? "enviando..." : erro ? "erro, tente de novo" : logoAtual ? "trocar" : "enviar"}
+      </span>
+      <input type="file" accept="image/*" onChange={onArquivo} disabled={enviando} className="hidden" />
+    </label>
+  );
+}
 
 function TipoCell({ fornecedorId, tipoAtual }: { fornecedorId: string; tipoAtual: string | null }) {
   const supabase = createClient();
@@ -125,6 +164,7 @@ export default function FornecedoresClient({ fornecedores, nomesAtivos }: { forn
         <div className="overflow-x-auto"><table className="w-full border-collapse min-w-[720px]">
           <thead>
             <tr className="bg-[#f1f3f5] h-12">
+              <th className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">Logo</th>
               <th className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">Fornecedor</th>
               <th className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">Tipo de conta</th>
               <th className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">Portal</th>
@@ -136,6 +176,7 @@ export default function FornecedoresClient({ fornecedores, nomesAtivos }: { forn
               const ativo = ativosSet.has(f.nome);
               return (
                 <tr key={f.id} className="h-12 border-b border-[#f1f3f5] last:border-0 hover:bg-[#f8f9fa]">
+                  <td className="px-4"><LogoCell fornecedorId={f.id} nome={f.nome} logoAtual={f.logo_url} /></td>
                   <td className="px-4 text-[13px] font-medium">{f.nome}</td>
                   <td className="px-4 text-[13px]"><TipoCell fornecedorId={f.id} tipoAtual={f.tipo_padrao} /></td>
                   <td className="px-4 text-[12px]"><PortalCell fornecedorId={f.id} portalAtual={f.portal_padrao} /></td>

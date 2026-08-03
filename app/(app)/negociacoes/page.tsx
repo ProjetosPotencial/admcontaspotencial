@@ -26,5 +26,8 @@ export default async function NegociacoesPage() {
     : { data: [] as any[] };
   const perfilMap = Object.fromEntries((perfis ?? []).map((p: any) => [p.id, p.nome ?? "—"]));
 
-  return <NegociacoesClient negociacoes={(negs ?? []) as any[]} lojas={lojaMap} responsaveis={perfilMap} />;
+  const { data: forns } = await supabase.from("fornecedores").select("nome, logo_url").not("logo_url", "is", null);
+  const logos = Object.fromEntries((forns ?? []).map((f: any) => [String(f.nome).toLowerCase(), f.logo_url]));
+
+  return <NegociacoesClient negociacoes={(negs ?? []) as any[]} lojas={lojaMap} responsaveis={perfilMap} logos={logos} />;
 }
