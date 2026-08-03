@@ -23,6 +23,7 @@ const ICONS: Record<string, React.ReactNode> = {
   config: <><rect x="3.5" y="8.5" width="13" height="9" rx="2" /><circle cx="10" cy="13" r="1.6" /></>,
   empresas: <><rect x="3" y="6" width="14" height="11" rx="1.5" /><path d="M3 6l7-3 7 3" /><path d="M8 17v-3.5h4V17" /></>,
   contratos: <><path d="M6 2.5h6l4 4V19a1 1 0 01-1 1H6a1 1 0 01-1-1V3.5a1 1 0 011-1z" /><path d="M7.5 8h5M7.5 11h5M7.5 14h3" /></>,
+  negociacoes: <><path d="M10 2.5v15" /><path d="M6 6.5c0-1.4 1.3-2.5 3-2.5s3 1 3 2.3c0 1.2-1 2-2.7 2.4C7.4 11 6.3 11.8 6.3 13.2c0 1.4 1.4 2.3 3.2 2.3s3-1 3-2.4" /></>,
 };
 
 function Icon({ name }: { name: string }) {
