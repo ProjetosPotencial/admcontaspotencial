@@ -120,6 +120,10 @@ function PainelNegociacao({ neg, nomeLoja, responsaveis, onClose, onSalvo }: { n
       fornecedor_telefone: f.fornecedor_telefone || null, fornecedor_responsavel: f.fornecedor_responsavel || null,
     };
     await supabase.from("negociacoes").update(patch).eq("id", neg.id);
+    // se encerrou a negociação, a conta volta a aparecer em Contas
+    if (neg.conta_id) {
+      await supabase.from("contas").update({ em_negociacao: f.status !== "encerrada" }).eq("id", neg.conta_id);
+    }
     setSalvando(false);
     onSalvo({ ...f, ...patch });
   }

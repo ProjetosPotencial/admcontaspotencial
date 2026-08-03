@@ -483,7 +483,10 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
       criado_por: user?.id ?? null,
     });
     setMovendoNeg(false);
-    if (!error) setNegCriada(true);
+    if (!error) {
+      await supabase.from("contas").update({ em_negociacao: true }).eq("id", conta.id);
+      setNegCriada(true);
+    }
   }
   const [mesHover, setMesHover] = useState<number | null>(null);
   const [login, setLogin] = useState<string | null>(null);
