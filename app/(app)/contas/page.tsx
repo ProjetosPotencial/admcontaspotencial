@@ -6,6 +6,7 @@ import { carregarCalendario } from "@/lib/calendario-server";
 import { formatarPeriodo, estaAtrasada, variacaoPct, contaValidaNoPeriodo } from "@/lib/date-utils";
 import { obterPeriodoSelecionado } from "@/lib/periodo";
 import { money, MES } from "@/lib/format";
+import { getLogosFornecedores } from "@/lib/logos-fornecedores";
 import Link from "next/link";
 import { podeAcessar, SemPermissao } from "@/lib/permissoes";
 
@@ -77,6 +78,8 @@ export default async function ContasPage() {
   const totalAtrasadasValor = somaValor(atrasadas);
   const totalGeralResumo = totalPagas + totalAVencer + totalAtrasadasValor || 1;
 
+  const logos = await getLogosFornecedores();
+
   return (
     <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-[1400px] w-full">
       <div className="mb-6">
@@ -95,7 +98,7 @@ export default async function ContasPage() {
             <KpiMini icon="pin" cor="#6B5B95" bg="#EDE7F6" value={semOrigem.length} label="Sem origem" extra={<span className="text-[11px] font-mono text-[#6c757d]">{money(somaValor(semOrigem))}</span>} />
           </div>
 
-          <ContasClient feriados={cal.feriados} regraVencimento={cal.regra} contas={contas} situacaoPorConta={situacaoPorConta} lojas={lojas ?? []} ano={ano} mes={mes} />
+          <ContasClient feriados={cal.feriados} regraVencimento={cal.regra} contas={contas} situacaoPorConta={situacaoPorConta} lojas={lojas ?? []} ano={ano} mes={mes} logos={logos} />
         </div>
 
         <div className="space-y-6">

@@ -4,6 +4,7 @@ import { carregarCalendario } from "@/lib/calendario-server";
 import { formatarPeriodo, estaAtrasada } from "@/lib/date-utils";
 import { obterPeriodoSelecionado } from "@/lib/periodo";
 import { money } from "@/lib/format";
+import { getLogosFornecedores } from "@/lib/logos-fornecedores";
 import Link from "next/link";
 import { podeAcessar, SemPermissao } from "@/lib/permissoes";
 
@@ -73,6 +74,7 @@ export default async function LancamentosPage() {
           <LancamentosClient
             itens={itens}
             ano={ano}
+            logos={await getLogosFornecedores()}
             resumo={{
               totalLancado, totalLancados, pctLancados: Math.round((totalLancados / (totalLancado || 1)) * 1000) / 10,
               totalContestados, pctContestados: Math.round((totalContestados / (totalLancado || 1)) * 1000) / 10,

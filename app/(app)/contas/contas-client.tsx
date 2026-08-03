@@ -11,6 +11,7 @@ import { useDebounce } from "@/lib/hooks/useDebounce";
 import { formatarPeriodo, contaValidaNoPeriodo, estaAtrasada } from "@/lib/date-utils";
 import { Calendario, type Feriado, type RegraVencimento } from "@/lib/calendario";
 import TipoIcon from "@/components/tipo-icon";
+import LogoFornecedor from "@/components/logo-fornecedor";
 import { money, MES, nomeArquivoSeguro, formatarDataSemFuso } from "@/lib/format";
 
 function StatusBadge({ status }: { status: string }) {
@@ -162,7 +163,7 @@ function LojaCell({ contaId, lojaAtual, lojas }: { contaId: string; lojaAtual: {
   );
 }
 
-function FornecedorCell({ contaId, nome }: { contaId: string; nome: string | null }) {
+function FornecedorCell({ contaId, nome, logo }: { contaId: string; nome: string | null; logo?: string | null }) {
   const supabase = createClient();
   const router = useRouter();
   const [editando, setEditando] = useState(false);
@@ -189,15 +190,16 @@ function FornecedorCell({ contaId, nome }: { contaId: string; nome: string | nul
     );
   }
   return (
-    <button onClick={(e) => { e.stopPropagation(); setEditando(true); }} className="text-left hover:opacity-70 transition">
-      {nome ?? "—"}
+    <button onClick={(e) => { e.stopPropagation(); setEditando(true); }} className="text-left hover:opacity-70 transition flex items-center gap-2">
+      <LogoFornecedor nome={nome ?? "?"} url={logo} size={26} />
+      <span>{nome ?? "—"}</span>
     </button>
   );
 }
 
-export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes, feriados = [], regraVencimento = "adiar" }: {
+export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes, feriados = [], regraVencimento = "adiar", logos = {} }: {
   contas: Conta[]; situacaoPorConta: Record<string, string>; lojas: { id: string; codigo: string }[]; ano: number; mes: number;
-  feriados?: Feriado[]; regraVencimento?: RegraVencimento;
+  feriados?: Feriado[]; regraVencimento?: RegraVencimento; logos?: Record<string, string>;
 }) {
   // calendário da empresa: vencimento em fim de semana ou feriado é ajustado
   // pela regra, e o que foi ajustado não conta como atraso.
@@ -403,7 +405,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
                   </span>
                 </td>
                 <td className="px-4 text-[13px] font-medium">
-                  <FornecedorCell contaId={c.id} nome={c.fornecedor_nome} />
+                  <FornecedorCell contaId={c.id} nome={c.fornecedor_nome} logo={logos[(c.fornecedor_nome ?? "").toLowerCase()]} />
                   {c.eh_rateio && <span className="text-[10px] font-mono text-amb border border-amarelo rounded px-1 ml-1.5">RATEIO</span>}
                 </td>
                 <td className="px-4">

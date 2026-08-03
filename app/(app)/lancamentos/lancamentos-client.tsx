@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TIPOS, SITUACAO } from "@/lib/types";
+import LogoFornecedor from "@/components/logo-fornecedor";
 import TipoIcon from "@/components/tipo-icon";
 import { money, MES } from "@/lib/format";
 import { useDebounce } from "@/lib/hooks/useDebounce";
@@ -33,7 +34,7 @@ function rotuloVencimento(dia: number | null, situacao: string): { texto: string
   return { texto: `dia ${dia}`, cor: "text-[#666]" };
 }
 
-export default function LancamentosClient({ itens, ano, resumo }: { itens: Item[]; ano: number; resumo: Resumo }) {
+export default function LancamentosClient({ itens, ano, resumo, logos = {} }: { itens: Item[]; ano: number; resumo: Resumo; logos?: Record<string, string> }) {
   const [fMes, setFMes] = useState("todos");
   const [fTipo, setFTipo] = useState("todos");
   const [fSituacao, setFSituacao] = useState("todos");
@@ -160,7 +161,12 @@ export default function LancamentosClient({ itens, ano, resumo }: { itens: Item[
                   <td className="px-4 text-[13px]">
                     <span className="inline-flex items-center gap-1.5"><TipoIcon tipo={l.contas.tipo} size={14} color={T?.c} />{T?.n}</span>
                   </td>
-                  <td className="px-4 text-[13px] text-[#666]">{l.contas.fornecedor_nome ?? "—"}</td>
+                  <td className="px-4 text-[13px] text-[#666]">
+                    <div className="flex items-center gap-2">
+                      <LogoFornecedor nome={l.contas.fornecedor_nome ?? "?"} url={logos[(l.contas.fornecedor_nome ?? "").toLowerCase()]} size={24} />
+                      <span>{l.contas.fornecedor_nome ?? "—"}</span>
+                    </div>
+                  </td>
                   <td className="px-4 text-[13px] font-mono font-semibold">{money(l.valor)}</td>
                   <td className="px-4"><span className={`badge ${s.cls}`}>{s.label}</span></td>
                   <td className={`px-4 text-[12.5px] font-mono ${rotuloVencimento(l.contas.dia_vencimento, l.situacao).cor}`}>{rotuloVencimento(l.contas.dia_vencimento, l.situacao).texto}</td>
