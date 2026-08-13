@@ -41,10 +41,10 @@ export type ExtracaoBoleto = {
   chave_acesso: string | null;
   dia_vencimento: number | null;
   data_emissao: { dia: number; mes: number; ano: number } | null;
-  conferencia?: import("./conferir-nvidia").ResultadoConferencia | null;
+  _raw_resposta?: string | null;
 };
 
-export async function extrairDadosBoleto(buffer: Buffer, nomeArquivo: string, mimeType: string, conferirNvidia = false): Promise<ExtracaoBoleto> {
+export async function extrairDadosBoleto(buffer: Buffer, nomeArquivo: string, mimeType: string): Promise<ExtracaoBoleto> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY não configurada.");
 
@@ -123,39 +123,8 @@ export async function extrairDadosBoleto(buffer: Buffer, nomeArquivo: string, mi
     chave_acesso: json.chave_acesso ? String(json.chave_acesso).replace(/\D/g, "") || null : null,
     dia_vencimento: diaVencimento,
     data_emissao: dataEmissao,
-    conferencia: null as import("./conferir-nvidia").ResultadoConferencia | null,
+    _raw_resposta: texto,
   };
-
-  // Segunda leitura pela NVIDIA (best-effort) — confere valor/CNPJ/nº/chave.
-  // Só roda se a chave estiver configurada; qualquer erro é silencioso.
-  if (conferirNvidia && process.env.NVIDIA_API_KEY) {
-    try {
-      const { conferirComNvidia } = await import("./conferir-nvidia");
-      let imgBase64: string | null = null;
-      let imgMime = "image/png";
-      let motivoImg: string | null = null;
-      if (isPdf) {
-        const { pdfPrimeiraPaginaPng } = await import("./pdf-para-imagem");
-        const r = await pdfPrimeiraPaginaPng(buffer);
-        if (r.png) imgBase64 = r.png.toString("base64");
-        else motivoImg = `Falha ao rasterizar o PDF: ${r.erro ?? "desconhecido"}`;
-      } else {
-        imgBase64 = base64;
-        imgMime = mimeType || "image/jpeg";
-      }
-      if (imgBase64) {
-        resultado.conferencia = await conferirComNvidia(imgBase64, imgMime, {
-          valor: resultado.valor, cnpj: resultado.cnpj,
-          numero_documento: resultado.numero_documento, chave_acesso: resultado.chave_acesso,
-        });
-      } else {
-        resultado.conferencia = { conferido: false, concorda: false, divergencias: [], lidoNvidia: null, erro: motivoImg ?? "Imagem indisponível para conferência" };
-      }
-      console.log("[conferencia-nvidia]", nomeArquivo, JSON.stringify(resultado.conferencia));
-    } catch (e: any) {
-      resultado.conferencia = { conferido: false, concorda: false, divergencias: [], lidoNvidia: null, erro: `Exceção na conferência: ${e?.message ?? "erro"}` };
-    }
-  }
 
   return resultado;
 }
