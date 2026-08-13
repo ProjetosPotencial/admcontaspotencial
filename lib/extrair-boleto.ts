@@ -56,11 +56,20 @@ export async function extrairDadosBoleto(buffer: Buffer, nomeArquivo: string, mi
     : { type: "image" as const, source: { type: "base64" as const, media_type: (mimeType || "image/jpeg") as any, data: base64 } };
 
   const anthropic = new Anthropic({ apiKey });
-  const resposta = await anthropic.messages.create({
-    model: "claude-sonnet-5",
-    max_tokens: 700,
-    messages: [{ role: "user", content: [conteudoArquivo, { type: "text", text: PROMPT }] }] as any,
-  });
+  let resposta;
+  try {
+    resposta = await anthropic.messages.create({
+      model: "claude-sonnet-5",
+      max_tokens: 700,
+      messages: [{ role: "user", content: [conteudoArquivo, { type: "text", text: PROMPT }] }] as any,
+    });
+  } catch (e: any) {
+    // Erro REAL da API da Anthropic (chave, crédito, modelo, rate limit...).
+    // Antes isso caía no catch de JSON e virava "documento ilegível" sem pista.
+    const status = e?.status ?? e?.response?.status;
+    const msg = e?.error?.error?.message ?? e?.message ?? "erro desconhecido";
+    throw new Error(`Anthropic falhou${status ? ` (HTTP ${status})` : ""}: ${msg}`);
+  }
 
   const bloco = resposta.content.find((b) => b.type === "text");
   const texto = bloco && "text" in bloco ? bloco.text.trim() : "{}";
