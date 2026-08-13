@@ -77,6 +77,21 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
     setTimeout(() => setToast(null), 3500);
   }
 
+  async function reprocessar() {
+    setProcessando("__reprocessar__");
+    try {
+      const resp = await fetch("/api/reprocessar-pendentes", { method: "POST" });
+      const json = await resp.json();
+      if (!resp.ok) { setToast(json.error ?? "Erro ao reprocessar."); }
+      else if (json.completados > 0) { setToast(`${json.completados} boleto(s) completado(s) de ${json.candidatos}.`); setTimeout(() => window.location.reload(), 1500); }
+      else { setToast(`Nenhum completado (${json.candidatos} verificado(s), ${json.sem_codigo_barras} ainda sem código de barras).`); }
+    } catch {
+      setToast("Não foi possível reprocessar agora.");
+    }
+    setProcessando(null);
+    setTimeout(() => setToast(null), 4500);
+  }
+
   async function reclassificar(item: Item, nova: "boleto" | "nota_fiscal") {
     setProcessando(item.id);
     const { error } = await supabase.from("caixa_entrada_boletos")
@@ -344,9 +359,14 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
     <>
       <div className="flex items-center justify-between mb-5">
         <span className="text-[13px] text-[#6c757d]">{itens.length} pendente{itens.length !== 1 ? "s" : ""} de revisão</span>
-        <button onClick={importar} disabled={processando === "__importar__"} className="btn-primario disabled:opacity-50">
-          {processando === "__importar__" ? "Verificando pasta..." : "Verificar pasta agora"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={reprocessar} disabled={!!processando} className="btn-secundario disabled:opacity-50" title="Relê pela API os boletos que ficaram sem código de barras">
+            {processando === "__reprocessar__" ? "Reprocessando..." : "Reprocessar pendências"}
+          </button>
+          <button onClick={importar} disabled={processando === "__importar__"} className="btn-primario disabled:opacity-50">
+            {processando === "__importar__" ? "Verificando pasta..." : "Verificar pasta agora"}
+          </button>
+        </div>
       </div>
 
       {itens.length === 0 ? (
