@@ -60,7 +60,7 @@ export async function extrairDadosBoleto(buffer: Buffer, nomeArquivo: string, mi
   try {
     resposta = await anthropic.messages.create({
       model: "claude-sonnet-5",
-      max_tokens: 700,
+      max_tokens: 1500,
       messages: [{ role: "user", content: [conteudoArquivo, { type: "text", text: PROMPT }] }] as any,
     });
   } catch (e: any) {

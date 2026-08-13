@@ -525,7 +525,9 @@ function ChamadoCard({ item, lojas, processando, onConfirmarChamado, onRejeitar,
       )}
 
       {pendente && (
-        <p className="text-[12px] font-medium text-alerr bg-alerr-bg rounded-md px-3 py-2 mb-3">⚠️ {item.observacao}</p>
+        <div className="text-[12px] rounded-md px-3 py-2 mb-3 bg-amarelo-bg text-amb">
+          <span className="font-medium">A IA não leu o documento automaticamente.</span> Você pode selecionar a loja abaixo e lançar a compra com os dados do chamado do GLPI — depois é só completar o que faltar direto na conta.
+        </div>
       )}
 
       <label className="block mb-3">

@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.1",
+    "@anthropic-ai/sdk": "^0.116.0",
     "@napi-rs/canvas": "^1.0.3",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.45.4",
