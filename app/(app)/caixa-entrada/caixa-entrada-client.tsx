@@ -98,8 +98,9 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
       const resp = await fetch("/api/reprocessar-chamados", { method: "POST" });
       const json = await resp.json();
       if (!resp.ok) { setToast(json.error ?? "Erro ao reler chamados."); }
-      else if (json.completados > 0) { setToast(`${json.completados} chamado(s) com NF lida de ${json.candidatos}.`); setTimeout(() => window.location.reload(), 1500); }
-      else { setToast(`Nenhum lido (${json.candidatos} chamado(s) verificado(s), ${json.sem_leitura} ainda sem NF).`); }
+      else if (json.candidatos === 0) { setToast("Nenhum chamado ilegível pendente. Tudo lido! 🎉"); }
+      else if (json.completados > 0) { setToast(`${json.completados} de ${json.candidatos} lidos neste lote. Clique de novo se ainda houver pendentes.`); setTimeout(() => window.location.reload(), 2000); }
+      else { setToast(`Lote de ${json.candidatos} verificado, ${json.sem_leitura} ainda ilegíveis, ${json.falhas} com erro.`); }
     } catch {
       setToast("Não foi possível reler os chamados agora.");
     }
