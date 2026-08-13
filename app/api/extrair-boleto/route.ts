@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { extrairDadosBoleto } from "@/lib/extrair-boleto";
 
 export const runtime = "nodejs";
+export const maxDuration = 120;
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
