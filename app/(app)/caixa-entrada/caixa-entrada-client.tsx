@@ -92,6 +92,21 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
     setTimeout(() => setToast(null), 4500);
   }
 
+  async function reprocessarChamados() {
+    setProcessando("__reprocessar_chamados__");
+    try {
+      const resp = await fetch("/api/reprocessar-chamados", { method: "POST" });
+      const json = await resp.json();
+      if (!resp.ok) { setToast(json.error ?? "Erro ao reler chamados."); }
+      else if (json.completados > 0) { setToast(`${json.completados} chamado(s) com NF lida de ${json.candidatos}.`); setTimeout(() => window.location.reload(), 1500); }
+      else { setToast(`Nenhum lido (${json.candidatos} chamado(s) verificado(s), ${json.sem_leitura} ainda sem NF).`); }
+    } catch {
+      setToast("Não foi possível reler os chamados agora.");
+    }
+    setProcessando(null);
+    setTimeout(() => setToast(null), 4500);
+  }
+
   async function reclassificar(item: Item, nova: "boleto" | "nota_fiscal") {
     setProcessando(item.id);
     const { error } = await supabase.from("caixa_entrada_boletos")
@@ -360,8 +375,11 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
       <div className="flex items-center justify-between mb-5">
         <span className="text-[13px] text-[#6c757d]">{itens.length} pendente{itens.length !== 1 ? "s" : ""} de revisão</span>
         <div className="flex items-center gap-2">
+          <button onClick={reprocessarChamados} disabled={!!processando} className="btn-secundario disabled:opacity-50" title="Relê as NF dos chamados que ficaram pendentes">
+            {processando === "__reprocessar_chamados__" ? "Relendo NF..." : "Reler NF dos chamados"}
+          </button>
           <button onClick={reprocessar} disabled={!!processando} className="btn-secundario disabled:opacity-50" title="Relê pela API os boletos que ficaram sem código de barras">
-            {processando === "__reprocessar__" ? "Reprocessando..." : "Reprocessar pendências"}
+            {processando === "__reprocessar__" ? "Reprocessando..." : "Reprocessar boletos"}
           </button>
           <button onClick={importar} disabled={processando === "__importar__"} className="btn-primario disabled:opacity-50">
             {processando === "__importar__" ? "Verificando pasta..." : "Verificar pasta agora"}
