@@ -49,10 +49,18 @@ export default function TopNav({ mes, ano, ehPeriodoAtual }: { mes: number; ano:
   }
 
   return (
-    <header className="h-16 bg-white border-b border-linha px-4 sm:px-6 flex items-center justify-between shrink-0 sticky top-0 z-30">
+    <header className="h-[72px] bg-white/95 backdrop-blur border-b border-[#e6e9ee] px-4 sm:px-8 flex items-center justify-between gap-4 shrink-0 sticky top-0 z-30">
       <button onClick={() => setAberto(true)} className="text-txt-2 hover:text-txt md:hidden shrink-0" aria-label="Abrir menu">
         <svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M3 6h14M3 10h14M3 14h14" /></svg>
       </button>
+
+      <div className="hidden md:flex items-center flex-1 max-w-[440px]">
+        <div className="relative w-full">
+          <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#98a2b3]" width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7"><circle cx="8.5" cy="8.5" r="5" /><path d="M12.5 12.5L17 17" /></svg>
+          <input aria-label="Buscar no sistema" placeholder="Buscar conta, loja ou fornecedor" className="w-full h-10 bg-[#f8f9fb] border border-[#e6e9ee] rounded-xl pl-10 pr-16 text-[13px] text-txt placeholder:text-[#98a2b3] focus:outline-none focus:border-amarelo focus:ring-[3px] focus:ring-amarelo/15" />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 hidden lg:inline-flex items-center gap-1 rounded-md border border-[#dfe3e8] bg-white px-1.5 py-0.5 text-[10px] font-semibold text-[#98a2b3]">⌘ K</span>
+        </div>
+      </div>
 
       {!ehPeriodoAtual && (
         <div className="hidden md:flex items-center gap-2 bg-amb-bg border border-amarelo/40 rounded-lg px-3 py-1.5 text-[12px] font-semibold text-[#7a5c00] ml-2">
