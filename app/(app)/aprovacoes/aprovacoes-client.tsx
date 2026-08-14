@@ -38,6 +38,10 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {} }
   const [decidindo, setDecidindo] = useState<string | null>(null);
   const [recusando, setRecusando] = useState<Item | null>(null);
   const [motivoRecusa, setMotivoRecusa] = useState("");
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+  const [loteProcessando, setLoteProcessando] = useState(false);
+  const [confirmandoLote, setConfirmandoLote] = useState<null | "aprovar" | "recusar">(null);
+  const [motivoLote, setMotivoLote] = useState("");
   const [busca, setBusca] = useState("");
   const [fEmpresa, setFEmpresa] = useState("todas");
   const [fLoja, setFLoja] = useState("todas");
@@ -126,6 +130,45 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {} }
     // sem isso, o Next.js pode continuar mostrando por até 30s a versão
     // antiga da lista (de antes da decisão) se a pessoa navegar pra outra
     // tela e voltar - o item "reaparecia" mesmo já decidido de verdade.
+    router.refresh();
+  }
+
+  const alternarSel = (id: string) => setSelecionados((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const limparSel = () => setSelecionados(new Set());
+
+  // Decisão em LOTE: aplica aprovar/recusar a todos os selecionados, um a um,
+  // reusando a mesma lógica de decisão individual. Recusa exige motivo.
+  async function decidirLote(aprovar: boolean, motivo?: string) {
+    setLoteProcessando(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const ids = Array.from(selecionados);
+    let ok = 0, falhas = 0;
+    for (const id of ids) {
+      const item = fila.find((x) => x.id === id);
+      if (!item) continue;
+      const { error } = await supabase.from("lancamentos").update(aprovar ? {
+        situacao: "aprovado", aprovado_em: new Date().toISOString(), aprovado_por: user?.id ?? null,
+      } : {
+        situacao: "contestado", motivo_recusa: motivo ?? null, recusado_em: new Date().toISOString(), recusado_por: user?.id ?? null,
+      }).eq("id", id);
+      if (error) { falhas++; continue; }
+      ok++;
+      fetch("/api/notificar-evento", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          evento: aprovar ? "aprovada" : "reprovada",
+          loja: item.contas.lojas?.codigo, tipo: TIPOS[item.contas.tipo]?.n ?? item.contas.tipo,
+          valor: money(Number(item.valor ?? 0)), por: user?.email ?? undefined, motivo: aprovar ? undefined : motivo,
+        }),
+      }).catch(() => {});
+    }
+    setFila((f) => f.filter((x) => !ids.includes(x.id)));
+    setLoteProcessando(false);
+    setConfirmandoLote(null);
+    setMotivoLote("");
+    limparSel();
+    setToast(`${ok} ${aprovar ? "aprovada(s)" : "recusada(s)"}${falhas > 0 ? `, ${falhas} com erro` : ""}.`);
+    setTimeout(() => setToast(null), 3000);
     router.refresh();
   }
 
@@ -269,8 +312,10 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {} }
                             const T = TIPOS[item.contas.tipo];
                             const ocupado = decidindo === item.id;
                             return (
-                              <div key={item.id} className="relative bg-white border border-linha rounded-xl shadow-leve hover:shadow-media transition p-4 flex flex-col">
+                              <div key={item.id} className={`relative bg-white border rounded-xl shadow-leve hover:shadow-media transition p-4 flex flex-col ${selecionados.has(item.id) ? "border-amarelo ring-2 ring-amarelo/30" : "border-linha"}`}>
                                 <span className="absolute left-0 top-0 right-0 h-1 bg-amarelo rounded-t-xl" />
+                                <input type="checkbox" checked={selecionados.has(item.id)} onChange={() => alternarSel(item.id)}
+                                  className="absolute top-3 right-3 w-4 h-4 rounded border-linha cursor-pointer accent-amarelo z-10" title="Selecionar para ação em lote" />
 
                                 <div className="flex items-center gap-2.5 mb-3">
                                   <div className="w-10 h-10 rounded-full grid place-items-center shrink-0 relative" style={{ background: T?.bg }}>
@@ -387,6 +432,49 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {} }
         </div>
         </div>
       </div>
+
+      {/* Barra fixa de ações em lote */}
+      {selecionados.size > 0 && !confirmandoLote && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-ebano text-white rounded-xl shadow-forte flex items-center gap-3 pl-5 pr-3 py-3">
+          <span className="text-[13px] font-medium">{selecionados.size} selecionada{selecionados.size !== 1 ? "s" : ""}</span>
+          <div className="h-5 w-px bg-white/20" />
+          <button onClick={() => setConfirmandoLote("aprovar")} className="btn-sucesso text-[12.5px] py-2">Aprovar selecionadas</button>
+          <button onClick={() => setConfirmandoLote("recusar")} className="btn-perigo text-[12.5px] py-2">Recusar selecionadas</button>
+          <button onClick={limparSel} className="text-[13px] text-white/70 hover:text-white transition px-1">Limpar</button>
+        </div>
+      )}
+
+      {/* Confirmação da ação em lote */}
+      {confirmandoLote && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-black/40" onClick={loteProcessando ? undefined : () => setConfirmandoLote(null)} />
+          <div className="relative bg-white rounded-xl shadow-forte w-full max-w-md p-6">
+            <h3 className="text-[16px] font-semibold text-txt">
+              {confirmandoLote === "aprovar" ? "Aprovar em lote" : "Recusar em lote"}
+            </h3>
+            <p className="text-[13.5px] text-txt-2 mt-2 leading-relaxed">
+              Você vai {confirmandoLote === "aprovar" ? "aprovar" : "recusar"} <b>{selecionados.size}</b> {selecionados.size === 1 ? "conta" : "contas"} de uma vez. Essa ação é aplicada a todas as selecionadas.
+            </p>
+            {confirmandoLote === "recusar" && (
+              <div className="mt-3">
+                <label className="text-[12px] font-medium text-txt-2">Motivo da recusa (obrigatório)</label>
+                <textarea value={motivoLote} onChange={(e) => setMotivoLote(e.target.value)} rows={3}
+                  placeholder="Explique por que essas contas estão sendo recusadas..."
+                  className="w-full mt-1 border border-linha2 rounded-md px-3 py-2 text-[13px] focus:outline-none focus:border-amarelo focus:ring-[3px] focus:ring-amarelo/10" />
+              </div>
+            )}
+            <div className="flex items-center justify-end gap-2 mt-6">
+              <button onClick={() => setConfirmandoLote(null)} disabled={loteProcessando} className="btn-secundario disabled:opacity-50">Cancelar</button>
+              <button
+                onClick={() => decidirLote(confirmandoLote === "aprovar", confirmandoLote === "recusar" ? motivoLote.trim() : undefined)}
+                disabled={loteProcessando || (confirmandoLote === "recusar" && motivoLote.trim() === "")}
+                className={`${confirmandoLote === "aprovar" ? "btn-sucesso" : "btn-perigo"} disabled:opacity-50`}>
+                {loteProcessando ? "Processando..." : confirmandoLote === "aprovar" ? "Aprovar todas" : "Recusar todas"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {recusando && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

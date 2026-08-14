@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import StatusChip from "@/components/status-chip";
+import EmptyState from "@/components/empty-state";
 import type { Empresa } from "@/lib/empresa-types";
 
 export default function EmpresasClient({ empresas: iniciais, contagemLojas }: { empresas: Empresa[]; contagemLojas: Record<string, number> }) {
@@ -40,14 +42,16 @@ export default function EmpresasClient({ empresas: iniciais, contagemLojas }: { 
                 </td>
                 <td className="px-4 text-[13px] font-mono text-[#6c757d]">{e.cnpj ?? "—"}</td>
                 <td className="px-4 text-[13px] font-mono">{contagemLojas[e.id] ?? 0}</td>
-                <td className="px-4"><span className={`badge ${e.ativa ? "bg-ok-bg text-ok" : "bg-[#f1f3f5] text-[#adb5bd]"}`}>{e.ativa ? "Ativa" : "Inativa"}</span></td>
+                <td className="px-4"><StatusChip tom={e.ativa ? "ok" : "neutro"}>{e.ativa ? "Ativa" : "Inativa"}</StatusChip></td>
                 <td className="px-4 text-right text-[#adb5bd]">
                   <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="inline"><path d="M7.5 4.5l6 5.5-6 5.5" /></svg>
                 </td>
               </tr>
             ))}
             {empresas.length === 0 && (
-              <tr><td colSpan={5} className="text-center py-12 text-[#adb5bd]">Nenhuma empresa cadastrada ainda.</td></tr>
+              <tr><td colSpan={5} className="py-4">
+                <EmptyState titulo="Nenhuma empresa cadastrada" descricao="As empresas do grupo aparecem aqui. Cadastre uma empresa para vincular lojas e centros de custo." />
+              </td></tr>
             )}
           </tbody>
         </table></div>

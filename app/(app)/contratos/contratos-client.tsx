@@ -4,6 +4,8 @@ import { useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { money, formatarDataSemFuso } from "@/lib/format";
 import { useDebounce } from "@/lib/hooks/useDebounce";
+import StatusChip, { type Tom } from "@/components/status-chip";
+import EmptyState from "@/components/empty-state";
 
 type ContratoRow = {
   id: string; numero: string; loja_id: string | null; empresa_id: string | null;
@@ -14,7 +16,7 @@ type ContratoRow = {
 
 const TIPOS_CONTRATO = ["aluguel", "prestacao_servico", "franquia", "outro"];
 const TIPO_LABEL: Record<string, string> = { aluguel: "Aluguel", prestacao_servico: "Prestação de serviço", franquia: "Franquia", outro: "Outro" };
-const STATUS_CLS: Record<string, string> = { ativo: "bg-ok-bg text-ok", encerrado: "bg-alerr-bg text-alerr", suspenso: "bg-amb-bg text-[#c9922a]" };
+const STATUS_TOM: Record<string, Tom> = { ativo: "ok", encerrado: "alerta", suspenso: "aviso" };
 
 export default function ContratosClient({ contratos: iniciais, lojas, empresas, buscaInicial }: {
   contratos: ContratoRow[]; lojas: { id: string; codigo: string }[]; empresas: { id: string; nome: string }[]; buscaInicial?: string;
@@ -153,11 +155,13 @@ export default function ContratosClient({ contratos: iniciais, lojas, empresas, 
                   })()}
                 </td>
                 <td className="px-4 text-[13px] font-mono font-semibold">{money(c.valor)}</td>
-                <td className="px-4"><span className={`badge ${STATUS_CLS[c.status] ?? ""}`}>{c.status}</span></td>
+                <td className="px-4"><StatusChip tom={STATUS_TOM[c.status] ?? "neutro"}>{c.status}</StatusChip></td>
               </tr>
             ))}
             {filtrados.length === 0 && (
-              <tr><td colSpan={7} className="text-center py-12 text-[#adb5bd]">Nenhum contrato encontrado.</td></tr>
+              <tr><td colSpan={7} className="py-4">
+                <EmptyState titulo="Nenhum contrato encontrado" descricao="Contratos ativos, vencimentos e vigências aparecem aqui. Ajuste os filtros ou cadastre um novo contrato." />
+              </td></tr>
             )}
           </tbody>
         </table></div>

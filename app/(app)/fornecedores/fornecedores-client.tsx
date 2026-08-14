@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { TIPOS } from "@/lib/types";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import LogoFornecedor from "@/components/logo-fornecedor";
+import EmptyState from "@/components/empty-state";
 
 type Fornecedor = { id: string; nome: string; tipo_padrao: string | null; portal_padrao: string | null; logo_url: string | null };
 
@@ -185,7 +186,9 @@ export default function FornecedoresClient({ fornecedores, nomesAtivos }: { forn
               );
             })}
             {filtrados.length === 0 && (
-              <tr><td colSpan={4} className="text-center py-12 text-[#adb5bd]">Nenhum fornecedor encontrado.</td></tr>
+              <tr><td colSpan={4} className="py-4">
+                <EmptyState titulo="Nenhum fornecedor encontrado" descricao="Ajuste a busca ou os filtros. Os fornecedores são criados automaticamente a partir das contas lançadas." />
+              </td></tr>
             )}
           </tbody>
         </table></div>

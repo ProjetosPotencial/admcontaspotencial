@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TIPOS } from "@/lib/types";
 import TipoIcon from "@/components/tipo-icon";
+import EmptyState from "@/components/empty-state";
+import Link from "next/link";
 import { money } from "@/lib/format";
 
 type Item = {
@@ -76,7 +78,13 @@ export default function PagamentosClient({ prontosPagar: prontosIniciais, pagos 
               </div>
             );
           })}
-          {prontos.length === 0 && <div className="text-center py-10 text-[#adb5bd] text-[13px]">Nada aprovado aguardando pagamento agora.</div>}
+          {prontos.length === 0 && (
+            <EmptyState
+              titulo="Nada aguardando pagamento"
+              descricao="Quando uma conta for aprovada, ela aparece aqui pronta para pagamento. Aprove contas na fila para liberar pagamentos."
+              acao={<Link href="/aprovacoes" className="btn-secundario">Ir para Aprovações</Link>}
+            />
+          )}
         </div>
       </section>
 
@@ -99,7 +107,12 @@ export default function PagamentosClient({ prontosPagar: prontosIniciais, pagos 
               </div>
             );
           })}
-          {pagos.length === 0 && <div className="text-center py-10 text-[#adb5bd] text-[13px]">Nenhum pagamento registrado ainda.</div>}
+          {pagos.length === 0 && (
+            <EmptyState
+              titulo="Nenhum pagamento registrado ainda"
+              descricao="Os pagamentos que você marcar como pagos aparecem aqui, com a forma de pagamento e o valor. Este é o histórico do que já foi quitado."
+            />
+          )}
         </div>
       </section>
     </div>
