@@ -371,7 +371,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
 
       {/* Tabela */}
       <div className="bg-white border border-linha rounded-xl overflow-hidden shadow-leve">
-        <div className="overflow-x-auto"><table className="w-full border-collapse min-w-[720px]">
+        <div className="hidden sm:block overflow-x-auto" style={{ WebkitOverflowScrolling: "touch" }}><table className="w-full border-collapse min-w-[720px]">
           <thead>
             <tr className="bg-[#f1f3f5] h-12">
               <th className="w-10 px-4">
@@ -448,6 +448,33 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
             )}
           </tbody>
         </table></div>
+
+        {/* Lista em cards no celular (a tabela acima fica só no desktop) */}
+        <div className="sm:hidden divide-y divide-linha2">
+          {visiveis.map((c) => (
+            <button key={c.id} onClick={() => setAberta(c)} className="w-full text-left px-4 py-3.5 hover:bg-[#f8f9fa] transition flex items-start gap-3">
+              <div className="w-9 h-9 rounded-full grid place-items-center shrink-0 mt-0.5" style={{ background: TIPOS[c.tipo]?.bg }}>
+                <TipoIcon tipo={c.tipo} size={17} color={TIPOS[c.tipo]?.c} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[14px] font-semibold text-txt truncate">{c.lojas?.codigo ?? "—"}</span>
+                  <StatusBadge status={c.status} />
+                </div>
+                <div className="text-[13px] text-txt-2 truncate mt-0.5">{c.fornecedor_nome ?? "—"}</div>
+                <div className="flex items-center gap-3 mt-1.5 text-[12px] text-txt-3">
+                  <span>{TIPOS[c.tipo]?.n}</span>
+                  {c.dia_vencimento != null && (c.tipo !== "compra" && c.tipo !== "nota_fiscal") && <span>vence dia {c.dia_vencimento}</span>}
+                  {c.chamado_numero && <span>#{c.chamado_numero}</span>}
+                </div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#adb5bd" strokeWidth="1.6" className="shrink-0 mt-2"><path d="M7.5 4.5l6 5.5-6 5.5" /></svg>
+            </button>
+          ))}
+          {filtradas.length === 0 && (
+            <div className="text-center py-14 text-[#adb5bd] text-[13px]">Nenhuma conta com esses filtros.</div>
+          )}
+        </div>
 
         {/* paginação real - evita renderizar as 450 linhas de uma vez */}
         <div className="flex items-center justify-between px-4 py-3 border-t border-linha2 flex-wrap gap-3">

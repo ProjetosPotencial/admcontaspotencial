@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { TIPOS, SITUACAO } from "@/lib/types";
 import { MES } from "@/lib/format";
 
@@ -13,6 +14,33 @@ function baixarCsv(nome: string, linhas: string[]) {
   a.href = url; a.download = nome;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function CardRelatorio({ titulo, descricao, icone, cor, onBaixar }: { titulo: string; descricao: string; icone: React.ReactNode; cor: string; onBaixar: () => void }) {
+  const [estado, setEstado] = useState<"idle" | "baixando" | "ok">("idle");
+  function baixar() {
+    setEstado("baixando");
+    onBaixar();
+    setTimeout(() => setEstado("ok"), 400);
+    setTimeout(() => setEstado("idle"), 2600);
+  }
+  return (
+    <div className="card p-5 flex items-center justify-between gap-4">
+      <div className="flex items-center gap-4 min-w-0">
+        <div className="w-11 h-11 rounded-xl grid place-items-center shrink-0" style={{ background: `${cor}14`, color: cor }}>
+          {icone}
+        </div>
+        <div className="min-w-0">
+          <div className="text-[14px] font-semibold text-txt">{titulo}</div>
+          <div className="text-[12.5px] text-txt-2 mt-0.5">{descricao}</div>
+        </div>
+      </div>
+      <button onClick={baixar} disabled={estado === "baixando"}
+        className={`shrink-0 rounded-md px-4 py-2.5 text-[13px] font-medium transition ${estado === "ok" ? "bg-ok text-white" : "btn-primario"}`}>
+        {estado === "baixando" ? "Gerando..." : estado === "ok" ? "✓ Baixado" : "Baixar CSV"}
+      </button>
+    </div>
+  );
 }
 
 export default function RelatoriosClient({ lancamentos, centrosCusto, ano }: { lancamentos: Lanc[]; centrosCusto: CC[]; ano: number }) {
@@ -45,24 +73,24 @@ export default function RelatoriosClient({ lancamentos, centrosCusto, ano }: { l
   }
 
   return (
-    <div className="grid gap-4">
-      <div className="card p-5 flex items-center justify-between">
-        <div>
-          <div className="text-[14px] font-semibold text-[#1a1a1a]">Lançamentos de {ano}</div>
-          <div className="text-[12.5px] text-[#6c757d] mt-0.5">{lancamentos.length} lançamentos, com loja, fornecedor e situação</div>
-        </div>
-        <button onClick={exportarLancamentos} className="btn-primario shrink-0">Baixar CSV</button>
-      </div>
-      <div className="card p-5 flex items-center justify-between">
-        <div>
-          <div className="text-[14px] font-semibold text-[#1a1a1a]">Centros de custo de {ano}</div>
-          <div className="text-[12.5px] text-[#6c757d] mt-0.5">Gasto acumulado por loja, do mesmo jeito que aparece no ranking</div>
-        </div>
-        <button onClick={exportarCentrosCusto} className="btn-primario shrink-0">Baixar CSV</button>
-      </div>
-      <div className="text-[12px] text-[#adb5bd] mt-1">
+    <div className="grid gap-3">
+      <CardRelatorio
+        titulo={`Lançamentos de ${ano}`}
+        descricao={`${lancamentos.length} lançamentos, com loja, fornecedor e situação`}
+        cor="#2A74C4"
+        icone={<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 16.5V9M10 16.5V4M16 16.5V11" /></svg>}
+        onBaixar={exportarLancamentos}
+      />
+      <CardRelatorio
+        titulo={`Centros de custo de ${ano}`}
+        descricao="Gasto acumulado por loja, do mesmo jeito que aparece no ranking"
+        cor="#2E7D32"
+        icone={<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="14" height="14" rx="2" /><path d="M7 7h6M7 10h6M7 13h3" /></svg>}
+        onBaixar={exportarCentrosCusto}
+      />
+      <p className="text-[12px] text-txt-3 mt-1 px-1">
         Mais relatórios (por fornecedor, por tipo de conta) chegam conforme a necessidade for aparecendo — me avisa se precisar de algum específico.
-      </div>
+      </p>
     </div>
   );
 }
