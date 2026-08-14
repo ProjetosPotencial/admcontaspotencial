@@ -11,6 +11,7 @@ import RelogioAoVivo from "./relogio-ao-vivo";
 import CalendarioMes, { type DiaCal } from "./calendario-mes";
 import DonutTipos, { type FatiaTipo } from "./donut-tipos";
 import ContadorAnimado from "@/components/contador-animado";
+import GraficoEvolucao from "@/components/grafico-evolucao";
 import Link from "next/link";
 import { podeAcessar, SemPermissao } from "@/lib/permissoes";
 
@@ -598,15 +599,8 @@ export default async function PainelPage() {
                 </span>
               )}
             </div>
-            <div className="flex items-end gap-1.5 h-[90px]">
-              {evolucaoPorMes.map((m) => (
-                <div key={m.mes} className="flex-1 flex flex-col items-center gap-1.5" title={`${MES[m.mes - 1]}: ${money(m.total)}`}>
-                  <div className="w-full flex items-end h-[70px]">
-                    <div className="w-full rounded-t" style={{ height: `${Math.max((m.total / maxEvolucao) * 100, 3)}%`, background: m.mes === mes ? "#FFC107" : "#FFE9A8" }} />
-                  </div>
-                  <span className="text-[9.5px] text-[#adb5bd] font-mono">{MES[m.mes - 1]}</span>
-                </div>
-              ))}
+            <div className="mt-2">
+              <GraficoEvolucao dados={evolucaoPorMes.map((m) => ({ mes: MES[m.mes - 1], total: m.total, atual: m.mes === mes }))} />
             </div>
           </div>
 
