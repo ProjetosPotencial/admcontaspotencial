@@ -27,12 +27,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <AppShell>
-      <Suspense fallback={<div className="bg-ebano w-[248px] shrink-0 h-screen sticky top-0 hidden md:block" />}>
+      <Suspense fallback={<div className="bg-[#111318] w-[252px] shrink-0 h-screen sticky top-0 hidden md:block" />}>
         <Sidebar nome={nome} email={email} itens={menuItens} />
       </Suspense>
       <div className="flex-1 flex flex-col min-w-0">
         <TopNav mes={mes} ano={ano} ehPeriodoAtual={ehPeriodoAtual} />
-        <main className="flex-1 min-w-0"><SincronizacaoTempoReal />{children}</main>
+        <main className="flex-1 min-w-0 page-canvas"><SincronizacaoTempoReal />{children}</main>
       </div>
       <IaFlutuante />
     </AppShell>
