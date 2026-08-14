@@ -80,10 +80,10 @@ export default function LancamentosClient({ itens, ano, resumo, logos = {} }: { 
   function mudarFiltro(fn: () => void) { fn(); setPagina(1); }
 
   function exportarCsv() {
-    const linhas = ["mes,loja,praca,tipo,fornecedor,valor,situacao"];
+    const linhas = ["mes,lancado_em,loja,praca,tipo,fornecedor,valor,situacao"];
     filtrados.forEach((l) => {
       linhas.push([
-        MES[l.mes - 1], l.contas.lojas?.codigo ?? "", l.contas.lojas?.coban ?? "",
+        MES[l.mes - 1], l.lancado_em ? new Date(l.lancado_em).toLocaleString("pt-BR") : "", l.contas.lojas?.codigo ?? "", l.contas.lojas?.coban ?? "",
         TIPOS[l.contas.tipo]?.n ?? l.contas.tipo, l.contas.fornecedor_nome ?? "",
         l.valor ?? "", SITUACAO[l.situacao]?.label ?? l.situacao,
       ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","));
@@ -134,7 +134,7 @@ export default function LancamentosClient({ itens, ano, resumo, logos = {} }: { 
         <div className="overflow-x-auto"><table className="w-full border-collapse min-w-[720px]">
           <thead>
             <tr className="bg-[#f5f5f5] h-12">
-              <th className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">Mês</th>
+              <th className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">Mês / Lançado</th>
               <th className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">Loja</th>
               <th className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">Tipo</th>
               <th className="text-left text-[12px] font-semibold text-[#1a1a1a] px-4">Fornecedor</th>
@@ -156,7 +156,14 @@ export default function LancamentosClient({ itens, ano, resumo, logos = {} }: { 
               const s = SITUACAO[l.situacao] ?? { label: l.situacao, cls: "bg-[#f5f5f5] text-[#999]" };
               return (
                 <tr key={l.id} onClick={() => setAberto(l)} className="h-12 border-b border-[#f0f0f0] last:border-0 hover:bg-[#f9f9f9] cursor-pointer">
-                  <td className="px-4 text-[13px] font-mono text-[#666]">{MES[l.mes - 1]}</td>
+                  <td className="px-4 py-2">
+                    <div className="text-[13px] font-mono font-medium text-[#1a1a1a]">{MES[l.mes - 1]}</div>
+                    {l.lancado_em && (
+                      <div className="text-[11px] text-[#adb5bd] font-mono mt-0.5 whitespace-nowrap">
+                        {new Date(l.lancado_em).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} · {new Date(l.lancado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 text-[13px] font-medium">{l.contas.lojas?.codigo}</td>
                   <td className="px-4 text-[13px]">
                     <span className="inline-flex items-center gap-1.5"><TipoIcon tipo={l.contas.tipo} size={14} color={T?.c} />{T?.n}</span>
