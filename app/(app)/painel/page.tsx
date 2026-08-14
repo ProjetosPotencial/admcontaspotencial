@@ -284,15 +284,17 @@ export default async function PainelPage() {
               { n: vencemHoje.length, rot: "vencimentos próximos", href: "/contas", acao: "Ver vencimentos", cor: "#2E7D32", bg: "#F0FDF4",
                 icone: <><rect x="3.5" y="4.5" width="13" height="12" rx="2" /><path d="M3.5 8h13M7 3v3M13 3v3" /></> },
             ].map((p) => (
-              <div key={p.rot} className="card dashboard-priority-card p-5">
-                <div className="flex items-center gap-3.5 mb-4">
-                  <span className="w-11 h-11 rounded-full grid place-items-center shrink-0" style={{ background: p.bg, color: p.cor }}>
-                    <svg width="21" height="21" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{p.icone}</svg>
-                  </span>
-                  <div className="min-w-0">
-                    <div className="text-[26px] font-bold text-txt leading-none tracking-tight">{p.n}</div>
-                    <div className="text-[12.5px] text-txt-2 mt-1">{p.rot}</div>
-                  </div>
+<div key={p.rot} className="card dashboard-priority-card p-5">
+  <div className="flex items-center gap-3.5 mb-4">
+    <span className="w-11 h-11 rounded-full grid place-items-center shrink-0" style={{ background: p.bg, color: p.cor }}>
+      <svg width="21" height="21" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{p.icone}</svg>
+    </span>
+    <div className="min-w-0">
+      <div className="text-[26px] font-bold text-txt leading-none tracking-tight">{p.n}</div>
+      <div className="text-[12.5px] text-txt-2 mt-1">{p.rot}</div>
+      {p.sub && <div className="text-[12px] text-txt-2 mt-1">{p.sub}</div>}
+    </div>
+  </div>
                 </div>
                 <Link href={p.href} className="block w-full text-center rounded-lg border py-2 text-[12.5px] font-medium transition hover:bg-off"
                   style={{ borderColor: `${p.cor}44`, color: p.cor }}>

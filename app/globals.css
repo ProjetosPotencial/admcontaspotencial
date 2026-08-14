@@ -2,24 +2,57 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --ui-canvas: #f6f7f9;
+  --ui-surface: #ffffff;
+  --ui-surface-muted: #f8f9fb;
+  --ui-border: #e6e9ee;
+  --ui-text: #111827;
+  --ui-text-muted: #667085;
+  --ui-text-subtle: #98a2b3;
+  --ui-yellow: #fbbf24;
+  --ui-yellow-strong: #f2ae00;
+  --ui-green: #16803c;
+  --ui-red: #d92d20;
+  --ui-blue: #2f6fed;
+  --ui-purple: #6941c6;
+}
+
 html, body { height: 100%; }
-body { background: #FAFAFA; color: #1a1a1a; -webkit-font-smoothing: antialiased; }
+body {
+  background: var(--ui-canvas);
+  color: var(--ui-text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection { background: #fff0b8; color: #111827; }
+*:focus-visible { outline: 3px solid rgba(251, 191, 36, 0.45); outline-offset: 2px; }
 
 @layer components {
-  .badge { @apply inline-flex items-center text-[11px] px-2.5 py-1 rounded-full font-medium; }
-  .card { @apply bg-white border border-linha2 rounded-xl shadow-leve; }
-  .btn-primario { @apply bg-amarelo text-ebano font-medium rounded-full px-5 py-2.5 text-[13px] transition-all duration-150 hover:bg-amarelo-dark hover:-translate-y-px hover:shadow-media; }
-  .btn-secundario { @apply bg-white border border-linha2 text-ebano font-medium rounded-full px-5 py-2.5 text-[13px] transition hover:bg-off; }
-  .btn-sucesso { @apply bg-ok text-white font-medium rounded-md px-4 py-2.5 text-[13px] transition hover:bg-ok-dark; }
-  .btn-perigo { @apply bg-alerr text-white font-medium rounded-md px-4 py-2.5 text-[13px] transition hover:bg-alerr-dark; }
-  .input-padrao { @apply bg-off border border-linha2 rounded-md px-4 h-10 text-[13px] text-txt placeholder:text-txt-3 focus:outline-none focus:border-amarelo focus:ring-[3px] focus:ring-amarelo/10; }
+  .badge { @apply inline-flex items-center text-[11px] px-2.5 py-1 rounded-full font-semibold; }
+  .card { @apply bg-white border border-[#e6e9ee] rounded-2xl shadow-[0_1px_2px_rgba(16,24,40,0.04)]; }
+  .btn-primario { @apply bg-amarelo text-ebano font-semibold rounded-lg px-5 py-2.5 text-[13px] transition-all duration-150 hover:bg-amarelo-dark hover:-translate-y-px hover:shadow-media active:translate-y-0; }
+  .btn-secundario { @apply bg-white border border-[#dfe3e8] text-txt font-semibold rounded-lg px-5 py-2.5 text-[13px] transition hover:bg-[#f8f9fb] hover:border-[#cbd2da]; }
+  .btn-sucesso { @apply bg-ok text-white font-semibold rounded-lg px-4 py-2.5 text-[13px] transition hover:bg-ok-dark active:scale-[0.98]; }
+  .btn-perigo { @apply bg-alerr text-white font-semibold rounded-lg px-4 py-2.5 text-[13px] transition hover:bg-alerr-dark active:scale-[0.98]; }
+  .input-padrao { @apply bg-white border border-[#dfe3e8] rounded-lg px-4 h-10 text-[13px] text-txt placeholder:text-[#98a2b3] focus:outline-none focus:border-amarelo focus:ring-[3px] focus:ring-amarelo/15; }
+  .page-canvas { @apply min-h-full bg-[#f6f7f9]; }
+  .section-label { @apply text-[11px] font-bold uppercase tracking-[0.12em] text-[#98a2b3]; }
+  .table-shell { @apply overflow-hidden rounded-2xl border border-[#e6e9ee] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]; }
 }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: #e9ecef; border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d9dee7; border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: #bfc7d4; border: 2px solid transparent; background-clip: padding-box; }
 
 @keyframes piscar-alerta {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
 }
 .alerta-piscando { animation: piscar-alerta 1.1s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
