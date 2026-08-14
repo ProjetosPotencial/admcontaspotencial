@@ -9,6 +9,33 @@ import { useMenuMobile } from "@/components/app-shell";
 
 type MenuItem = { id: string; label: string; href: string; icone: string };
 
+// Agrupamento visual do menu por seção. Mapeia o href de cada item ao seu grupo.
+// Não mexe no banco — o menu continua vindo de menu_itens; aqui só organizamos
+// a exibição. Itens cujo href não esteja mapeado caem em "Geral" (nunca somem).
+const GRUPOS: { titulo: string; hrefs: string[] }[] = [
+  { titulo: "Visão geral", hrefs: ["/painel", "/inicio"] },
+  { titulo: "Operação", hrefs: ["/caixa-entrada", "/contas", "/lancamentos", "/aprovacoes", "/pagamentos", "/negociacoes"] },
+  { titulo: "Cadastros", hrefs: ["/fornecedores", "/empresas", "/lojas", "/contratos", "/centros-de-custo", "/cadastros"] },
+  { titulo: "Análises", hrefs: ["/relatorios"] },
+  { titulo: "Administração", hrefs: ["/cofre", "/usuarios", "/configuracoes"] },
+];
+
+function agruparItens(itens: MenuItem[]) {
+  const usados = new Set<string>();
+  const grupos = GRUPOS.map((g) => {
+    const doGrupo = itens.filter((it) => {
+      const bate = g.hrefs.some((h) => it.href === h || it.href.startsWith(h + "/"));
+      if (bate) usados.add(it.id);
+      return bate;
+    });
+    return { titulo: g.titulo, itens: doGrupo };
+  }).filter((g) => g.itens.length > 0);
+  // itens não mapeados vão pra um grupo "Geral" no fim, pra nunca sumirem
+  const restantes = itens.filter((it) => !usados.has(it.id));
+  if (restantes.length > 0) grupos.push({ titulo: "Geral", itens: restantes });
+  return grupos;
+}
+
 const ICONS: Record<string, React.ReactNode> = {
   painel: <><rect x="2.5" y="2.5" width="6" height="6" rx="1.5" /><rect x="11.5" y="2.5" width="6" height="6" rx="1.5" /><rect x="2.5" y="11.5" width="6" height="6" rx="1.5" /><rect x="11.5" y="11.5" width="6" height="6" rx="1.5" /></>,
   contas: <><path d="M6 3.5h6l4 4V19a1 1 0 01-1 1H6a1 1 0 01-1-1V4.5a1 1 0 011-1z" /><path d="M12 3.5V8h4" /></>,
@@ -65,24 +92,31 @@ export default function Sidebar({ nome, email, itens }: { nome: string; email: s
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
           {itens.length === 0 && (
             <div className="px-3.5 py-2.5 text-[12px] text-white/40 leading-snug">
               Nenhum item de menu liberado para o seu papel.
             </div>
           )}
-          {itens.map((item) => {
-            const ativo = pathname.startsWith(item.href);
-            return (
-              <Link key={item.id} href={item.href} onClick={() => setAberto(false)}
-                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-[13.5px] font-medium transition ${
-                  ativo ? "bg-amarelo text-ebano font-semibold" : "text-white/75 hover:bg-white/10 hover:text-white"
-                }`}>
-                <Icon name={item.icone} />
-                {item.label}
-              </Link>
-            );
-          })}
+          {agruparItens(itens).map((grupo) => (
+            <div key={grupo.titulo} className="space-y-1">
+              <div className="px-3.5 pb-1 text-[10.5px] font-semibold uppercase tracking-wider text-white/35">
+                {grupo.titulo}
+              </div>
+              {grupo.itens.map((item) => {
+                const ativo = pathname.startsWith(item.href);
+                return (
+                  <Link key={item.id} href={item.href} onClick={() => setAberto(false)}
+                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-[13.5px] font-medium transition ${
+                      ativo ? "bg-amarelo text-ebano font-semibold" : "text-white/75 hover:bg-white/10 hover:text-white"
+                    }`}>
+                    <Icon name={item.icone} />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         <div className="relative border-t border-white/10 p-3">
