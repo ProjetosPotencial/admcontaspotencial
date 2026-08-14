@@ -269,6 +269,31 @@ export default async function PainelPage() {
         </div>
       </div>
 
+      {/* Minha fila de hoje — prioridades acionáveis */}
+      {(totAtrasadas > 0 || aprovacoesPendentes > 0 || totMapear > 0 || vencemHoje.length > 0) && (
+        <div className="mb-6">
+          <h2 className="text-[13px] font-semibold text-txt-2 uppercase tracking-wider mb-3">Minha fila de hoje</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            {[
+              { n: totAtrasadas, rot: "Contas atrasadas", sub: "precisam de atenção agora", href: "/contas?situacao=atrasada", acao: "Revisar atrasadas", cor: "#D32F2F", bg: "#FDEDED" },
+              { n: aprovacoesPendentes, rot: "Aprovações pendentes", sub: "aguardando sua análise", href: podeAprovacoes ? "/aprovacoes" : "/painel", acao: "Aprovar pendências", cor: "#E6A600", bg: "#FFF9E6" },
+              { n: totMapear, rot: "Sem origem definida", sub: "falta identificar a origem", href: "/contas?origem=a_definir", acao: "Identificar origem", cor: "#2A74C4", bg: "#EAF3FC" },
+              { n: vencemHoje.length, rot: "Vencem hoje", sub: valorVenceHoje > 0 ? money(valorVenceHoje) : "próximos vencimentos", href: "/contas", acao: "Ver vencimentos", cor: "#2E7D32", bg: "#E8F5E9" },
+            ].map((p) => (
+              <Link key={p.rot} href={p.href} className="card p-4 hover:shadow-media transition group">
+                <span className="w-9 h-9 rounded-lg grid place-items-center text-[15px] font-bold" style={{ background: p.bg, color: p.cor }}>{p.n}</span>
+                <div className="mt-3 text-[14px] font-semibold text-txt">{p.rot}</div>
+                <div className="text-[12px] text-txt-2 mt-0.5">{p.sub}</div>
+                <div className="mt-3 text-[12.5px] font-medium flex items-center gap-1 group-hover:gap-1.5 transition-all" style={{ color: p.cor }}>
+                  {p.acao}
+                  <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 10h10M11 6l4 4-4 4" /></svg>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* indicadores principais */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-3 mb-4">
         {[

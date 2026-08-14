@@ -213,6 +213,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
   const [fStatus, setFStatus] = useState(params.get("status") ?? "todos");
   const [fSituacao, setFSituacao] = useState(params.get("situacao") ?? "todos");
   const [busca, setBusca] = useState("");
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const buscaDebounced = useDebounce(busca, 250);
   const [pagina, setPagina] = useState(1);
   const [itensPorPagina, setItensPorPagina] = useState(25);
@@ -295,6 +296,9 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
   const visiveis = ordenadas.slice(inicio, inicio + itensPorPagina);
 
   const limparFiltros = () => { setFTipo("todos"); setFCoban("todos"); setFStatus("todos"); setFSituacao("todos"); setBusca(""); };
+
+  const alternarSel = (id: string) => setSelecionados((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const limparSel = () => setSelecionados(new Set());
   const temFiltro = fTipo !== "todos" || fCoban !== "todos" || fStatus !== "todos" || fSituacao !== "todos" || busca !== "";
   const chips = ["todos", ...Object.keys(TIPOS)];
 
@@ -370,6 +374,17 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
         <div className="overflow-x-auto"><table className="w-full border-collapse min-w-[720px]">
           <thead>
             <tr className="bg-[#f1f3f5] h-12">
+              <th className="w-10 px-4">
+                <input type="checkbox"
+                  checked={visiveis.length > 0 && visiveis.every((c) => selecionados.has(c.id))}
+                  onChange={(e) => setSelecionados((s) => {
+                    const n = new Set(s);
+                    if (e.target.checked) visiveis.forEach((c) => n.add(c.id));
+                    else visiveis.forEach((c) => n.delete(c.id));
+                    return n;
+                  })}
+                  className="w-4 h-4 rounded border-linha cursor-pointer accent-amarelo" />
+              </th>
               {COLUNAS.map((col) => {
                 const ativa = col.sortable && ordem.campo === col.campo;
                 return (
@@ -393,7 +408,11 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
           </thead>
           <tbody>
             {visiveis.map((c) => (
-              <tr key={c.id} onClick={() => setAberta(c)} className="h-14 cursor-pointer border-b border-[#f1f3f5] last:border-0 hover:bg-[#f8f9fa] transition group relative">
+              <tr key={c.id} onClick={() => setAberta(c)} className={`h-14 cursor-pointer border-b border-[#f1f3f5] last:border-0 transition group relative ${selecionados.has(c.id) ? "bg-amarelo-light" : "hover:bg-[#f8f9fa]"}`}>
+                <td className="w-10 px-4" onClick={(e) => e.stopPropagation()}>
+                  <input type="checkbox" checked={selecionados.has(c.id)} onChange={() => alternarSel(c.id)}
+                    className="w-4 h-4 rounded border-linha cursor-pointer accent-amarelo" />
+                </td>
                 <td className="px-4 text-[13px] font-medium relative">
                   <span className="absolute left-0 top-0 bottom-0 w-1 bg-amarelo opacity-0 group-hover:opacity-100 transition" />
                   <LojaCell contaId={c.id} lojaAtual={c.lojas} lojas={lojas} />
@@ -425,7 +444,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
               </tr>
             ))}
             {filtradas.length === 0 && (
-              <tr><td colSpan={7} className="text-center py-14 text-[#adb5bd]">Nenhuma conta com esses filtros.</td></tr>
+              <tr><td colSpan={8} className="text-center py-14 text-[#adb5bd]">Nenhuma conta com esses filtros.</td></tr>
             )}
           </tbody>
         </table></div>
@@ -454,6 +473,15 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
 
       {aberta && <ContaDrawer conta={aberta} onClose={() => setAberta(null)} ano={ano} mes={mes} />}
       {criando && <NovaContaDrawer lojas={lojas} onClose={() => setCriando(false)} />}
+
+      {/* Barra fixa de ações em lote — aparece quando há contas selecionadas */}
+      {selecionados.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-ebano text-white rounded-xl shadow-forte flex items-center gap-4 pl-5 pr-3 py-3">
+          <span className="text-[13px] font-medium">{selecionados.size} selecionada{selecionados.size !== 1 ? "s" : ""}</span>
+          <div className="h-5 w-px bg-white/20" />
+          <button onClick={limparSel} className="text-[13px] text-white/70 hover:text-white transition">Limpar</button>
+        </div>
+      )}
     </>
   );
 }
