@@ -63,13 +63,13 @@ export default async function LancamentosPage() {
   const totalTodosFornecedores = Object.values(porFornecedor).reduce((s, v) => s + v, 0) || 1;
 
   return (
-    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-[1400px] w-full">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 w-full min-h-full flex flex-col">
       <div className="mb-6">
         <h1 className="text-[24px] font-bold text-[#1a1a1a]">Lançamentos</h1>
         <p className="text-[14px] text-[#6c757d] mt-1">Todos os valores lançados em {ano}, mês a mês.</p>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-6 flex-1 min-h-0">
         <div className="min-w-0">
           <LancamentosClient
             itens={itens}
