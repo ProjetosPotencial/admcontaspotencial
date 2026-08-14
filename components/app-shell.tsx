@@ -14,7 +14,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [aberto, setAberto] = useState(false);
   return (
     <MenuMobileContext.Provider value={{ aberto, setAberto }}>
-      <div className="min-h-screen flex bg-papel">{children}</div>
+      <div className="min-h-screen flex bg-[#f6f7f9]">{children}</div>
     </MenuMobileContext.Provider>
   );
 }
