@@ -244,7 +244,7 @@ export default async function PainelPage() {
   const podeAprovacoes = await podeAcessar("/aprovacoes");
 
   return (
-    <div className="px-4 sm:px-8 py-5 sm:py-6 max-w-[1560px] w-full">
+    <div className="dashboard-page px-4 sm:px-8 py-5 sm:py-6 max-w-[1560px] w-full">
       <div className="mb-4">
         <h1 className="text-[24px] font-bold text-[#1a1a1a]">👋 {saudacao()}{nome ? `, ${nome}` : ""}!</h1>
         <p className="text-[14px] text-[#6c757d] mt-1">
@@ -272,7 +272,7 @@ export default async function PainelPage() {
       {/* Minha fila de hoje — prioridades acionáveis */}
       {(totAtrasadas > 0 || aprovacoesPendentes > 0 || totMapear > 0 || vencemHoje.length > 0) && (
         <div className="mb-6">
-          <h2 className="text-[13px] font-semibold text-txt-2 uppercase tracking-wider mb-3">Minha fila de hoje</h2>
+          <h2 className="text-[16px] font-semibold text-[#111827] tracking-tight mb-3">Minha fila de hoje</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
             {[
               { n: totAtrasadas, rot: "Contas atrasadas", sub: "precisam de atenção agora", href: "/contas?situacao=atrasada", acao: "Revisar atrasadas", cor: "#D32F2F", bg: "#FDEDED" },
@@ -280,11 +280,9 @@ export default async function PainelPage() {
               { n: totMapear, rot: "Sem origem definida", sub: "falta identificar a origem", href: "/contas?origem=a_definir", acao: "Identificar origem", cor: "#2A74C4", bg: "#EAF3FC" },
               { n: vencemHoje.length, rot: "Vencem hoje", sub: valorVenceHoje > 0 ? money(valorVenceHoje) : "próximos vencimentos", href: "/contas", acao: "Ver vencimentos", cor: "#2E7D32", bg: "#E8F5E9" },
             ].map((p) => (
-              <Link key={p.rot} href={p.href} className="card p-4 hover:shadow-media transition group">
-                <span className="w-9 h-9 rounded-lg grid place-items-center text-[15px] font-bold" style={{ background: p.bg, color: p.cor }}>{p.n}</span>
-                <div className="mt-3 text-[14px] font-semibold text-txt">{p.rot}</div>
-                <div className="text-[12px] text-txt-2 mt-0.5">{p.sub}</div>
-                <div className="mt-3 text-[12.5px] font-medium flex items-center gap-1 group-hover:gap-1.5 transition-all" style={{ color: p.cor }}>
+              <Link key={p.rot} href={p.href} className="card dashboard-priority-card p-4 hover:shadow-media transition group">
+                <div className="flex items-start gap-3"><span className="w-10 h-10 rounded-xl grid place-items-center text-[18px] font-bold" style={{ background: p.bg, color: p.cor }}>{p.n}</span><div className="min-w-0"><div className="text-[14px] font-semibold text-txt leading-tight">{p.rot}</div><div className="text-[12px] text-txt-2 mt-1">{p.sub}</div></div></div>
+                <div className="mt-4 text-[12.5px] font-medium flex items-center gap-1 group-hover:gap-1.5 transition-all" style={{ color: p.cor }}>
                   {p.acao}
                   <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 10h10M11 6l4 4-4 4" /></svg>
                 </div>
