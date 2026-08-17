@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { TIPOS } from "@/lib/types";
 import { money, MES } from "@/lib/format";
+import GraficoBarras from "@/components/grafico-barras";
 
 type Lanc = {
   ano: number; mes: number; valor: number | null; situacao: string;
@@ -158,23 +159,21 @@ export default function Comparativos({ lancamentos, ano }: { lancamentos: Lanc[]
       {/* praça + tipo lado a lado */}
       <div className="grid lg:grid-cols-2 gap-4">
         <div className="card p-4">
-          <h3 className="font-disp text-[14px] font-semibold text-[#1a1a1a] mb-2">Por praça</h3>
-          {ordenado(porPraca).map(([k, v], i) => (
-            <BarraLinha key={k} rotulo={k} valor={v} total={total}
-              maximo={ordenado(porPraca)[0]?.[1] ?? 1} cor={PALETA[i % PALETA.length]}
-              extra={mesFoco !== "ano" ? <Seta pct={variacao(v, pracaAnt.get(k) ?? 0)} /> : undefined} />
-          ))}
-          {porPraca.size === 0 && <div className="text-[12px] text-[#adb5bd]">Sem dados no período.</div>}
+          <h3 className="font-disp text-[14px] font-semibold text-[#1a1a1a] mb-3">Por praça</h3>
+          {porPraca.size > 0 ? (
+            <GraficoBarras dados={ordenado(porPraca).map(([k, v], i) => ({ rotulo: k, valor: v, cor: PALETA[i % PALETA.length] }))} />
+          ) : (
+            <div className="text-[12px] text-[#adb5bd]">Sem dados no período.</div>
+          )}
         </div>
 
         <div className="card p-4">
-          <h3 className="font-disp text-[14px] font-semibold text-[#1a1a1a] mb-2">Por tipo de despesa</h3>
-          {ordenado(porTipo).map(([k, v]) => (
-            <BarraLinha key={k} rotulo={TIPOS[k]?.n ?? k} valor={v} total={total}
-              maximo={ordenado(porTipo)[0]?.[1] ?? 1} cor={CORES[k] ?? "#adb5bd"}
-              extra={mesFoco !== "ano" ? <Seta pct={variacao(v, tipoAnt.get(k) ?? 0)} /> : undefined} />
-          ))}
-          {porTipo.size === 0 && <div className="text-[12px] text-[#adb5bd]">Sem dados no período.</div>}
+          <h3 className="font-disp text-[14px] font-semibold text-[#1a1a1a] mb-3">Por tipo de despesa</h3>
+          {porTipo.size > 0 ? (
+            <GraficoBarras dados={ordenado(porTipo).map(([k, v]) => ({ rotulo: TIPOS[k]?.n ?? k, valor: v, cor: CORES[k] ?? "#adb5bd" }))} />
+          ) : (
+            <div className="text-[12px] text-[#adb5bd]">Sem dados no período.</div>
+          )}
         </div>
       </div>
 
