@@ -3,6 +3,7 @@ import MenuAdminClient from "./menu-admin-client";
 import CalendarioAdminClient from "./calendario-admin-client";
 import TestarSlackButton from "./testar-slack-button";
 import TestarDriveButton from "./testar-drive-button";
+import TestarSlackEntradaButton from "./testar-slack-entrada-button";
 import TestarGlpiButton from "./testar-glpi-button";
 import TestarLeituraIaButton from "./testar-leitura-ia-button";
 import TrocarSenhaForm from "./trocar-senha-form";
@@ -146,6 +147,14 @@ export default async function ConfiguracoesPage() {
             <h2 className="text-[16px] font-semibold text-[#1a1a1a] mb-1">Resumo semanal no Slack</h2>
             <p className="text-[13px] text-[#6c757d] mb-4">Lançado e aprovado nos últimos 7 dias, mais o ranking de lojas com mais atraso. Roda sozinho toda segunda de manhã.</p>
             <TestarSlackButton endpoint="/api/notificar-slack-semanal/testar" />
+          </div>
+        )}
+
+        {ehAdmin && (
+          <div className="mt-8">
+            <h2 className="text-[16px] font-semibold text-[#1a1a1a] mb-1">Recebimento de boletos pelo Slack</h2>
+            <p className="text-[13px] text-[#6c757d] mb-4">Confere token, assinatura, canal e se o bot foi convidado — sem postar nada no canal. É o caminho da loja mandar o PDF e ele cair na Caixa de Entrada.</p>
+            <TestarSlackEntradaButton />
           </div>
         )}
       </div>

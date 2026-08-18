@@ -112,27 +112,106 @@ export async function responderNaThread(canal: string, threadTs: string | undefi
   }
 }
 
-/** Teste de diagnóstico, no mesmo formato dos outros botões de Configurações. */
-export async function testarConexaoSlackEntrada() {
-  const checks: { nome: string; ok: boolean; detalhe: string }[] = [];
+export type CheckSlack = { nome: string; ok: boolean; detalhe: string };
+
+/**
+ * Diagnóstico da entrada pelo Slack, no mesmo formato dos outros testes de
+ * Configurações. Cobre de propósito a falha mais silenciosa da configuração:
+ * o bot não estar no canal. Quando isso acontece o Slack simplesmente não
+ * entrega o evento - não dá erro, não aparece nada em lugar nenhum, e o
+ * arquivo postado some no vazio.
+ */
+export async function testarConexaoSlackEntrada(): Promise<{ ok: boolean; checks: CheckSlack[] }> {
+  const checks: CheckSlack[] = [];
 
   for (const e of ["SLACK_BOT_TOKEN", "SLACK_SIGNING_SECRET", "SLACK_CANAL_BOLETOS"]) {
     checks.push({ nome: e, ok: !!process.env[e], detalhe: process.env[e] ? "configurada" : "FALTANDO" });
   }
 
-  if (!process.env.SLACK_BOT_TOKEN) return { ok: false, checks };
+  const canal = process.env.SLACK_CANAL_BOLETOS;
+  if (canal) {
+    // O engano comum é colar o NOME do canal ("#potencialcontas") no lugar
+    // do ID. Fica tudo parecendo certo e nenhum arquivo entra.
+    const formatoOk = /^[CG][A-Z0-9]{6,}$/.test(canal);
+    checks.push({
+      nome: "Formato do ID do canal",
+      ok: formatoOk,
+      detalhe: formatoOk
+        ? `${canal} tem cara de ID de canal`
+        : `"${canal}" não parece um ID. Tem que ser algo como C0BG38UKUKZ, não o nome do canal.`,
+    });
+  }
 
+  if (!process.env.SLACK_BOT_TOKEN) {
+    return { ok: false, checks };
+  }
+
+  // auth.test é o jeito barato de validar o token e ainda descobrir COMO QUAL
+  // bot ele autentica - mesma ideia do teste do Drive mostrar a conta Google.
+  let autenticou = false;
   try {
     const resp = await fetch(`${API}/auth.test`, { headers: { authorization: `Bearer ${botToken()}` } });
     const json: any = await resp.json();
+    autenticou = !!json.ok;
     checks.push({
       nome: "Autenticação do bot",
-      ok: !!json.ok,
-      detalhe: json.ok ? `Conectado como ${json.user} em ${json.team}` : `falhou: ${json.error}`,
+      ok: autenticou,
+      detalhe: autenticou
+        ? `Conectado como ${json.user} no workspace ${json.team}`
+        : `falhou: ${json.error ?? "erro desconhecido"} — confira se o token começa com xoxb- e se o app foi instalado`,
     });
   } catch (err: any) {
     checks.push({ nome: "Autenticação do bot", ok: false, detalhe: err?.message ?? "erro desconhecido" });
   }
 
+  if (autenticou && canal) {
+    checks.push(await checarCanal(canal));
+  }
+
   return { ok: checks.every((c) => c.ok), checks };
+}
+
+/**
+ * O bot enxerga o canal? Em canal privado, "channel_not_found" é o que o
+ * Slack devolve pra quem não é membro - é o sintoma de faltar o /invite.
+ */
+async function checarCanal(canal: string): Promise<CheckSlack> {
+  try {
+    const resp = await fetch(`${API}/conversations.info?channel=${encodeURIComponent(canal)}`, {
+      headers: { authorization: `Bearer ${botToken()}` },
+    });
+    const json: any = await resp.json();
+
+    if (json.ok) {
+      const c = json.channel ?? {};
+      const membro = c.is_member !== false;
+      return {
+        nome: "Bot no canal",
+        ok: membro,
+        detalhe: membro
+          ? `#${c.name} encontrado, bot é membro`
+          : `#${c.name} existe, mas o bot NÃO está nele. Rode /invite no canal.`,
+      };
+    }
+
+    // Sem channels:read/groups:read não dá pra verificar. Não é erro de
+    // configuração da entrada de boletos, então não reprova o teste todo.
+    if (json.error === "missing_scope") {
+      return {
+        nome: "Bot no canal",
+        ok: true,
+        detalhe: "não deu pra verificar (falta o escopo channels:read/groups:read, que é opcional). Confirme na mão que o bot foi convidado.",
+      };
+    }
+    if (json.error === "channel_not_found") {
+      return {
+        nome: "Bot no canal",
+        ok: false,
+        detalhe: `o bot não enxerga ${canal}. Ou o ID está errado, ou falta convidar o bot no canal (/invite), ou o canal é privado e falta o escopo groups:history.`,
+      };
+    }
+    return { nome: "Bot no canal", ok: false, detalhe: `falhou: ${json.error}` };
+  } catch (err: any) {
+    return { nome: "Bot no canal", ok: false, detalhe: err?.message ?? "erro desconhecido" };
+  }
 }
