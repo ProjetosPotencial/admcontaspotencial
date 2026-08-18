@@ -28,8 +28,11 @@ export async function POST(req: Request) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return NextResponse.json({ error: "não autenticado" }, { status: 401 });
 
-  const webhookUrl = process.env.SLACK_WEBHOOK_URL;
-  if (!webhookUrl) return NextResponse.json({ ok: false, error: "SLACK_WEBHOOK_URL não configurado" }, { status: 200 });
+  // Canal próprio pro movimento contínuo: são muitas mensagens por dia e
+  // misturá-las com o resumo diário faria o resumo passar batido. Cai no
+  // webhook geral se o específico não estiver configurado.
+  const webhookUrl = process.env.SLACK_WEBHOOK_EVENTOS ?? process.env.SLACK_WEBHOOK_URL;
+  if (!webhookUrl) return NextResponse.json({ ok: false, error: "SLACK_WEBHOOK_EVENTOS não configurado" }, { status: 200 });
 
   const body = await req.json().catch(() => ({}));
   const montar = TEMPLATES[String(body.evento ?? "")];

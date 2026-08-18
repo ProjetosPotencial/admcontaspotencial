@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { obterPeriodoAtual, estaAtrasada } from "@/lib/date-utils";
 import { TIPOS } from "@/lib/types";
 import { money } from "@/lib/format";
+import { detectarValoresForaDoPadrao } from "@/lib/alertas-inteligentes";
 
 /** Quantos dias à frente entram em "próximos vencimentos". */
 const JANELA_PROXIMOS = 3;
@@ -58,6 +59,7 @@ export async function enviarResumoDiarioSlack() {
     { data: aguardandoAprovacao, error: e2 },
     { data: boletosMovimento, error: e3 },
     { data: boletosNaCaixa, error: e4 },
+    { data: historicoAno, error: e5 },
   ] = await Promise.all([
     // tudo do período: serve pra pendentes, vence hoje, próximos e atrasadas
     supabase
@@ -81,9 +83,14 @@ export async function enviarResumoDiarioSlack() {
       .from("caixa_entrada_boletos")
       .select("id, nome_arquivo, confianca, observacao")
       .eq("status", "pendente"),
+    // meses anteriores do ano: a base pra saber o que é valor fora do padrão
+    supabase
+      .from("lancamentos")
+      .select("valor, contas!inner ( tipo, fornecedor_nome )")
+      .eq("ano", ano).neq("mes", mes),
   ]);
 
-  const erro = e1 ?? e2 ?? e3 ?? e4;
+  const erro = e1 ?? e2 ?? e3 ?? e4 ?? e5;
   if (erro) return { ok: false as const, status: 500, error: erro.message };
 
   const itens = (lancPeriodo ?? []) as any[];
@@ -174,7 +181,34 @@ export async function enviarResumoDiarioSlack() {
     });
   }
 
-  // ---- 5. inconsistências ----
+  // ---- 5. valores fora do padrão do fornecedor ----
+  // Mesmo critério do alerta que já aparece no Painel (acima de 1,6× a média
+  // histórica), só que aqui com nome de loja e valor - é o que permite alguém
+  // desconfiar da conta antes de aprovar, não depois de pagar.
+  const foraDoPadrao = detectarValoresForaDoPadrao(
+    itens,
+    (historicoAno ?? []).map((l: any) => ({
+      fornecedor: l.contas?.fornecedor_nome ?? null,
+      tipo: l.contas?.tipo ?? null,
+      valor: Number(l.valor ?? 0),
+    })),
+  );
+
+  if (foraDoPadrao.length > 0) {
+    const linhas = foraDoPadrao.slice(0, 5).map((f) => {
+      const t = TIPOS[f.tipo ?? ""]?.n ?? f.tipo ?? "—";
+      return `• *${f.loja ?? "?"}* — ${t} · ${f.fornecedor} — ${money(f.valor)} _(${f.vezes.toFixed(1)}× a média de ${money(f.media)})_`;
+    }).join("\n");
+    const resto = foraDoPadrao.length > 5 ? `\n_… e mais ${foraDoPadrao.length - 5}_` : "";
+
+    blocos.push({ type: "divider" });
+    blocos.push({
+      type: "section",
+      text: { type: "mrkdwn", text: `*📈 Valores acima do padrão da loja (${foraDoPadrao.length})*\n${linhas}${resto}` },
+    });
+  }
+
+  // ---- 6. inconsistências ----
   const inconsistencias = [
     baixaConfianca.length > 0 ? `• ${baixaConfianca.length} ${baixaConfianca.length === 1 ? "boleto na caixa precisa" : "boletos na caixa precisam"} de conferência manual (leitura incerta)` : null,
     naCaixa.length > 0 ? `• ${naCaixa.length} ${naCaixa.length === 1 ? "boleto aguarda" : "boletos aguardam"} revisão na Caixa de Entrada` : null,
@@ -221,5 +255,6 @@ export async function enviarResumoDiarioSlack() {
     proximos: proximos.length,
     atrasadas: atrasadas.length,
     inconsistencias: inconsistencias.length,
+    foraDoPadrao: foraDoPadrao.length,
   };
 }

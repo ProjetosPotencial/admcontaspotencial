@@ -107,37 +107,14 @@ export function gerarAlertas(
   }
 
   // ---- 3. valores fora do padrão ----
-  const media = new Map<string, { soma: number; n: number }>();
-  for (const h of historico) {
-    const v = Number(h.valor ?? 0);
-    if (!v || !h.fornecedor) continue;
-    const k = `${h.fornecedor}|${h.tipo ?? ""}`.toLowerCase();
-    const a = media.get(k) ?? { soma: 0, n: 0 };
-    a.soma += v; a.n++;
-    media.set(k, a);
-  }
-
-  let foraDoPadrao = 0;
-  let exemplo = "";
-  for (const l of lancamentos) {
-    const v = Number(l.valor ?? 0);
-    const forn = l.contas?.fornecedor_nome;
-    if (!v || v < VALOR_MINIMO_ANALISE || !forn) continue;
-    const k = `${forn}|${l.contas?.tipo ?? ""}`.toLowerCase();
-    const m = media.get(k);
-    if (!m || m.n < 2) continue;
-    const med = m.soma / m.n;
-    if (v > med * FATOR_ACIMA) {
-      foraDoPadrao++;
-      if (!exemplo) exemplo = `${l.contas?.lojas?.codigo ?? "loja"} · ${forn}`;
-    }
-  }
-  if (foraDoPadrao > 0) {
+  const foraDoPadrao = detectarValoresForaDoPadrao(lancamentos, historico);
+  if (foraDoPadrao.length > 0) {
+    const primeiro = foraDoPadrao[0];
     alertas.push({
       chave: "fora-padrao",
       icone: "📈",
-      titulo: `${foraDoPadrao} ${foraDoPadrao === 1 ? "conta está" : "contas estão"} acima do padrão do fornecedor`,
-      detalhe: exemplo ? `Ex.: ${exemplo}. Vale conferir antes de aprovar.` : undefined,
+      titulo: `${foraDoPadrao.length} ${foraDoPadrao.length === 1 ? "conta está" : "contas estão"} acima do padrão do fornecedor`,
+      detalhe: `Ex.: ${primeiro.loja ?? "loja"} · ${primeiro.fornecedor}. Vale conferir antes de aprovar.`,
       href: "/lancamentos",
       prioridade: "media",
     });
@@ -189,4 +166,66 @@ export function gerarAlertas(
 
   const peso = { alta: 0, media: 1, baixa: 2 };
   return alertas.sort((a, b) => peso[a.prioridade] - peso[b.prioridade]);
+}
+
+export type ValorForaDoPadrao = {
+  loja: string | null;
+  fornecedor: string;
+  tipo: string | null;
+  valor: number;
+  /** média histórica daquele fornecedor+tipo, fora do mês analisado */
+  media: number;
+  /** quantas vezes acima da média, ex 2.3 */
+  vezes: number;
+};
+
+/**
+ * Contas cobrando muito acima do que aquele fornecedor costuma cobrar.
+ *
+ * Estava embutido no gerarAlertas, que só precisava da contagem. O resumo
+ * diário do Slack precisa da lista com nome de loja e valor, então virou
+ * função própria - as duas telas passam a enxergar exatamente o mesmo
+ * critério, em vez de cada uma ter a sua ideia de "fora do padrão".
+ *
+ * A média ignora o mês analisado (senão a própria conta puxaria a média pra
+ * cima e se esconderia) e exige pelo menos 2 cobranças anteriores, porque
+ * comparar contra uma única ocorrência não diz nada.
+ */
+export function detectarValoresForaDoPadrao(
+  lancamentos: LancamentoLike[],
+  historico: { fornecedor: string | null; tipo: string | null; valor: number | null }[],
+): ValorForaDoPadrao[] {
+  const media = new Map<string, { soma: number; n: number }>();
+  for (const h of historico) {
+    const v = Number(h.valor ?? 0);
+    if (!v || !h.fornecedor) continue;
+    const k = `${h.fornecedor}|${h.tipo ?? ""}`.toLowerCase();
+    const a = media.get(k) ?? { soma: 0, n: 0 };
+    a.soma += v; a.n++;
+    media.set(k, a);
+  }
+
+  const achados: ValorForaDoPadrao[] = [];
+  for (const l of lancamentos) {
+    const v = Number(l.valor ?? 0);
+    const forn = l.contas?.fornecedor_nome;
+    if (!v || v < VALOR_MINIMO_ANALISE || !forn) continue;
+    const k = `${forn}|${l.contas?.tipo ?? ""}`.toLowerCase();
+    const m = media.get(k);
+    if (!m || m.n < 2) continue;
+    const med = m.soma / m.n;
+    if (v <= med * FATOR_ACIMA) continue;
+
+    achados.push({
+      loja: l.contas?.lojas?.codigo ?? null,
+      fornecedor: forn,
+      tipo: l.contas?.tipo ?? null,
+      valor: v,
+      media: med,
+      vezes: v / med,
+    });
+  }
+
+  // o mais fora da curva primeiro: é o que alguém deve olhar antes
+  return achados.sort((a, b) => b.vezes - a.vezes);
 }

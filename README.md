@@ -105,6 +105,28 @@ O que chega fora do horário ou com a leitura falhando fica numa fila
 (`slack_fila`) e é recolhido pelo cron diário da Caixa de Entrada — no máximo
 três tentativas por arquivo, e o bot avisa na thread quando desiste.
 
+## Avisos no Slack
+
+São três coisas diferentes, e vale saber qual é qual:
+
+| O quê | Quando | Vai pra onde |
+|---|---|---|
+| Resumo diário | Dias úteis, 8h | `SLACK_WEBHOOK_URL` |
+| Resumo semanal | Segunda de manhã | `SLACK_WEBHOOK_URL` |
+| Eventos do sistema | Na hora em que acontece | `SLACK_WEBHOOK_EVENTOS` |
+
+Os eventos são disparados pelo uso: conta lançada, aprovada, reprovada,
+reenviada pra fila, paga, conta ou fornecedor cadastrado, excluído, encerrado
+ou reativado, e loja concluída. São muitas mensagens por dia — por isso vão
+num canal separado, pra não afogar o resumo diário.
+
+Se `SLACK_WEBHOOK_EVENTOS` ficar vazio, tudo cai no canal do resumo.
+
+O resumo diário também lista **valores acima do padrão da loja**: contas
+cobrando mais de 1,6× a média histórica daquele fornecedor no ano, ignorando
+valores abaixo de R$ 80 (onde a porcentagem engana) e fornecedores com menos
+de duas cobranças anteriores. É o mesmo critério do alerta do Painel.
+
 ## Telas
 
 - **Painel**: ativas, a lançar em julho, aguardando pagamento e origem a mapear, com um card por tipo de conta.
