@@ -17,6 +17,7 @@ type Item = {
   destinatario_detectado?: string | null; destinatario_cnpj_detectado?: string | null;
   chave_acesso?: string | null;
   conta_existente_id?: string | null;
+  origem_entrada?: string | null;
   beneficiario?: string | null;
   fornecedor_detectado?: string | null; cnpj_detectado?: string | null;
   numero_documento_detectado?: string | null;
@@ -786,9 +787,18 @@ function ItemCard({ item, lojas, processando, onConfirmar, onRejeitar, onReclass
       <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
         <div className="min-w-0">
           <b className="text-[13.5px] font-semibold block truncate">{item.nome_arquivo}</b>
-          {item.drive_web_view_link && (
-            <a href={item.drive_web_view_link} target="_blank" rel="noreferrer" className="text-[11.5px] text-info hover:underline">Ver no Drive</a>
-          )}
+          <div className="flex items-center gap-2">
+            {item.drive_web_view_link && (
+              <a href={item.drive_web_view_link} target="_blank" rel="noreferrer" className="text-[11.5px] text-info hover:underline">Ver no Drive</a>
+            )}
+            {/* de onde veio importa na conferência: o que chega pelo Slack tem
+                um responsável com nome, o da pasta do Drive não tem. */}
+            {item.origem_entrada === "slack" && (
+              <span className="text-[11.5px] text-[#6c757d]">
+                via Slack{item.requerente ? ` · ${item.requerente}` : ""}
+              </span>
+            )}
+          </div>
         </div>
         <span className={`badge ${conf.cor} shrink-0`}>{conf.texto}</span>
       </div>

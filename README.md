@@ -61,6 +61,50 @@ O `.gitignore` já exclui `node_modules`, `.next` e o `.env.local`, então suas 
 
 Depois do deploy, vá em Supabase > Authentication > URL Configuration e adicione a URL do Vercel em Site URL e Redirect URLs, para o login funcionar em produção.
 
+## Boletos pelo Slack (opcional)
+
+A loja posta o PDF do boleto num canal do Slack e ele cai na Caixa de Entrada
+já lido pela IA, com valor, tipo, loja e vencimento preenchidos. O bot responde
+na thread dizendo o que entendeu. Continua passando pela confirmação humana —
+nada vira lançamento sozinho.
+
+É a mesma fila da varredura do Drive, só que outra porta de entrada: chega na
+hora em vez de esperar o cron, e tem nome de quem enviou.
+
+### 1. Criar o app no Slack
+
+1. Em [api.slack.com/apps](https://api.slack.com/apps), **Create New App > From scratch**, escolha o workspace.
+2. Em **OAuth & Permissions > Bot Token Scopes**, adicione:
+   - `files:read` — baixar o PDF que foi postado
+   - `chat:write` — responder na thread
+   - `users:read` — descobrir o nome de quem enviou
+3. Ainda nessa tela, **Install to Workspace**. Copie o **Bot User OAuth Token** (`xoxb-...`) para `SLACK_BOT_TOKEN`.
+4. Em **Basic Information > App Credentials**, copie o **Signing Secret** para `SLACK_SIGNING_SECRET`.
+
+### 2. Apontar os eventos para o app
+
+1. Em **Event Subscriptions**, ligue o botão e ponha em Request URL:
+   `https://SEU-APP.vercel.app/api/slack-eventos`
+   O Slack chama a URL na hora pra validar — precisa já estar publicada, com
+   `SLACK_SIGNING_SECRET` configurado no ambiente da Vercel.
+2. Em **Subscribe to bot events**, adicione `file_shared`.
+3. Salve e reinstale o app quando ele pedir.
+
+### 3. Criar o canal e liberar o resto
+
+1. Crie o canal (ex.: `#contas-boletos`) e convide o bot: `/invite @nome-do-app`.
+2. Pegue o ID do canal (clique no nome do canal, o ID aparece no rodapé da aba
+   Sobre, tipo `C0123ABCDEF`) e ponha em `SLACK_CANAL_BOLETOS`. Arquivo postado
+   em qualquer outro canal é ignorado de propósito, pra ninguém gerar
+   lançamento sem querer ao compartilhar um PDF.
+3. Rode `sql/2026-08-18-slack-entrada.sql` no SQL Editor do Supabase.
+4. O arquivo também é arquivado no Drive, em `Boletos-Entrada/Slack/AAAA-MM/`,
+   então as credenciais do Drive precisam estar configuradas.
+
+O que chega fora do horário ou com a leitura falhando fica numa fila
+(`slack_fila`) e é recolhido pelo cron diário da Caixa de Entrada — no máximo
+três tentativas por arquivo, e o bot avisa na thread quando desiste.
+
 ## Telas
 
 - **Painel**: ativas, a lançar em julho, aguardando pagamento e origem a mapear, com um card por tipo de conta.

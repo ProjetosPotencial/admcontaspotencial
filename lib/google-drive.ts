@@ -125,6 +125,46 @@ function extensaoDoNome(nome: string): string {
 }
 
 /**
+ * Arquiva um documento que chegou pelo Slack em
+ *
+ *   PASTA_DE_ENTRADA / Slack / AAAA-MM / nome-do-arquivo
+ *
+ * De propósito numa SUBPASTA: listarArquivosNaPasta só olha os filhos diretos
+ * da pasta de entrada, então o que fica aqui dentro nunca é varrido de novo
+ * pelo cron do Drive - senão o mesmo boleto viraria um segundo card, com
+ * outro drive_file_id, e apareceria duplicado na revisão.
+ *
+ * Devolve o link de visualização, que é o que o card mostra pra conferência.
+ */
+export async function arquivarDocumentoDoSlack(params: {
+  arquivo: Buffer;
+  nomeArquivo: string;
+  mimeType: string;
+  /** competência do arquivamento, no formato "2026-08" */
+  pastaMes: string;
+}): Promise<{ fileId: string; webViewLink: string }> {
+  const raizId = process.env.GOOGLE_DRIVE_INBOX_FOLDER_ID;
+  if (!raizId) {
+    throw new Error("GOOGLE_DRIVE_INBOX_FOLDER_ID não configurado.");
+  }
+  const drive = getDrive();
+
+  const pastaSlack = await garantirPasta(process.env.SLACK_DRIVE_FOLDER_NAME ?? "Slack", raizId);
+  const pastaDestino = await garantirPasta(params.pastaMes, pastaSlack);
+
+  const resultado = await drive.files.create({
+    requestBody: { name: params.nomeArquivo, parents: [pastaDestino] },
+    media: { mimeType: params.mimeType, body: Readable.from(params.arquivo) },
+    fields: "id, webViewLink",
+  });
+
+  return {
+    fileId: resultado.data.id!,
+    webViewLink: resultado.data.webViewLink ?? `https://drive.google.com/file/d/${resultado.data.id}/view`,
+  };
+}
+
+/**
  * Lista os arquivos direto dentro de uma pasta (sem entrar em subpastas),
  * usado pra ler a "Caixa de Entrada" de boletos que alguém colocou solto
  * numa pasta do Drive.
