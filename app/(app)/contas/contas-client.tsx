@@ -14,6 +14,7 @@ import TipoIcon from "@/components/tipo-icon";
 import LogoFornecedor from "@/components/logo-fornecedor";
 import { money, MES, nomeArquivoSeguro, formatarDataSemFuso } from "@/lib/format";
 import { MOTIVOS_SEM_DOCUMENTO, motivoValido, textoDoMotivo, mensagemSemDocumento, agoraBrasil } from "@/lib/sem-documento";
+import { MOTIVOS_ZERADO, motivoZeradoValido, textoMotivoZerado, lerValorDigitado, ehZerada } from "@/lib/conta-zerada";
 
 function StatusBadge({ status }: { status: string }) {
   if (status === "encerrado") return <span className="badge bg-alerr-bg text-alerr">Encerrada</span>;
@@ -644,6 +645,8 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId
   const [motivoOutro, setMotivoOutro] = useState("");
   const [vencSemDoc, setVencSemDoc] = useState("");
   const [obsSemDoc, setObsSemDoc] = useState("");
+  const [motivoZerado, setMotivoZerado] = useState("");
+  const [motivoZeradoOutro, setMotivoZeradoOutro] = useState("");
   const [salvandoSemDoc, setSalvandoSemDoc] = useState(false);
   const [erroSemDoc, setErroSemDoc] = useState<string | null>(null);
   const [arquivoBoleto, setArquivoBoleto] = useState<File | null>(null);
@@ -672,7 +675,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId
   const [salvandoStatus, setSalvandoStatus] = useState(false);
 
   function carregarLancamentos() {
-    supabase.from("lancamentos").select("id, ano, mes, valor, situacao, comprovante_url, comprovante_drive_url, aprovado_por, aprovado_em, sem_documento, motivo_sem_documento, documento_anexado_em")
+    supabase.from("lancamentos").select("id, ano, mes, valor, situacao, comprovante_url, comprovante_drive_url, aprovado_por, aprovado_em, sem_documento, motivo_sem_documento, documento_anexado_em, motivo_zerado")
       .eq("conta_id", conta.id).eq("ano", ANO_ATUAL)
       .then(({ data }) => setLancs((data ?? []) as Lancamento[]));
   }
@@ -1079,9 +1082,12 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId
   async function lancarSemDocumento() {
     setErroSemDoc(null);
 
-    const valorNum = Number(valorLancar.replace(",", "."));
-    if (!valorLancar.trim() || !Number.isFinite(valorNum) || valorNum <= 0) {
-      setErroSemDoc("Informe o valor da conta."); return;
+    const lido = lerValorDigitado(valorLancar);
+    if (!lido.ok) { setErroSemDoc(lido.erro!); return; }
+    const valorNum = lido.valor!;
+    // R$ 0,00 é aceito, mas exige dizer por que não houve cobrança
+    if (ehZerada(valorNum) && !motivoZeradoValido(motivoZerado, motivoZeradoOutro)) {
+      setErroSemDoc("Conta zerada: informe o motivo da conta estar em R$ 0,00."); return;
     }
     // a regra de segurança: sem motivo, não lança
     if (!motivoValido(motivoSemDoc, motivoOutro)) {
@@ -1103,6 +1109,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId
       lancado_por: usuarioId,
       sem_documento: true,
       motivo_sem_documento: motivo,
+      motivo_zerado: ehZerada(valorNum) ? textoMotivoZerado(motivoZerado, motivoZeradoOutro) : null,
       vencimento,
       observacao: obsSemDoc.trim() || null,
     }, { onConflict: "conta_id,ano,mes" }).select("id").single();
@@ -1156,7 +1163,12 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId
   }
 
   async function lancarComBoleto() {
-    if (!valorLancar.trim()) { setErroLancamento("Informe o valor da fatura."); return; }
+    const lidoBoleto = lerValorDigitado(valorLancar);
+    if (!lidoBoleto.ok) { setErroLancamento(lidoBoleto.erro!); return; }
+    // R$ 0,00 vale como lançamento, desde que se diga por quê
+    if (ehZerada(lidoBoleto.valor) && !motivoZeradoValido(motivoZerado, motivoZeradoOutro)) {
+      setErroLancamento("Conta zerada: informe o motivo da conta estar em R$ 0,00."); return;
+    }
     setSalvandoLancamento(true);
     setErroLancamento(null);
 
@@ -1195,7 +1207,8 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId
 
     const payload: any = {
       conta_id: conta.id, ano: ANO_ATUAL, mes: MES_ATUAL,
-      valor: Number(valorLancar.replace(",", ".")),
+      valor: lidoBoleto.valor,
+      motivo_zerado: ehZerada(lidoBoleto.valor) ? textoMotivoZerado(motivoZerado, motivoZeradoOutro) : null,
       situacao: "lancado", comprovante_url: caminhoBoleto,
       lancado_em: new Date().toISOString(),
       codigo_barras: codigoBarras.trim() || null,
@@ -1578,6 +1591,11 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId
                     <SituacaoBadgeInline situacao={lancamentoAtual.situacao} />
                     {/* estado do DOCUMENTO, separado do estado do dinheiro:
                         a conta pode estar aprovada e paga e o boleto ainda faltar */}
+                    {ehZerada(lancamentoAtual.valor) && (
+                      <span className="badge bg-info-bg text-info ml-2" title={(lancamentoAtual as any).motivo_zerado ?? undefined}>
+                        R$ 0,00 · Conta zerada
+                      </span>
+                    )}
                     {(lancamentoAtual as any).sem_documento && (
                       (lancamentoAtual as any).documento_anexado_em ? (
                         <span className="badge bg-ok-bg text-ok ml-2">📎 Documento anexado</span>
@@ -1752,6 +1770,22 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId
                   </label>
                 </div>
 
+
+                {/* Zero é valor informado, não campo vazio — mas exige explicação. */}
+                {ehZerada(lerValorDigitado(valorLancar).valor) && (
+                  <div className="border border-amarelo/40 bg-amb-bg rounded-md p-3 mb-3">
+                    <div className="text-[11.5px] font-semibold text-amb mb-2">Conta zerada — por que não houve cobrança? <span className="text-alerr">*</span></div>
+                    <select value={motivoZerado} onChange={(e) => setMotivoZerado(e.target.value)}
+                      className="input-padrao w-full text-[12.5px] mb-2">
+                      <option value="">Selecione o motivo...</option>
+                      {MOTIVOS_ZERADO.map((m) => (<option key={m.valor} value={m.valor}>{m.rotulo}</option>))}
+                    </select>
+                    {motivoZerado === "outro" && (
+                      <input value={motivoZeradoOutro} onChange={(e) => setMotivoZeradoOutro(e.target.value)}
+                        placeholder="Descreva o motivo" className="input-padrao w-full text-[12.5px]" />
+                    )}
+                  </div>
+                )}
                 <label className="block mb-3">
                   <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">
                     Motivo do lançamento sem documento <span className="text-alerr">*</span>
@@ -1815,6 +1849,22 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId
                     onBlur={() => rodarVerificacoes({ codigo: codigoBarras, valor: Number(valorLancar.replace(",", ".")) || null })}
                     placeholder="0,00" className="input-padrao w-full font-mono" />
                 </label>
+
+                {/* Zero é valor informado, não campo vazio — mas exige explicação. */}
+                {ehZerada(lerValorDigitado(valorLancar).valor) && (
+                  <div className="border border-amarelo/40 bg-amb-bg rounded-md p-3 mb-3">
+                    <div className="text-[11.5px] font-semibold text-amb mb-2">Conta zerada — por que não houve cobrança? <span className="text-alerr">*</span></div>
+                    <select value={motivoZerado} onChange={(e) => setMotivoZerado(e.target.value)}
+                      className="input-padrao w-full text-[12.5px] mb-2">
+                      <option value="">Selecione o motivo...</option>
+                      {MOTIVOS_ZERADO.map((m) => (<option key={m.valor} value={m.valor}>{m.rotulo}</option>))}
+                    </select>
+                    {motivoZerado === "outro" && (
+                      <input value={motivoZeradoOutro} onChange={(e) => setMotivoZeradoOutro(e.target.value)}
+                        placeholder="Descreva o motivo" className="input-padrao w-full text-[12.5px]" />
+                    )}
+                  </div>
+                )}
                 <label className="block mb-3">
                   <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Boleto (PDF ou imagem)</div>
                   <input type="file" accept=".pdf,image/*" onChange={(e) => selecionarArquivo(e.target.files?.[0] ?? null)}

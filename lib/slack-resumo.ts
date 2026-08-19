@@ -3,6 +3,7 @@ import { obterPeriodoAtual, estaAtrasada } from "@/lib/date-utils";
 import { TIPOS } from "@/lib/types";
 import { money } from "@/lib/format";
 import { detectarValoresForaDoPadrao } from "@/lib/alertas-inteligentes";
+import { semValorInformado } from "@/lib/conta-zerada";
 
 /** Quantos dias à frente entram em "próximos vencimentos". */
 const JANELA_PROXIMOS = 3;
@@ -112,7 +113,10 @@ export async function enviarResumoDiarioSlack() {
   const baixaConfianca = naCaixa.filter((b) => b.confianca === "baixa" || b.observacao);
   const semOrigem = pendentes.filter((l) => l.contas?.origem === "a_definir");
   const semVencimento = pendentes.filter((l) => l.contas?.dia_vencimento == null);
-  const semValor = fila.filter((l) => l.valor == null || Number(l.valor) === 0);
+  // Só entra aqui quem NÃO informou valor. Conta de R$ 0,00 é valor
+  // informado (com motivo), não pendência — antes as duas se misturavam e a
+  // conta zerada nunca saía desta lista.
+  const semValor = fila.filter((l) => semValorInformado(l.valor));
 
   const soma = (arr: any[], campo = "valor") => arr.reduce((s, l) => s + Number(l[campo] ?? 0), 0);
 

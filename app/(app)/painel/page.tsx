@@ -3,6 +3,7 @@ import TipoIcon from "@/components/tipo-icon";
 import { TIPOS } from "@/lib/types";
 import { carregarCalendario } from "@/lib/calendario-server";
 import { gerarAlertas } from "@/lib/alertas-inteligentes";
+import { semValorInformado } from "@/lib/conta-zerada";
 import { formatarPeriodo, estaAtrasada, variacaoPct, contaValidaNoPeriodo } from "@/lib/date-utils";
 import { obterPeriodoSelecionado } from "@/lib/periodo";
 import { money, MES, formatarDataSemFuso } from "@/lib/format";
@@ -172,7 +173,9 @@ export default async function PainelPage() {
   const valorVenceHoje = vencemHoje.reduce((s: number, l: any) => s + Number(l.valor ?? 0), 0);
 
   // --- o que o assistente encontrou (leituras diretas dos dados) ---
-  const semValor = (lancamentosDetalhados ?? []).filter((l: any) => l.situacao !== "pendente" && !l.valor).length;
+  // R$ 0,00 é valor informado, não campo em branco: só conta como pendência
+  // quem ainda não informou nada (valor nulo).
+  const semValor = (lancamentosDetalhados ?? []).filter((l: any) => l.situacao !== "pendente" && semValorInformado(l.valor)).length;
   const insightsIA = [
     totAtrasadas > 0 ? { icone: "🔴", texto: `${totAtrasadas} ${totAtrasadas === 1 ? "conta atrasada" : "contas atrasadas"}`, href: "/contas?situacao=atrasada" } : null,
     aprovacoesPendentes > 0 ? { icone: "🟡", texto: `${aprovacoesPendentes} ${aprovacoesPendentes === 1 ? "conta precisa" : "contas precisam"} de aprovação`, href: "/aprovacoes" } : null,
