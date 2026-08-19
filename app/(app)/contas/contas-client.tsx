@@ -13,6 +13,7 @@ import { Calendario, type Feriado, type RegraVencimento } from "@/lib/calendario
 import TipoIcon from "@/components/tipo-icon";
 import LogoFornecedor from "@/components/logo-fornecedor";
 import { money, MES, nomeArquivoSeguro, formatarDataSemFuso } from "@/lib/format";
+import { MOTIVOS_SEM_DOCUMENTO, motivoValido, textoDoMotivo, mensagemSemDocumento, agoraBrasil } from "@/lib/sem-documento";
 
 function StatusBadge({ status }: { status: string }) {
   if (status === "encerrado") return <span className="badge bg-alerr-bg text-alerr">Encerrada</span>;
@@ -197,9 +198,10 @@ function FornecedorCell({ contaId, nome, logo }: { contaId: string; nome: string
   );
 }
 
-export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes, feriados = [], regraVencimento = "adiar", logos = {} }: {
+export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes, feriados = [], regraVencimento = "adiar", logos = {}, usuarioId = null, usuarioEmail = null, usuarioNome = null }: {
   contas: Conta[]; situacaoPorConta: Record<string, string>; lojas: { id: string; codigo: string }[]; ano: number; mes: number;
   feriados?: Feriado[]; regraVencimento?: RegraVencimento; logos?: Record<string, string>;
+  usuarioId?: string | null; usuarioEmail?: string | null; usuarioNome?: string | null;
 }) {
   // calendário da empresa: vencimento em fim de semana ou feriado é ajustado
   // pela regra, e o que foi ajustado não conta como atraso.
@@ -498,7 +500,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
         </div>
       </div>
 
-      {aberta && <ContaDrawer conta={aberta} onClose={() => setAberta(null)} ano={ano} mes={mes} />}
+      {aberta && <ContaDrawer conta={aberta} onClose={() => setAberta(null)} ano={ano} mes={mes} usuarioId={usuarioId} usuarioEmail={usuarioEmail} usuarioNome={usuarioNome} />}
       {criando && <NovaContaDrawer lojas={lojas} onClose={() => setCriando(false)} />}
 
       {/* Barra fixa de ações em lote — aparece quando há contas selecionadas */}
@@ -513,7 +515,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
   );
 }
 
-function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta: Conta; onClose: () => void; ano: number; mes: number }) {
+function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId, usuarioEmail, usuarioNome }: { conta: Conta; onClose: () => void; ano: number; mes: number; usuarioId: string | null; usuarioEmail: string | null; usuarioNome: string | null }) {
   const supabase = createClient();
   const router = useRouter();
   const T = TIPOS[conta.tipo];
@@ -526,7 +528,6 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
 
   async function moverParaNegociacao() {
     setMovendoNeg(true);
-    const { data: { user } } = await supabase.auth.getUser();
     const valorOriginal = (lancamentoAtual as any)?.valor ?? (conta as any).valor ?? null;
     const { error } = await supabase.from("negociacoes").insert({
       conta_id: conta.id,
@@ -537,7 +538,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
       valor_atualizado: valorOriginal,
       status: "aberta",
       prioridade: "media",
-      criado_por: user?.id ?? null,
+      criado_por: usuarioId ?? null,
     });
     setMovendoNeg(false);
     if (!error) {
@@ -614,12 +615,11 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
   async function confirmarEncerramento() {
     if (!dataEncerrar) { setErroEncerramento("Informe a data de encerramento."); return; }
     setSalvandoEncerramento(true);
-    const { data: { user } } = await supabase.auth.getUser();
     const payload = {
       status: "encerrado",
       data_encerramento: dataEncerrar,
       motivo_encerramento: motivoEncerrar.trim() || null,
-      encerrada_por: user?.id ?? null,
+      encerrada_por: usuarioId ?? null,
     };
 
     if (encerrarFornecedorTodo && conta.fornecedor_nome) {
@@ -638,6 +638,14 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
   const [lancando, setLancando] = useState(false);
   const [sucessoLancamento, setSucessoLancamento] = useState<string | null>(null);
   const [valorLancar, setValorLancar] = useState("");
+  // lançamento sem documento: a conta existe e vence, mas o boleto não chegou
+  const [semDoc, setSemDoc] = useState(false);
+  const [motivoSemDoc, setMotivoSemDoc] = useState("");
+  const [motivoOutro, setMotivoOutro] = useState("");
+  const [vencSemDoc, setVencSemDoc] = useState("");
+  const [obsSemDoc, setObsSemDoc] = useState("");
+  const [salvandoSemDoc, setSalvandoSemDoc] = useState(false);
+  const [erroSemDoc, setErroSemDoc] = useState<string | null>(null);
   const [arquivoBoleto, setArquivoBoleto] = useState<File | null>(null);
   const [hashArquivo, setHashArquivo] = useState<string | null>(null);
   const [enviarDrive, setEnviarDrive] = useState(false);
@@ -664,7 +672,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
   const [salvandoStatus, setSalvandoStatus] = useState(false);
 
   function carregarLancamentos() {
-    supabase.from("lancamentos").select("id, ano, mes, valor, situacao, comprovante_url, comprovante_drive_url, aprovado_por, aprovado_em")
+    supabase.from("lancamentos").select("id, ano, mes, valor, situacao, comprovante_url, comprovante_drive_url, aprovado_por, aprovado_em, sem_documento, motivo_sem_documento, documento_anexado_em")
       .eq("conta_id", conta.id).eq("ano", ANO_ATUAL)
       .then(({ data }) => setLancs((data ?? []) as Lancamento[]));
   }
@@ -747,13 +755,12 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
 
     // voltou para a fila: avisa o Slack como uma solicitação nova
     if (novoStatus === "lancado") {
-      const { data: { user } } = await supabase.auth.getUser();
       fetch("/api/notificar-evento", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           evento: "reenviada", loja: conta.lojas?.codigo,
           tipo: TIPOS[conta.tipo]?.n ?? conta.tipo,
-          valor: money(Number(lancamentoAtual.valor ?? 0)), por: user?.email ?? undefined,
+          valor: money(Number(lancamentoAtual.valor ?? 0)), por: usuarioEmail ?? undefined,
         }),
       }).catch(() => {});
     }
@@ -766,11 +773,10 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
   async function reenviarParaAprovacao() {
     if (!lancamentoAtual?.id) return;
     setReenviando(true);
-    const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase.from("lancamentos").update({
       situacao: "lancado",
       reenviado_em: new Date().toISOString(),
-      reenviado_por: user?.id ?? null,
+      reenviado_por: usuarioId ?? null,
     }).eq("id", lancamentoAtual.id);
     setReenviando(false);
     if (error) { setAviso("Não foi possível reenviar para aprovação."); return; }
@@ -809,13 +815,12 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
     await supabase.from("contas").update(patch).eq("id", conta.id);
     // registra no histórico do lançamento (rastreabilidade: quem, quando, o quê)
     if (mudou && lancamentoAtual?.id) {
-      const { data: { user } } = await supabase.auth.getUser();
       await supabase.from("lancamento_historico").insert({
         lancamento_id: lancamentoAtual.id,
         de: conta.destinatario_razao ?? conta.numero_nf ?? "—",
         para: patch.destinatario_razao ?? patch.numero_nf ?? "—",
         comentario: "Dados da nota fiscal atualizados manualmente",
-        quem: user?.id ?? null,
+        quem: usuarioId ?? null,
         em: new Date().toISOString(),
       });
     }
@@ -1063,6 +1068,93 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
     setVerificando(false);
   }
 
+  /**
+   * Lança uma conta cujo boleto não chegou.
+   *
+   * O lançamento entra em "lancado" como qualquer outro — segue pra
+   * aprovação e pagamento normalmente. O que muda é que fica marcado como
+   * sem documento, com o motivo obrigatório, e o Slack avisa o time pra
+   * alguém correr atrás do documento.
+   */
+  async function lancarSemDocumento() {
+    setErroSemDoc(null);
+
+    const valorNum = Number(valorLancar.replace(",", "."));
+    if (!valorLancar.trim() || !Number.isFinite(valorNum) || valorNum <= 0) {
+      setErroSemDoc("Informe o valor da conta."); return;
+    }
+    // a regra de segurança: sem motivo, não lança
+    if (!motivoValido(motivoSemDoc, motivoOutro)) {
+      setErroSemDoc(motivoSemDoc === "outro"
+        ? "Descreva o motivo do lançamento sem documento."
+        : "Selecione o motivo do lançamento sem documento.");
+      return;
+    }
+
+    setSalvandoSemDoc(true);
+    const motivo = textoDoMotivo(motivoSemDoc, motivoOutro);
+    const vencimento = vencSemDoc || null;
+
+    const { data: lanc, error } = await supabase.from("lancamentos").upsert({
+      conta_id: conta.id, ano: ANO_ATUAL, mes: MES_ATUAL,
+      valor: valorNum,
+      situacao: "lancado",
+      lancado_em: new Date().toISOString(),
+      lancado_por: usuarioId,
+      sem_documento: true,
+      motivo_sem_documento: motivo,
+      vencimento,
+      observacao: obsSemDoc.trim() || null,
+    }, { onConflict: "conta_id,ano,mes" }).select("id").single();
+
+    if (error || !lanc) {
+      setSalvandoSemDoc(false);
+      setErroSemDoc("Não foi possível salvar o lançamento.");
+      return;
+    }
+
+    // histórico: fica registrado que entrou sem documento, e por quê
+    await supabase.from("lancamento_historico").insert({
+      lancamento_id: lanc.id,
+      de: "pendente", para: "lancado",
+      quem: usuarioId,
+      comentario: `Lançado sem documento. Motivo: ${motivo}`,
+      em: new Date().toISOString(),
+    });
+
+    const venc = vencimento
+      ? formatarDataSemFuso(vencimento)
+      : (conta.dia_vencimento ? `${String(conta.dia_vencimento).padStart(2, "0")}/${String(MES_ATUAL).padStart(2, "0")}/${ANO_ATUAL}` : "—");
+
+    fetch("/api/notificar-evento", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        evento: "sem_documento",
+        texto: mensagemSemDocumento({
+          loja: conta.lojas?.codigo ?? null,
+          tipoConta: T?.n ?? conta.tipo,
+          instalacao: conta.insc_cod_mat ?? conta.identificador ?? null,
+          fornecedor: conta.fornecedor_nome ?? null,
+          competencia: `${String(MES_ATUAL).padStart(2, "0")}/${ANO_ATUAL}`,
+          vencimento: venc,
+          valor: money(valorNum),
+          motivo,
+          observacao: obsSemDoc,
+          lancadoPor: usuarioNome ?? usuarioEmail ?? "—",
+          dataHora: agoraBrasil(),
+        }),
+      }),
+    }).catch(() => {});
+
+    setSalvandoSemDoc(false);
+    setSemDoc(false);
+    setMotivoSemDoc(""); setMotivoOutro(""); setObsSemDoc(""); setVencSemDoc("");
+    setValorLancar("");
+    setSucessoLancamento("Conta lançada sem documento. O time foi avisado no Slack.");
+    setTimeout(() => setSucessoLancamento(null), 6000);
+    router.refresh();
+  }
+
   async function lancarComBoleto() {
     if (!valorLancar.trim()) { setErroLancamento("Informe o valor da fatura."); return; }
     setSalvandoLancamento(true);
@@ -1110,9 +1202,41 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
       arquivo_hash: hashArquivo,
     };
     if (linkDrive) payload.comprovante_drive_url = linkDrive;
+
+    // Esse lançamento tinha entrado sem documento e agora o documento chegou:
+    // marca quem anexou e quando. O sem_documento continua true de propósito —
+    // é fato histórico, e é o que permite auditar depois quantas contas
+    // entraram às cegas num mês.
+    const anexandoDepois = !!arquivoBoleto
+      && !!(lancamentoAtual as any)?.sem_documento
+      && !(lancamentoAtual as any)?.documento_anexado_em;
+    if (anexandoDepois) {
+      payload.documento_anexado_em = new Date().toISOString();
+      payload.documento_anexado_por = usuarioId;
+    }
+
     const { error } = await supabase.from("lancamentos").upsert(payload, { onConflict: "conta_id,ano,mes" });
     setSalvandoLancamento(false);
     if (error) { setErroLancamento("Não foi possível salvar o lançamento."); return; }
+
+    if (anexandoDepois && lancamentoAtual?.id) {
+      await supabase.from("lancamento_historico").insert({
+        lancamento_id: lancamentoAtual.id,
+        de: "sem documento", para: "documento anexado",
+        quem: usuarioId,
+        comentario: "Documento que faltava foi anexado.",
+        em: new Date().toISOString(),
+      });
+      fetch("/api/notificar-evento", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          evento: "documento_anexado",
+          loja: conta.lojas?.codigo, tipo: T?.n ?? conta.tipo,
+          competencia: `${String(MES_ATUAL).padStart(2, "0")}/${ANO_ATUAL}`,
+          por: usuarioNome ?? usuarioEmail ?? undefined,
+        }),
+      }).catch(() => {});
+    }
     // fecha o formulário, limpa os campos e confirma na própria área da fatura
     setLancando(false);
     setValorLancar("");
@@ -1452,6 +1576,17 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
                   <div>
                     <div className="text-[18px] font-bold text-[#1a1a1a]">{money(lancamentoAtual.valor)}</div>
                     <SituacaoBadgeInline situacao={lancamentoAtual.situacao} />
+                    {/* estado do DOCUMENTO, separado do estado do dinheiro:
+                        a conta pode estar aprovada e paga e o boleto ainda faltar */}
+                    {(lancamentoAtual as any).sem_documento && (
+                      (lancamentoAtual as any).documento_anexado_em ? (
+                        <span className="badge bg-ok-bg text-ok ml-2">📎 Documento anexado</span>
+                      ) : (
+                        <span className="badge bg-amb-bg text-amb ml-2" title={(lancamentoAtual as any).motivo_sem_documento ?? undefined}>
+                          ⚠️ Sem documento
+                        </span>
+                      )
+                    )}
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     {lancamentoAtual.comprovante_url && (
@@ -1587,12 +1722,86 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL }: { conta
                   Boleto errado? Substituir
                 </button>
               </div>
+            ) : semDoc ? (
+              <div className="card p-4">
+                <div className="text-[12.5px] font-semibold text-[#1a1a1a] mb-1">Lançar conta sem documento</div>
+                <p className="text-[11.5px] text-[#6c757d] mb-3 leading-relaxed">
+                  A conta segue normalmente para aprovação e pagamento. Fica marcada como sem documento
+                  até alguém anexar o boleto, e o time é avisado no Slack.
+                </p>
+
+                {/* o que já se sabe da conta: confere antes de lançar às cegas */}
+                <div className="grid grid-cols-2 gap-3 mb-3 bg-off rounded-md p-3">
+                  <Campo label="Loja" valor={conta.lojas?.codigo ?? "—"} />
+                  <Campo label="Fornecedor" valor={conta.fornecedor_nome ?? "—"} />
+                  <Campo label={CAMPOS_TIPO[conta.tipo]?.labelIdentificador ?? "Instalação"}
+                    valor={conta.insc_cod_mat ?? conta.identificador ?? "—"} />
+                  <Campo label="Competência" valor={`${String(MES_ATUAL).padStart(2, "0")}/${ANO_ATUAL}`} />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <label className="block">
+                    <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Valor</div>
+                    <input value={valorLancar} onChange={(e) => setValorLancar(e.target.value)}
+                      placeholder="0,00" className="input-padrao w-full font-mono" />
+                  </label>
+                  <label className="block">
+                    <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Vencimento</div>
+                    <input type="date" value={vencSemDoc} onChange={(e) => setVencSemDoc(e.target.value)}
+                      className="input-padrao w-full" />
+                  </label>
+                </div>
+
+                <label className="block mb-3">
+                  <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">
+                    Motivo do lançamento sem documento <span className="text-alerr">*</span>
+                  </div>
+                  <select value={motivoSemDoc} onChange={(e) => setMotivoSemDoc(e.target.value)}
+                    className="input-padrao w-full text-[12.5px]">
+                    <option value="">Selecione o motivo...</option>
+                    {MOTIVOS_SEM_DOCUMENTO.map((m) => (
+                      <option key={m.valor} value={m.valor}>{m.rotulo}</option>
+                    ))}
+                  </select>
+                </label>
+
+                {motivoSemDoc === "outro" && (
+                  <label className="block mb-3">
+                    <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Qual o motivo? <span className="text-alerr">*</span></div>
+                    <input value={motivoOutro} onChange={(e) => setMotivoOutro(e.target.value)}
+                      placeholder="Descreva por que está lançando sem o documento"
+                      className="input-padrao w-full text-[12.5px]" />
+                  </label>
+                )}
+
+                <label className="block mb-3">
+                  <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Observação</div>
+                  <textarea value={obsSemDoc} onChange={(e) => setObsSemDoc(e.target.value)} rows={2}
+                    placeholder="opcional" className="input-padrao w-full text-[12.5px]" />
+                </label>
+
+                {erroSemDoc && <div className="text-[11.5px] text-alerr bg-alerr-bg rounded-md px-3 py-2 mb-3">{erroSemDoc}</div>}
+
+                <div className="flex gap-2">
+                  <button onClick={lancarSemDocumento} disabled={salvandoSemDoc}
+                    className="btn-primario flex-1 disabled:opacity-50">
+                    {salvandoSemDoc ? "Lançando..." : "Lançar sem documento"}
+                  </button>
+                  <button onClick={() => { setSemDoc(false); setErroSemDoc(null); }} className="btn-secundario">Cancelar</button>
+                </div>
+              </div>
             ) : !lancando ? (
               contaValidaNoPeriodo(conta.status, conta.data_encerramento, ANO_ATUAL, MES_ATUAL) ? (
+                <>
                 <button onClick={() => { setValorLancar(lancamentoAtual ? String(lancamentoAtual.valor ?? "") : ""); setAlertas([]); setConfirmarMesmoAssim(false); setCodigoBarras(""); setHashArquivo(null); setBloqueio(null); setLancando(true); }}
                   className="w-full text-[12.5px] font-semibold text-amb border border-amarelo/40 bg-amb-bg rounded-md py-2.5 hover:bg-amarelo/10 transition">
                   {lancamentoAtual ? `Lançar fatura de ${formatarPeriodo(MES_ATUAL, ANO_ATUAL).toLowerCase()}` : `Lançar fatura de ${formatarPeriodo(MES_ATUAL, ANO_ATUAL).toLowerCase()} (sem lançamento pendente ainda)`}
                 </button>
+                <button onClick={() => { setValorLancar(lancamentoAtual ? String(lancamentoAtual.valor ?? "") : ""); setMotivoSemDoc(""); setMotivoOutro(""); setObsSemDoc(""); setVencSemDoc(""); setErroSemDoc(null); setSemDoc(true); }}
+                  className="w-full mt-2 text-[12px] font-medium text-[#6c757d] border border-linha rounded-md py-2 hover:border-txt-3 hover:text-txt transition">
+                  Lançar conta sem documento
+                </button>
+                </>
               ) : (
                 <div className="text-center text-[12px] text-[#adb5bd] bg-off rounded-md py-2.5 px-3">
                   Essa conta foi encerrada em {conta.data_encerramento && formatarDataSemFuso(conta.data_encerramento)} - não é possível lançar depois desse período.

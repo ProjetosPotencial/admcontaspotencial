@@ -21,7 +21,7 @@ const FORMAS = [
   { valor: "transferencia", label: "Transferência" },
 ];
 
-export default function PagamentosClient({ prontosPagar: prontosIniciais, pagos }: { prontosPagar: Item[]; pagos: Item[] }) {
+export default function PagamentosClient({ prontosPagar: prontosIniciais, pagos, usuarioId = null }: { prontosPagar: Item[]; pagos: Item[]; usuarioId?: string | null }) {
   const supabase = createClient();
   const router = useRouter();
   const [prontos, setProntos] = useState(prontosIniciais);
@@ -34,9 +34,8 @@ export default function PagamentosClient({ prontosPagar: prontosIniciais, pagos 
     if (!forma) return;
     setMarcando(item.id);
     setErro(null);
-    const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase.from("lancamentos").update({
-      situacao: "pago", forma_pagamento: forma, pago_em: new Date().toISOString(), pago_por: user?.id ?? null,
+      situacao: "pago", forma_pagamento: forma, pago_em: new Date().toISOString(), pago_por: usuarioId ?? null,
     }).eq("id", item.id);
     setMarcando(null);
     if (error) { setErro(`Não foi possível marcar como pago: ${error.message}`); return; }

@@ -26,7 +26,7 @@ const PRIORIDADE: Record<string, { rot: string; cls: string }> = {
 
 const ABERTAS = ["aberta", "em_negociacao", "aguardando", "proposta"];
 
-export default function NegociacoesClient({ negociacoes, lojas, responsaveis, logos }: { negociacoes: Neg[]; lojas: Record<string, any>; responsaveis: Record<string, string>; logos: Record<string, string> }) {
+export default function NegociacoesClient({ negociacoes, lojas, responsaveis, logos, usuarioId = null }: { negociacoes: Neg[]; lojas: Record<string, any>; responsaveis: Record<string, string>; logos: Record<string, string>; usuarioId?: string | null }) {
   const [lista, setLista] = useState<Neg[]>(negociacoes);
   const [aberta, setAberta] = useState<Neg | null>(null);
   const [busca, setBusca] = useState("");
@@ -194,7 +194,7 @@ export default function NegociacoesClient({ negociacoes, lojas, responsaveis, lo
       </div>
 
       {aberta && (
-        <PainelNegociacao
+        <PainelNegociacao usuarioId={usuarioId}
           neg={aberta} nomeLoja={`${nomeLoja(aberta)} ${cidadeLoja(aberta)}`.trim()} responsaveis={responsaveis}
           onClose={() => setAberta(null)}
           onSalvo={(atual) => { setLista((l) => l.map((x) => (x.id === atual.id ? { ...x, ...atual } : x))); setAberta({ ...aberta, ...atual }); }}
@@ -276,7 +276,7 @@ function Donut({ original, atual, negociado, economia }: { original: number; atu
   );
 }
 
-function PainelNegociacao({ neg, nomeLoja, responsaveis, onClose, onSalvo }: { neg: Neg; nomeLoja: string; responsaveis: Record<string, string>; onClose: () => void; onSalvo: (n: Neg) => void }) {
+function PainelNegociacao({ neg, nomeLoja, responsaveis, onClose, onSalvo, usuarioId }: { neg: Neg; nomeLoja: string; responsaveis: Record<string, string>; onClose: () => void; onSalvo: (n: Neg) => void; usuarioId: string | null }) {
   const supabase = createClient();
   const [f, setF] = useState<Neg>({ ...neg });
   const [salvando, setSalvando] = useState(false);
@@ -317,8 +317,7 @@ function PainelNegociacao({ neg, nomeLoja, responsaveis, onClose, onSalvo }: { n
   async function adicionarObs() {
     if (!novaObs.trim()) return;
     setAddingObs(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from("negociacao_interacoes").insert({ negociacao_id: neg.id, tipo: "observacao", conteudo: novaObs.trim(), origem: "sistema", quem: user?.id ?? null });
+    await supabase.from("negociacao_interacoes").insert({ negociacao_id: neg.id, tipo: "observacao", conteudo: novaObs.trim(), origem: "sistema", quem: usuarioId ?? null });
     setNovaObs(""); setAddingObs(false); carregarInteracoes();
   }
 

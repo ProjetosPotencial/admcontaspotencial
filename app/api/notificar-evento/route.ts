@@ -21,7 +21,18 @@ const TEMPLATES: Record<string, (d: any) => string> = {
   encerrada:  (d) => `🏢 *Fornecedor encerrado* — ${d.loja ?? "loja"} · ${d.tipo ?? "conta"}\n_Não gera mais cobranças; cadastro mantido._`,
   reativada:  (d) => `🔄 *Fornecedor reativado* — ${d.loja ?? "loja"} · ${d.tipo ?? "conta"}`,
   loja_concluida: (d) => `🏪 *Loja concluída* — todas as contas de ${d.loja ?? "uma loja"} foram lançadas.`,
+  // Já vem pronta de lib/sem-documento.ts: o texto é longo, tem formato
+  // fixo acordado com a operação, e precisa sair igual venha de onde vier.
+  sem_documento: (d) => String(d.texto ?? ""),
+  documento_anexado: (d) =>
+    `📎 *Documento anexado* — ${d.loja ?? "loja"} · ${d.tipo ?? "conta"}${d.competencia ? ` · ${d.competencia}` : ""}\n_a conta tinha sido lançada sem documento_`,
 };
+
+/**
+ * Eventos que já trazem autor e horário no próprio corpo. Sem isso a linha
+ * de rodapé repetiria "Lançado por / Data" logo abaixo de onde já está.
+ */
+const SEM_RODAPE = new Set(["sem_documento"]);
 
 export async function POST(req: Request) {
   const supabase = createClient();
@@ -35,17 +46,19 @@ export async function POST(req: Request) {
   if (!webhookUrl) return NextResponse.json({ ok: false, error: "SLACK_WEBHOOK_EVENTOS não configurado" }, { status: 200 });
 
   const body = await req.json().catch(() => ({}));
-  const montar = TEMPLATES[String(body.evento ?? "")];
+  const evento = String(body.evento ?? "");
+  const montar = TEMPLATES[evento];
   if (!montar) return NextResponse.json({ ok: false, error: "evento desconhecido" }, { status: 400 });
+
+  const rodape = SEM_RODAPE.has(evento)
+    ? ""
+    : `\n_${body.por ?? "sistema"} · ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}_`;
 
   try {
     await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        text: montar(body) +
-          `\n_${body.por ?? "sistema"} · ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}_`,
-      }),
+      body: JSON.stringify({ text: montar(body) + rodape }),
     });
   } catch {
     // Slack fora do ar não pode quebrar o fluxo de quem está lançando

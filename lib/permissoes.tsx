@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getMenuParaUsuario, getRotaInicial } from "@/lib/menu-cache";
+import { perfilAtual } from "@/lib/auth-usuario";
 import RedirecionarApos from "@/components/redirecionar-apos";
 import BotaoSair from "@/components/botao-sair";
 
@@ -12,16 +13,15 @@ import BotaoSair from "@/components/botao-sair";
  * inclusive digitando a URL direto.
  */
 export async function podeAcessar(href: string): Promise<boolean> {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
+  const perfil = await perfilAtual();
+  if (!perfil) return false;
 
-  const { data: perfil } = await supabase.from("perfis").select("papel").eq("id", user.id).maybeSingle();
-  const papel = perfil?.papel ?? "leitura";
+  const { id, papel } = perfil;
   if (papel === "admin") return true;
 
+  const supabase = createClient();
   try {
-    const itens = await getMenuParaUsuario(user.id, papel);
+    const itens = await getMenuParaUsuario(id, papel);
     // se o módulo nem está cadastrado no menu, não bloqueia por engano
     const existeNoMenu = itens.some((i: any) => i.href === href);
     if (existeNoMenu) return true;
@@ -36,11 +36,9 @@ export async function podeAcessar(href: string): Promise<boolean> {
 
 /** Primeira rota liberada pra pessoa logada agora (ou null se nenhuma). */
 async function rotaInicialAtual(): Promise<string | null> {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data: perfil } = await supabase.from("perfis").select("papel").eq("id", user.id).maybeSingle();
-  return getRotaInicial(user.id, perfil?.papel ?? "leitura");
+  const perfil = await perfilAtual();
+  if (!perfil) return null;
+  return getRotaInicial(perfil.id, perfil.papel);
 }
 
 /**

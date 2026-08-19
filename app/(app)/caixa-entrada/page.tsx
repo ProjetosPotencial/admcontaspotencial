@@ -1,12 +1,16 @@
 import { createClient } from "@/lib/supabase/server";
 import CaixaEntradaClient from "./caixa-entrada-client";
 import { podeAcessar, SemPermissao } from "@/lib/permissoes";
+import { usuarioAtual } from "@/lib/auth-usuario";
 
 export const dynamic = "force-dynamic";
 
 export default async function CaixaEntradaPage() {
   if (!(await podeAcessar("/caixa-entrada"))) return <SemPermissao modulo="Caixa de Entrada" />;
   const supabase = createClient();
+  // o id vem do servidor: antes o cliente batia em auth.getUser() 5 vezes,
+  // uma ida a rede por acao, so pra saber quem estava confirmando.
+  const usuario = await usuarioAtual();
 
   const [{ data: pendentes }, { data: lojas }] = await Promise.all([
     supabase
@@ -24,7 +28,7 @@ export default async function CaixaEntradaPage() {
         <p className="text-[14px] text-[#6c757d] mt-2.5">Boletos vindos da pasta do Google Drive e do canal de boletos no Slack, aguardando confirmação antes de virar lançamento.</p>
       </div>
       <div className="px-4 sm:px-8 pb-6 sm:pb-8">
-        <CaixaEntradaClient itens={(pendentes ?? []) as any[]} lojas={(lojas ?? []) as any[]} />
+        <CaixaEntradaClient itens={(pendentes ?? []) as any[]} lojas={(lojas ?? []) as any[]} usuarioId={usuario?.id ?? null} />
       </div>
     </>
   );

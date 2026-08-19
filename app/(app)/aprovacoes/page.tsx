@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import AprovacoesClient from "./aprovacoes-client";
 import { obterPeriodoSelecionado } from "@/lib/periodo";
 import { podeAcessar, SemPermissao } from "@/lib/permissoes";
+import { usuarioAtual } from "@/lib/auth-usuario";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,7 @@ export default async function AprovacoesPage() {
   if (!(await podeAcessar("/aprovacoes"))) return <SemPermissao modulo="Aprovações" />;
 
   const supabase = createClient();
+  const usuario = await usuarioAtual();
   const { ano, mes } = obterPeriodoSelecionado();
 
   const [{ data }, { data: resumoRaw }] = await Promise.all([
@@ -43,5 +45,5 @@ export default async function AprovacoesPage() {
     : { data: [] as { id: string; nome: string }[] };
   const solicitantes = Object.fromEntries((perfis ?? []).map((p: any) => [p.id, p.nome ?? "—"]));
 
-  return <AprovacoesClient itens={(data ?? []) as any[]} resumoMes={resumo} solicitantes={solicitantes} />;
+  return <AprovacoesClient itens={(data ?? []) as any[]} resumoMes={resumo} solicitantes={solicitantes} usuarioId={usuario?.id ?? null} usuarioEmail={usuario?.email ?? null} />;
 }

@@ -9,6 +9,7 @@ import { money, MES } from "@/lib/format";
 import { getLogosFornecedores } from "@/lib/logos-fornecedores";
 import Link from "next/link";
 import { podeAcessar, SemPermissao } from "@/lib/permissoes";
+import { usuarioAtual } from "@/lib/auth-usuario";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,12 @@ export default async function ContasPage() {
   const { ano, mes, mesAnterior, anoAnterior, ehPeriodoAtual } = obterPeriodoSelecionado();
   const cal = await carregarCalendario(ano);
   const diaAtual = new Date().getDate();
+  // id e email vem do servidor: o cliente batia em auth.getUser() 5 vezes,
+  // uma ida a rede por acao, so pra registrar quem fez.
+  const usuario = await usuarioAtual();
+  const { data: perfilUsuario } = usuario
+    ? await supabase.from("perfis").select("nome").eq("id", usuario.id).maybeSingle()
+    : { data: null };
 
   await supabase.rpc("garantir_lancamentos_pendentes", { p_ano: ano, p_mes: mes });
 
@@ -98,7 +105,7 @@ export default async function ContasPage() {
             <KpiMini icon="pin" cor="#6B5B95" bg="#EDE7F6" value={semOrigem.length} label="Sem origem" extra={<span className="text-[11px] font-mono text-[#6c757d]">{money(somaValor(semOrigem))}</span>} />
           </div>
 
-          <ContasClient feriados={cal.feriados} regraVencimento={cal.regra} contas={contas} situacaoPorConta={situacaoPorConta} lojas={lojas ?? []} ano={ano} mes={mes} logos={logos} />
+          <ContasClient feriados={cal.feriados} regraVencimento={cal.regra} contas={contas} situacaoPorConta={situacaoPorConta} lojas={lojas ?? []} ano={ano} mes={mes} logos={logos} usuarioId={usuario?.id ?? null} usuarioEmail={usuario?.email ?? null} usuarioNome={perfilUsuario?.nome ?? null} />
         </div>
 
         <div className="space-y-6">

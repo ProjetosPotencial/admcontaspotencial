@@ -4,6 +4,7 @@ import { estaAtrasada } from "@/lib/date-utils";
 import { obterPeriodoSelecionado } from "@/lib/periodo";
 import { money } from "@/lib/format";
 import { podeAcessar, SemPermissao } from "@/lib/permissoes";
+import { usuarioAtual } from "@/lib/auth-usuario";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ export default async function PagamentosPage() {
   if (!(await podeAcessar("/pagamentos"))) return <SemPermissao modulo="Pagamentos" />;
 
   const supabase = createClient();
+  const usuario = await usuarioAtual();
   const { ano, mes, ehPeriodoAtual } = obterPeriodoSelecionado();
   const diaAtual = new Date().getDate();
 
@@ -58,7 +60,7 @@ export default async function PagamentosPage() {
               <KpiMini label="Vencendo em 7 dias" value={money(vencendo7.reduce((s, i) => s + Number(i.valor ?? 0), 0))} sub={`${vencendo7.length} lançamentos`} cor="#c9922a" bg="#fdf3e3" />
               <KpiMini label="Vencidos" value={money(totalVencido)} sub={`${vencidos.length} lançamentos`} cor="#B23B3B" bg="#F7E4E2" />
             </div>
-            <PagamentosClient prontosPagar={prontosPagar} pagos={itens.filter((i) => i.situacao === "pago")} />
+            <PagamentosClient prontosPagar={prontosPagar} pagos={itens.filter((i) => i.situacao === "pago")} usuarioId={usuario?.id ?? null} />
           </div>
 
           <div className="space-y-6">

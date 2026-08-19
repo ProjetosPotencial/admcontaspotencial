@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import NegociacoesClient from "./negociacoes-client";
 import { podeAcessar, SemPermissao } from "@/lib/permissoes";
+import { usuarioAtual } from "@/lib/auth-usuario";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +9,7 @@ export default async function NegociacoesPage() {
   if (!(await podeAcessar("/negociacoes"))) return <SemPermissao modulo="Negociações" />;
 
   const supabase = createClient();
+  const usuario = await usuarioAtual();
   const { data: negs } = await supabase
     .from("negociacoes")
     .select("*")
@@ -29,5 +31,5 @@ export default async function NegociacoesPage() {
   const { data: forns } = await supabase.from("fornecedores").select("nome, logo_url").not("logo_url", "is", null);
   const logos = Object.fromEntries((forns ?? []).map((f: any) => [String(f.nome).toLowerCase(), f.logo_url]));
 
-  return <NegociacoesClient negociacoes={(negs ?? []) as any[]} lojas={lojaMap} responsaveis={perfilMap} logos={logos} />;
+  return <NegociacoesClient negociacoes={(negs ?? []) as any[]} lojas={lojaMap} responsaveis={perfilMap} logos={logos} usuarioId={usuario?.id ?? null} />;
 }

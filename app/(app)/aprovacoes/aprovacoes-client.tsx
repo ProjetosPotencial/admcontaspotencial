@@ -26,7 +26,8 @@ type Item = {
   };
 };
 
-export default function AprovacoesClient({ itens, resumoMes, solicitantes = {} }: {
+export default function AprovacoesClient({ itens, resumoMes, solicitantes = {}, usuarioId = null, usuarioEmail = null }: {
+  usuarioId?: string | null; usuarioEmail?: string | null;
   itens: Item[];
   resumoMes: { aprovado: { qtd: number; total: number }; contestado: { qtd: number; total: number } };
   solicitantes?: Record<string, string>;
@@ -96,18 +97,17 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {} }
 
   async function decidir(item: Item, aprovar: boolean, motivo?: string) {
     setDecidindo(item.id);
-    const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase
       .from("lancamentos")
       .update(aprovar ? {
         situacao: "aprovado",
         aprovado_em: new Date().toISOString(),
-        aprovado_por: user?.id ?? null,
+        aprovado_por: usuarioId ?? null,
       } : {
         situacao: "contestado",
         motivo_recusa: motivo ?? null,
         recusado_em: new Date().toISOString(),
-        recusado_por: user?.id ?? null,
+        recusado_por: usuarioId ?? null,
       })
       .eq("id", item.id);
     setDecidindo(null);
@@ -118,7 +118,7 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {} }
       body: JSON.stringify({
         evento: aprovar ? "aprovada" : "reprovada",
         loja: item.contas.lojas?.codigo, tipo: TIPOS[item.contas.tipo]?.n ?? item.contas.tipo,
-        valor: money(Number(item.valor ?? 0)), por: user?.email ?? undefined, motivo: aprovar ? undefined : motivo,
+        valor: money(Number(item.valor ?? 0)), por: usuarioEmail ?? undefined, motivo: aprovar ? undefined : motivo,
       }),
     }).catch(() => {});
     setFila((f) => f.filter((x) => x.id !== item.id));
@@ -140,16 +140,15 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {} }
   // reusando a mesma lógica de decisão individual. Recusa exige motivo.
   async function decidirLote(aprovar: boolean, motivo?: string) {
     setLoteProcessando(true);
-    const { data: { user } } = await supabase.auth.getUser();
     const ids = Array.from(selecionados);
     let ok = 0, falhas = 0;
     for (const id of ids) {
       const item = fila.find((x) => x.id === id);
       if (!item) continue;
       const { error } = await supabase.from("lancamentos").update(aprovar ? {
-        situacao: "aprovado", aprovado_em: new Date().toISOString(), aprovado_por: user?.id ?? null,
+        situacao: "aprovado", aprovado_em: new Date().toISOString(), aprovado_por: usuarioId ?? null,
       } : {
-        situacao: "contestado", motivo_recusa: motivo ?? null, recusado_em: new Date().toISOString(), recusado_por: user?.id ?? null,
+        situacao: "contestado", motivo_recusa: motivo ?? null, recusado_em: new Date().toISOString(), recusado_por: usuarioId ?? null,
       }).eq("id", id);
       if (error) { falhas++; continue; }
       ok++;
@@ -158,7 +157,7 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {} }
         body: JSON.stringify({
           evento: aprovar ? "aprovada" : "reprovada",
           loja: item.contas.lojas?.codigo, tipo: TIPOS[item.contas.tipo]?.n ?? item.contas.tipo,
-          valor: money(Number(item.valor ?? 0)), por: user?.email ?? undefined, motivo: aprovar ? undefined : motivo,
+          valor: money(Number(item.valor ?? 0)), por: usuarioEmail ?? undefined, motivo: aprovar ? undefined : motivo,
         }),
       }).catch(() => {});
     }

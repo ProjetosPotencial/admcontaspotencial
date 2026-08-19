@@ -54,7 +54,7 @@ const CONFIANCA_LABEL: Record<string, { texto: string; cor: string }> = {
   baixa: { texto: "Não identificado - escolhe manual", cor: "bg-alerr-bg text-alerr" },
 };
 
-export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { itens: Item[]; lojas: Loja[] }) {
+export default function CaixaEntradaClient({ itens: itensIniciais, lojas, usuarioId }: { itens: Item[]; lojas: Loja[]; usuarioId: string | null }) {
   const supabase = createClient();
   const [itens, setItens] = useState(itensIniciais);
   const notasFiscais = itens.filter((i) => i.classe_documento === "nota_fiscal");
@@ -156,7 +156,6 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
       }).eq("id", contaId);
 
       const agora = new Date();
-      const { data: { user } } = await supabase.auth.getUser();
       const { data: lanc, error } = await supabase.from("lancamentos").upsert({
         conta_id: contaId, ano, mes, valor: item.valor_detectado, situacao: "lancado",
         lancado_em: agora.toISOString(), codigo_barras: item.codigo_barras_detectado,
@@ -165,7 +164,7 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
       if (error || !lanc) { setToast("Não foi possível lançar."); setProcessando(null); return; }
 
       await supabase.from("caixa_entrada_boletos").update({
-        status: "confirmado", revisado_por: user?.id ?? null, revisado_em: agora.toISOString(), lancamento_criado_id: lanc.id,
+        status: "confirmado", revisado_por: usuarioId ?? null, revisado_em: agora.toISOString(), lancamento_criado_id: lanc.id,
       }).eq("id", item.id);
 
       // registra a compra individual (histórico soma por mês e lista cada compra da loja)
@@ -258,7 +257,6 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
       }).eq("id", contaId);
 
       const agora = new Date();
-      const { data: { user } } = await supabase.auth.getUser();
       const { data: lanc, error } = await supabase.from("lancamentos").upsert({
         conta_id: contaId, ano, mes, valor: item.valor_detectado, situacao: "lancado",
         lancado_em: agora.toISOString(), codigo_barras: item.codigo_barras_detectado, comprovante_drive_url: item.drive_web_view_link,
@@ -266,7 +264,7 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
       if (error || !lanc) { setToast("Não foi possível lançar."); setProcessando(null); return; }
 
       await supabase.from("caixa_entrada_boletos").update({
-        status: "confirmado", revisado_por: user?.id ?? null, revisado_em: agora.toISOString(), lancamento_criado_id: lanc.id,
+        status: "confirmado", revisado_por: usuarioId ?? null, revisado_em: agora.toISOString(), lancamento_criado_id: lanc.id,
       }).eq("id", item.id);
 
       await supabase.from("compra_detalhe").insert({
@@ -306,7 +304,6 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
       }
 
       const agora = new Date();
-      const { data: { user } } = await supabase.auth.getUser();
       const { data: lancamento, error } = await supabase.from("lancamentos").upsert({
         conta_id: contaId, ano, mes,
         valor: item.valor_detectado, situacao: "lancado", lancado_em: agora.toISOString(),
@@ -316,7 +313,7 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
       if (error || !lancamento) { setToast("Não foi possível lançar."); setProcessando(null); return; }
 
       await supabase.from("caixa_entrada_boletos").update({
-        status: "confirmado", revisado_por: user?.id ?? null, revisado_em: agora.toISOString(), lancamento_criado_id: lancamento.id,
+        status: "confirmado", revisado_por: usuarioId ?? null, revisado_em: agora.toISOString(), lancamento_criado_id: lancamento.id,
       }).eq("id", item.id);
 
       setItens((lista) => lista.filter((i) => i.id !== item.id));
@@ -350,12 +347,11 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
     const { data: lancs } = await supabase.from("lancamentos").select("id").eq("conta_id", contaId).order("lancado_em", { ascending: false }).limit(1);
     if (lancs?.[0]?.id) {
       if (item.valor_detectado != null) await supabase.from("lancamentos").update({ valor: item.valor_detectado }).eq("id", lancs[0].id);
-      const { data: { user } } = await supabase.auth.getUser();
       await supabase.from("lancamento_historico").insert({
         lancamento_id: lancs[0].id, de: "—",
         para: item.numero_documento_detectado ? `NF ${item.numero_documento_detectado}` : "dados atualizados",
         comentario: `Substituição por reenvio do chamado ${item.chamado_numero ?? ""}`.trim(),
-        quem: user?.id ?? null, em: new Date().toISOString(),
+        quem: usuarioId ?? null, em: new Date().toISOString(),
       });
     }
     await supabase.from("caixa_entrada_boletos").update({ status: "confirmado", revisado_em: new Date().toISOString() }).eq("id", item.id);
@@ -366,8 +362,7 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas }: { it
 
   async function rejeitar(item: Item) {
     setProcessando(item.id);
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from("caixa_entrada_boletos").update({ status: "rejeitado", revisado_por: user?.id ?? null, revisado_em: new Date().toISOString() }).eq("id", item.id);
+    await supabase.from("caixa_entrada_boletos").update({ status: "rejeitado", revisado_por: usuarioId ?? null, revisado_em: new Date().toISOString() }).eq("id", item.id);
     setItens((lista) => lista.filter((i) => i.id !== item.id));
     setProcessando(null);
   }
