@@ -15,6 +15,7 @@ import LogoFornecedor from "@/components/logo-fornecedor";
 import { money, MES, nomeArquivoSeguro, formatarDataSemFuso } from "@/lib/format";
 import { MOTIVOS_SEM_DOCUMENTO, motivoValido, textoDoMotivo, mensagemSemDocumento, agoraBrasil } from "@/lib/sem-documento";
 import { MOTIVOS_ZERADO, motivoZeradoValido, textoMotivoZerado, lerValorDigitado, ehZerada } from "@/lib/conta-zerada";
+import { mensagemLancamentoIncorreto, motivoIncorretoValido } from "@/lib/lancamento-incorreto";
 
 function StatusBadge({ status }: { status: string }) {
   if (status === "encerrado") return <span className="badge bg-alerr-bg text-alerr">Encerrada</span>;
@@ -200,7 +201,7 @@ function FornecedorCell({ contaId, nome, logo }: { contaId: string; nome: string
 }
 
 export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes, feriados = [], regraVencimento = "adiar", logos = {}, usuarioId = null, usuarioEmail = null, usuarioNome = null }: {
-  contas: Conta[]; situacaoPorConta: Record<string, string>; lojas: { id: string; codigo: string }[]; ano: number; mes: number;
+  contas: Conta[]; situacaoPorConta: Record<string, string>; lojas: { id: string; codigo: string; empresa_id?: string | null; empresas?: { nome: string | null } | null }[]; ano: number; mes: number;
   feriados?: Feriado[]; regraVencimento?: RegraVencimento; logos?: Record<string, string>;
   usuarioId?: string | null; usuarioEmail?: string | null; usuarioNome?: string | null;
 }) {
@@ -501,7 +502,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
         </div>
       </div>
 
-      {aberta && <ContaDrawer conta={aberta} onClose={() => setAberta(null)} ano={ano} mes={mes} usuarioId={usuarioId} usuarioEmail={usuarioEmail} usuarioNome={usuarioNome} />}
+      {aberta && <ContaDrawer conta={aberta} onClose={() => setAberta(null)} ano={ano} mes={mes} usuarioId={usuarioId} usuarioEmail={usuarioEmail} usuarioNome={usuarioNome} lojas={lojas} />}
       {criando && <NovaContaDrawer lojas={lojas} onClose={() => setCriando(false)} />}
 
       {/* Barra fixa de ações em lote — aparece quando há contas selecionadas */}
@@ -516,7 +517,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
   );
 }
 
-function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId, usuarioEmail, usuarioNome }: { conta: Conta; onClose: () => void; ano: number; mes: number; usuarioId: string | null; usuarioEmail: string | null; usuarioNome: string | null }) {
+function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId, usuarioEmail, usuarioNome, lojas }: { conta: Conta; onClose: () => void; ano: number; mes: number; usuarioId: string | null; usuarioEmail: string | null; usuarioNome: string | null; lojas: { id: string; codigo: string; empresa_id?: string | null; empresas?: { nome: string | null } | null }[] }) {
   const supabase = createClient();
   const router = useRouter();
   const T = TIPOS[conta.tipo];
@@ -645,6 +646,12 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId
   const [motivoOutro, setMotivoOutro] = useState("");
   const [vencSemDoc, setVencSemDoc] = useState("");
   const [obsSemDoc, setObsSemDoc] = useState("");
+  const [corrigindo, setCorrigindo] = useState(false);
+  const [empresaCorreta, setEmpresaCorreta] = useState("");
+  const [lojaCorreta, setLojaCorreta] = useState("");
+  const [motivoIncorreto, setMotivoIncorreto] = useState("");
+  const [salvandoCorrecao, setSalvandoCorrecao] = useState(false);
+  const [erroCorrecao, setErroCorrecao] = useState<string | null>(null);
   const [motivoZerado, setMotivoZerado] = useState("");
   const [motivoZeradoOutro, setMotivoZeradoOutro] = useState("");
   const [salvandoSemDoc, setSalvandoSemDoc] = useState(false);
@@ -675,7 +682,7 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId
   const [salvandoStatus, setSalvandoStatus] = useState(false);
 
   function carregarLancamentos() {
-    supabase.from("lancamentos").select("id, ano, mes, valor, situacao, comprovante_url, comprovante_drive_url, aprovado_por, aprovado_em, sem_documento, motivo_sem_documento, documento_anexado_em, motivo_zerado")
+    supabase.from("lancamentos").select("id, ano, mes, valor, situacao, comprovante_url, comprovante_drive_url, aprovado_por, aprovado_em, sem_documento, motivo_sem_documento, documento_anexado_em, motivo_zerado, lancamento_incorreto, motivo_incorreto")
       .eq("conta_id", conta.id).eq("ano", ANO_ATUAL)
       .then(({ data }) => setLancs((data ?? []) as Lancamento[]));
   }
@@ -1079,6 +1086,94 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId
    * sem documento, com o motivo obrigatório, e o Slack avisa o time pra
    * alguém correr atrás do documento.
    */
+  /**
+   * Empresas disponíveis para a correção.
+   *
+   * Inclui "Sem empresa" de propósito: há 32 lojas ativas sem empresa
+   * cadastrada, e sem essa entrada elas ficariam invisíveis no seletor —
+   * alguém tentaria corrigir para uma delas e não a encontraria.
+   */
+  const empresasDisponiveis = useMemo(() => {
+    const mapa = new Map<string, string>();
+    let temSemEmpresa = false;
+    for (const l of lojas) {
+      const nome = l.empresas?.nome;
+      if (l.empresa_id && nome) mapa.set(l.empresa_id, nome);
+      else temSemEmpresa = true;
+    }
+    const lista = Array.from(mapa, ([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    if (temSemEmpresa) lista.push({ id: "__sem__", nome: "Sem empresa cadastrada" });
+    return lista;
+  }, [lojas]);
+
+  /** Lojas da empresa escolhida — nunca mistura loja de outra empresa. */
+  const lojasDaEmpresa = useMemo(() => {
+    if (!empresaCorreta) return [];
+    return lojas
+      .filter((l) => (empresaCorreta === "__sem__" ? !l.empresa_id : l.empresa_id === empresaCorreta))
+      .filter((l) => l.id !== conta.loja_id); // a loja atual não é destino de correção
+  }, [lojas, empresaCorreta, conta.loja_id]);
+
+  /**
+   * Marca o lançamento como incorreto e cria o certo na loja escolhida.
+   *
+   * O trabalho pesado é da rota /api/corrigir-lancamento: são cinco escritas
+   * que precisam andar juntas, e deixá-las aqui significaria correção pela
+   * metade se a aba fechasse no meio.
+   */
+  async function corrigirLancamento() {
+    setErroCorrecao(null);
+    if (!lancamentoAtual?.id) { setErroCorrecao("Não há lançamento para corrigir."); return; }
+    if (!lojaCorreta) { setErroCorrecao("Escolha a loja correta."); return; }
+    if (!motivoIncorretoValido(motivoIncorreto)) { setErroCorrecao("Descreva o motivo do lançamento incorreto."); return; }
+
+    setSalvandoCorrecao(true);
+    try {
+      const resp = await fetch("/api/corrigir-lancamento", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lancamentoId: lancamentoAtual.id, lojaCorretaId: lojaCorreta, motivo: motivoIncorreto }),
+      });
+      const json = await resp.json();
+      if (!resp.ok) { setErroCorrecao(json.error ?? "Não foi possível corrigir."); setSalvandoCorrecao(false); return; }
+
+      const venc = conta.dia_vencimento
+        ? `${String(conta.dia_vencimento).padStart(2, "0")}/${String(MES_ATUAL).padStart(2, "0")}/${ANO_ATUAL}`
+        : "—";
+
+      fetch("/api/notificar-evento", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          evento: "lancamento_incorreto",
+          texto: mensagemLancamentoIncorreto({
+            fornecedor: conta.fornecedor_nome ?? null,
+            tipoConta: T?.n ?? conta.tipo,
+            descricao: conta.observacoes ?? null,
+            valor: money(lancamentoAtual.valor),
+            vencimento: venc,
+            competencia: `${String(MES_ATUAL).padStart(2, "0")}/${ANO_ATUAL}`,
+            empresaErrada: json.empresaErrada ?? null,
+            lojaErrada: json.lojaErrada ?? null,
+            empresaCorreta: json.empresaCorreta ?? null,
+            lojaCorreta: json.lojaCorreta ?? null,
+            motivo: motivoIncorreto.trim(),
+            usuario: usuarioNome ?? usuarioEmail ?? "—",
+            dataHora: agoraBrasil(),
+          }),
+        }),
+      }).catch(() => {});
+
+      setSalvandoCorrecao(false);
+      setCorrigindo(false);
+      setEmpresaCorreta(""); setLojaCorreta(""); setMotivoIncorreto("");
+      setSucessoLancamento(`Lançamento corrigido para ${json.lojaCorreta ?? "a loja escolhida"}. O time foi avisado no Slack.`);
+      setTimeout(() => setSucessoLancamento(null), 7000);
+      router.refresh();
+    } catch {
+      setSalvandoCorrecao(false);
+      setErroCorrecao("Não foi possível corrigir agora.");
+    }
+  }
+
   async function lancarSemDocumento() {
     setErroSemDoc(null);
 
@@ -1591,6 +1686,11 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId
                     <SituacaoBadgeInline situacao={lancamentoAtual.situacao} />
                     {/* estado do DOCUMENTO, separado do estado do dinheiro:
                         a conta pode estar aprovada e paga e o boleto ainda faltar */}
+                    {(lancamentoAtual as any).lancamento_incorreto && (
+                      <span className="badge bg-alerr-bg text-alerr ml-2" title={(lancamentoAtual as any).motivo_incorreto ?? undefined}>
+                        🚨 Lançamento incorreto
+                      </span>
+                    )}
                     {ehZerada(lancamentoAtual.valor) && (
                       <span className="badge bg-info-bg text-info ml-2" title={(lancamentoAtual as any).motivo_zerado ?? undefined}>
                         R$ 0,00 · Conta zerada
@@ -1630,6 +1730,65 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId
                     )}
                   </div>
                 </div>
+                {corrigindo ? (
+                  <div className="card p-4 mt-3 border-alerr/30">
+                    <div className="text-[12.5px] font-semibold text-[#1a1a1a] mb-1">Lançamento incorreto</div>
+                    <p className="text-[11.5px] text-[#6c757d] mb-3 leading-relaxed">
+                      O lançamento atual será cancelado e um novo será criado na loja correta, com o mesmo valor.
+                      Nada é apagado — os dois ficam ligados no histórico.
+                    </p>
+
+                    <div className="bg-off rounded-md p-3 mb-3">
+                      <div className="text-[10.5px] font-semibold text-alerr uppercase mb-1">Foi lançada em</div>
+                      <div className="text-[12.5px] text-[#1a1a1a]">
+                        {conta.lojas?.empresas?.nome ?? "Sem empresa"} · {conta.lojas?.codigo ?? "—"}
+                      </div>
+                    </div>
+
+                    <label className="block mb-3">
+                      <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Empresa correta <span className="text-alerr">*</span></div>
+                      <select value={empresaCorreta} onChange={(e) => { setEmpresaCorreta(e.target.value); setLojaCorreta(""); }}
+                        className="input-padrao w-full text-[12.5px]">
+                        <option value="">Selecione a empresa...</option>
+                        {empresasDisponiveis.map((e) => (<option key={e.id} value={e.id}>{e.nome}</option>))}
+                      </select>
+                    </label>
+
+                    <label className="block mb-3">
+                      <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Loja correta <span className="text-alerr">*</span></div>
+                      <select value={lojaCorreta} onChange={(e) => setLojaCorreta(e.target.value)} disabled={!empresaCorreta}
+                        className="input-padrao w-full text-[12.5px] disabled:opacity-50">
+                        <option value="">{empresaCorreta ? "Selecione a loja..." : "Escolha a empresa primeiro"}</option>
+                        {lojasDaEmpresa.map((l) => (<option key={l.id} value={l.id}>{l.codigo}</option>))}
+                      </select>
+                      {empresaCorreta && lojasDaEmpresa.length === 0 && (
+                        <div className="text-[11px] text-amb mt-1">Essa empresa não tem outra loja ativa disponível.</div>
+                      )}
+                    </label>
+
+                    <label className="block mb-3">
+                      <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Motivo do erro <span className="text-alerr">*</span></div>
+                      <textarea value={motivoIncorreto} onChange={(e) => setMotivoIncorreto(e.target.value)} rows={2}
+                        placeholder="Ex: boleto pertence à loja MG 075, foi lançado na MG 074 por engano"
+                        className="input-padrao w-full text-[12.5px]" />
+                    </label>
+
+                    {erroCorrecao && <div className="text-[11.5px] text-alerr bg-alerr-bg rounded-md px-3 py-2 mb-3">{erroCorrecao}</div>}
+
+                    <div className="flex gap-2">
+                      <button onClick={corrigirLancamento} disabled={salvandoCorrecao}
+                        className="btn-primario flex-1 disabled:opacity-50">
+                        {salvandoCorrecao ? "Corrigindo..." : "Corrigir lançamento"}
+                      </button>
+                      <button onClick={() => { setCorrigindo(false); setErroCorrecao(null); }} className="btn-secundario">Cancelar</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => { setCorrigindo(true); setErroCorrecao(null); }}
+                    className="w-full mt-3 text-[12px] font-medium text-alerr border border-alerr/30 rounded-md py-2 hover:bg-alerr-bg transition">
+                    Marcar como lançamento incorreto
+                  </button>
+                )}
                 {lancamentoAtual.situacao === "contestado" && (
                   <div className="mt-3 bg-alerr-bg border border-alerr/30 rounded-md px-3 py-2.5">
                     <div className="text-[12px] font-semibold text-alerr mb-0.5">Recusado — precisa de correção</div>

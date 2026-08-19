@@ -24,6 +24,7 @@ const TEMPLATES: Record<string, (d: any) => string> = {
   // Já vem pronta de lib/sem-documento.ts: o texto é longo, tem formato
   // fixo acordado com a operação, e precisa sair igual venha de onde vier.
   sem_documento: (d) => String(d.texto ?? ""),
+  lancamento_incorreto: (d) => String(d.texto ?? ""),
   documento_anexado: (d) =>
     `📎 *Documento anexado* — ${d.loja ?? "loja"} · ${d.tipo ?? "conta"}${d.competencia ? ` · ${d.competencia}` : ""}\n_a conta tinha sido lançada sem documento_`,
 };
@@ -32,7 +33,7 @@ const TEMPLATES: Record<string, (d: any) => string> = {
  * Eventos que já trazem autor e horário no próprio corpo. Sem isso a linha
  * de rodapé repetiria "Lançado por / Data" logo abaixo de onde já está.
  */
-const SEM_RODAPE = new Set(["sem_documento"]);
+const SEM_RODAPE = new Set(["sem_documento", "lancamento_incorreto"]);
 
 export async function POST(req: Request) {
   const supabase = createClient();

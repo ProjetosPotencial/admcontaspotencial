@@ -43,11 +43,13 @@ export default async function ContasPage() {
       .or("em_negociacao.is.null,em_negociacao.eq.false")
       .order("dia_vencimento", { ascending: true, nullsFirst: false }),
     supabase.from("lancamentos").select("conta_id, situacao").eq("ano", ano).eq("mes", mes),
-    supabase.from("lojas").select("id, codigo").eq("status", "ativo").order("codigo"),
+    supabase.from("lojas").select("id, codigo, empresa_id, empresas ( nome )").eq("status", "ativo").order("codigo"),
     supabase.from("lancamentos")
       .select("id, valor, situacao, contas!inner ( dia_vencimento, origem )")
       .eq("ano", ano).eq("mes", mes),
-    supabase.from("lancamentos").select("mes, valor, situacao").eq("ano", ano).not("valor", "is", null),
+    // cancelado fica de fora dos totais: o lançamento corrigido substitui o
+    // incorreto, e somar os dois contaria o mesmo valor duas vezes.
+    supabase.from("lancamentos").select("mes, valor, situacao").eq("ano", ano).not("valor", "is", null).neq("situacao", "cancelado"),
     supabase.from("metricas_mensais").select("contas_ativas").eq("ano", anoAnterior).eq("mes", mesAnterior).maybeSingle(),
   ]);
 
@@ -105,7 +107,7 @@ export default async function ContasPage() {
             <KpiMini icon="pin" cor="#6B5B95" bg="#EDE7F6" value={semOrigem.length} label="Sem origem" extra={<span className="text-[11px] font-mono text-[#6c757d]">{money(somaValor(semOrigem))}</span>} />
           </div>
 
-          <ContasClient feriados={cal.feriados} regraVencimento={cal.regra} contas={contas} situacaoPorConta={situacaoPorConta} lojas={lojas ?? []} ano={ano} mes={mes} logos={logos} usuarioId={usuario?.id ?? null} usuarioEmail={usuario?.email ?? null} usuarioNome={perfilUsuario?.nome ?? null} />
+          <ContasClient feriados={cal.feriados} regraVencimento={cal.regra} contas={contas} situacaoPorConta={situacaoPorConta} lojas={(lojas ?? []) as any} ano={ano} mes={mes} logos={logos} usuarioId={usuario?.id ?? null} usuarioEmail={usuario?.email ?? null} usuarioNome={perfilUsuario?.nome ?? null} />
         </div>
 
         <div className="space-y-6">

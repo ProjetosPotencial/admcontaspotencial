@@ -17,12 +17,13 @@ export default async function RelatoriosPage() {
     supabase
       .from("lancamentos")
       .select("ano, mes, valor, situacao, contas!inner ( tipo, fornecedor_nome, lojas ( codigo, coban ) )")
-      .eq("ano", ano),
+      .eq("ano", ano).neq("situacao", "cancelado"),
     supabase
       .from("lancamentos")
       .select("valor, contas!inner ( loja_id, lojas ( codigo, coban ) )")
       .eq("ano", ano)
-      .not("valor", "is", null),
+      .not("valor", "is", null)
+      .neq("situacao", "cancelado"),
   ]);
 
   return (
