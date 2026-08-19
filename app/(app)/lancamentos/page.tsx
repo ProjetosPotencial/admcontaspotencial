@@ -7,6 +7,7 @@ import { money } from "@/lib/format";
 import { getLogosFornecedores } from "@/lib/logos-fornecedores";
 import Link from "next/link";
 import { podeAcessar, SemPermissao } from "@/lib/permissoes";
+import ErroConsulta from "@/components/erro-consulta";
 
 export const dynamic = "force-dynamic";
 
@@ -17,9 +18,9 @@ export default async function LancamentosPage() {
   const cal = await carregarCalendario(ano);
   const diaAtual = new Date().getDate();
 
-  await supabase.rpc("garantir_lancamentos_pendentes", { p_ano: ano, p_mes: mes });
+  const { error: erroRpc } = await supabase.rpc("garantir_lancamentos_pendentes", { p_ano: ano, p_mes: mes });
 
-  const [{ data }, { data: mesAtualDetalhado }] = await Promise.all([
+  const [{ data, error: erroLista }, { data: mesAtualDetalhado, error: erroMes }] = await Promise.all([
     supabase
       .from("lancamentos")
       .select("id, ano, mes, valor, situacao, lancado_em, comprovante_url, comprovante_drive_url, codigo_barras, aprovado_por, aprovado_em, contas!inner ( tipo, dia_vencimento, fornecedor_nome, lojas ( codigo, coban ) )")
@@ -68,6 +69,8 @@ export default async function LancamentosPage() {
         <h1 className="text-[24px] font-bold text-[#1a1a1a]">Lançamentos</h1>
         <p className="text-[14px] text-[#6c757d] mt-1">Todos os valores lançados em {ano}, mês a mês.</p>
       </div>
+
+      <ErroConsulta erros={[erroLista, erroMes, erroRpc]} />
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-6 flex-1 min-h-0">
         <div className="min-w-0">

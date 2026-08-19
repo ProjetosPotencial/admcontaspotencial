@@ -9,6 +9,7 @@ import { money, MES } from "@/lib/format";
 import { getLogosFornecedores } from "@/lib/logos-fornecedores";
 import Link from "next/link";
 import { podeAcessar, SemPermissao } from "@/lib/permissoes";
+import ErroConsulta from "@/components/erro-consulta";
 import { usuarioAtual } from "@/lib/auth-usuario";
 
 export const dynamic = "force-dynamic";
@@ -29,11 +30,11 @@ export default async function ContasPage() {
   await supabase.rpc("garantir_lancamentos_pendentes", { p_ano: ano, p_mes: mes });
 
   const [
-    { data },
-    { data: lancAtual },
-    { data: lojas },
-    { data: lancDetalhado },
-    { data: lancamentosAno },
+    { data, error: e1 },
+    { data: lancAtual, error: e2 },
+    { data: lojas, error: e3 },
+    { data: lancDetalhado, error: e4 },
+    { data: lancamentosAno, error: e5 },
     { data: metricaAnterior },
   ] = await Promise.all([
     supabase
@@ -95,6 +96,8 @@ export default async function ContasPage() {
         <h1 className="text-[24px] font-bold text-[#1a1a1a]">Contas de consumo</h1>
         <p className="text-[14px] text-[#6c757d] mt-1">Gerencie todas as contas cadastradas e acompanhe vencimentos, pendências e origem.</p>
       </div>
+
+      <ErroConsulta erros={[e1, e2, e3, e4, e5]} />
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
         <div className="min-w-0">
