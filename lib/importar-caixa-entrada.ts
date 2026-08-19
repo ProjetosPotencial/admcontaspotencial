@@ -4,6 +4,15 @@ import { buscarDadosChamado } from "@/lib/glpi";
 import { extrairDadosBoleto } from "@/lib/extrair-boleto";
 import { criarCardDeDocumento } from "@/lib/processar-documento";
 import { processarFilaSlack } from "@/lib/slack-fila";
+import { emParaleloTolerante } from "@/lib/paralelo";
+
+/**
+ * Quantos documentos são lidos pela IA ao mesmo tempo.
+ *
+ * 4 é o meio-termo: corta o tempo do lote em ~4× sem chegar perto do teto de
+ * requisições por minuto da Anthropic, onde o lote inteiro falharia com 429.
+ */
+const LEITURAS_SIMULTANEAS = 4;
 
 export async function importarCaixaEntradaDrive() {
   const pastaId = process.env.GOOGLE_DRIVE_INBOX_FOLDER_ID;
@@ -27,9 +36,26 @@ export async function importarCaixaEntradaDrive() {
 
   // Não sai cedo se não houver arquivo solto novo: o fluxo GLPI (pasta
   // Compras) roda de qualquer jeito, independente dos arquivos da raiz.
-  for (const arquivo of novos) {
+
+  // Fase 1 - baixar e ler, várias ao mesmo tempo. É onde o tempo mora: cada
+  // PDF leva uns 15s na IA, e em série 7 arquivos viram quase dois minutos.
+  const lidos = await emParaleloTolerante(novos, LEITURAS_SIMULTANEAS, async (arquivo) => {
+    const buffer = await baixarArquivoDoDrive(arquivo.id);
+    const extraido = await extrairDadosBoleto(buffer, arquivo.name, arquivo.mimeType);
+    return { arquivo, buffer, extraido };
+  });
+
+  // Fase 2 - gravar em série, de propósito. A checagem de nota duplicada
+  // consulta os cards já gravados; em paralelo, duas cópias da mesma NF não
+  // enxergariam uma à outra e as duas entrariam sem o aviso.
+  for (let i = 0; i < lidos.length; i++) {
+    const r = lidos[i];
+    if (!r.ok) {
+      erros.push(`${novos[i].name}: ${r.erro?.message ?? "erro desconhecido"}`);
+      continue;
+    }
+    const { arquivo, buffer, extraido } = r.valor;
     try {
-      const buffer = await baixarArquivoDoDrive(arquivo.id);
       await criarCardDeDocumento({
         supabase,
         fonteId: arquivo.id,
@@ -39,6 +65,7 @@ export async function importarCaixaEntradaDrive() {
         mimeType: arquivo.mimeType,
         lojas: (lojas ?? []) as any,
         extras: { origem_entrada: "drive" },
+        extraido,
       });
       processados++;
     } catch (err: any) {
@@ -77,19 +104,28 @@ export async function importarCaixaEntradaDrive() {
         }
         let nf: any = null, boleto: any = null;
         let falhaLeitura = false;
-        for (const pdf of pdfs) {
-          try {
-            const buf = await baixarArquivoDoDrive(pdf.id);
-            const ex = await extrairDadosBoleto(buf, pdf.name, pdf.mimeType);
-            docsChamado++;
-            if (!nf && ex.classe_documento === "nota_fiscal") nf = ex;
-            else if (!boleto && (ex.codigo_barras || ex.classe_documento === "boleto")) boleto = ex;
-            else if (!nf && (ex.fornecedor || ex.numero_documento)) nf = ex; // sobra que parece nota
-          } catch (errArq: any) {
+
+        // Lê os PDFs do chamado ao mesmo tempo. O emParaleloTolerante devolve
+        // na ordem de entrada, então a escolha de quem é NF e quem é boleto
+        // continua saindo igual à leitura em série - só mais rápido.
+        const leituras = await emParaleloTolerante(pdfs, LEITURAS_SIMULTANEAS, async (pdf) => {
+          const buf = await baixarArquivoDoDrive(pdf.id);
+          return extrairDadosBoleto(buf, pdf.name, pdf.mimeType);
+        });
+
+        for (let i = 0; i < leituras.length; i++) {
+          const leitura = leituras[i];
+          if (!leitura.ok) {
             // um PDF ruim não derruba o chamado; marca leitura falha e segue
             falhaLeitura = true;
-            erros.push(`Chamado ${ch.chamadoNumero ?? ch.pastaId} / ${pdf.name}: ${errArq?.message ?? "erro na leitura"}`);
+            erros.push(`Chamado ${ch.chamadoNumero ?? ch.pastaId} / ${pdfs[i].name}: ${leitura.erro?.message ?? "erro na leitura"}`);
+            continue;
           }
+          const ex = leitura.valor;
+          docsChamado++;
+          if (!nf && ex.classe_documento === "nota_fiscal") nf = ex;
+          else if (!boleto && (ex.codigo_barras || ex.classe_documento === "boleto")) boleto = ex;
+          else if (!nf && (ex.fornecedor || ex.numero_documento)) nf = ex; // sobra que parece nota
         }
 
         // Cria o card com o que houver. Só é problema se não veio NENHUM PDF

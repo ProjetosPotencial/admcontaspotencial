@@ -40,6 +40,15 @@ export type ParamsCard = {
   lojas: LojaBusca[];
   /** colunas a mais gravadas junto (origem_entrada, slack_*, requerente...) */
   extras?: Record<string, any>;
+  /**
+   * Leitura já feita antes, pra quem leu vários documentos em paralelo.
+   *
+   * A leitura por IA é a parte cara e pode rodar concorrente; a gravação
+   * precisa continuar em série, senão duas cópias da mesma nota processadas
+   * ao mesmo tempo não enxergam uma à outra e as duas passam sem o aviso de
+   * duplicada. Quem vier sem isso lê aqui mesmo, como sempre.
+   */
+  extraido?: ExtracaoBoleto;
 };
 
 /**
@@ -50,7 +59,7 @@ export type ParamsCard = {
 export async function criarCardDeDocumento(params: ParamsCard): Promise<ResultadoCard> {
   const { supabase, fonteId, nomeArquivo, link, buffer, mimeType, lojas, extras = {} } = params;
 
-  const extraido = await extrairDadosBoleto(buffer, nomeArquivo, mimeType);
+  const extraido = params.extraido ?? (await extrairDadosBoleto(buffer, nomeArquivo, mimeType));
 
   // Nota fiscal: não casa loja (é custo de empresa, não de loja). Guarda
   // fornecedor/CNPJ/número/emissão pra revisão e lançamento posterior.

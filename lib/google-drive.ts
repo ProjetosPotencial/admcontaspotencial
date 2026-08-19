@@ -1,5 +1,14 @@
 import { google } from "googleapis";
 import { Readable } from "stream";
+import { emParalelo } from "@/lib/paralelo";
+
+/**
+ * Quantas listagens de pasta o Drive recebe ao mesmo tempo.
+ *
+ * 6 é confortável: a cota da API do Drive é generosa pra listagem (bem mais
+ * folgada que o teto da IA), e o gargalo aqui é latência de rede, não CPU.
+ */
+const VARREDURAS_SIMULTANEAS = 6;
 
 // Autentica AGINDO COMO a conta real do Google que já tem a pasta no Drive
 // pessoal (não uma conta de serviço "robô" — essas não têm cota própria de
@@ -236,12 +245,15 @@ async function coletarArquivosRecursivo(
   profundidade = 0,
 ): Promise<{ id: string; name: string; webViewLink: string; mimeType: string }[]> {
   if (profundidade > 12) return [];
-  const arquivos = await listarArquivosNaPasta(pastaId);
-  const subs = await listarSubpastas(pastaId);
-  for (const s of subs) {
-    arquivos.push(...(await coletarArquivosRecursivo(s.id, profundidade + 1)));
-  }
-  return arquivos;
+  // arquivos e subpastas do mesmo nível não dependem um do outro
+  const [arquivos, subs] = await Promise.all([
+    listarArquivosNaPasta(pastaId),
+    listarSubpastas(pastaId),
+  ]);
+  const dosFilhos = await emParalelo(subs, VARREDURAS_SIMULTANEAS, (s) =>
+    coletarArquivosRecursivo(s.id, profundidade + 1),
+  );
+  return arquivos.concat(...dosFilhos);
 }
 
 export async function listarChamadosGLPI(raizId: string): Promise<ChamadoGLPI[]> {
@@ -265,27 +277,38 @@ async function listarChamadosEmSubpasta(raizId: string, nomeSubpasta: string): P
   if (!base) return []; // subpasta ainda não existe, nada a processar
 
   const chamadosPastas = await listarSubpastas(base.id);
-  const resultado: ChamadoGLPI[] = [];
 
-  for (const pastaChamado of chamadosPastas) {
+  // Um chamado não depende do outro, então varre vários ao mesmo tempo. Em
+  // série isso eram 4 chamadas de Drive por chamado, uma esperando a outra -
+  // com 10 chamados, meio minuto só pra descobrir o que existe na pasta.
+  const porChamado = await emParalelo(chamadosPastas, VARREDURAS_SIMULTANEAS, async (pastaChamado) => {
     const num = pastaChamado.name.match(/(\d{3,})/);
     const chamadoNumero = num ? num[1] : null;
 
-    const subs = await listarSubpastas(pastaChamado.id);
+    const [subs, soltos] = await Promise.all([
+      listarSubpastas(pastaChamado.id),
+      listarArquivosNaPasta(pastaChamado.id),
+    ]);
 
-    const soltos = await listarArquivosNaPasta(pastaChamado.id);
+    const itens: ChamadoGLPI[] = [];
     if (soltos.length > 0) {
-      resultado.push({ pastaId: pastaChamado.id, chamadoNumero, lojaTexto: null, arquivos: soltos });
+      itens.push({ pastaId: pastaChamado.id, chamadoNumero, lojaTexto: null, arquivos: soltos });
     }
 
-    for (const sub of subs) {
-      const arquivos = await coletarArquivosRecursivo(sub.id);
+    const porLoja = await emParalelo(subs, VARREDURAS_SIMULTANEAS, async (sub) => ({
+      sub,
+      arquivos: await coletarArquivosRecursivo(sub.id),
+    }));
+    for (const { sub, arquivos } of porLoja) {
       if (arquivos.length > 0) {
-        resultado.push({ pastaId: sub.id, chamadoNumero, lojaTexto: sub.name, arquivos });
+        itens.push({ pastaId: sub.id, chamadoNumero, lojaTexto: sub.name, arquivos });
       }
     }
-  }
-  return resultado;
+    return itens;
+  });
+
+  // achata mantendo a ordem original dos chamados
+  return porChamado.flat();
 }
 
 /**
