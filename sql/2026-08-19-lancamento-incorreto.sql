@@ -23,8 +23,15 @@ alter table public.lancamentos
   add column if not exists motivo_incorreto       text,
   add column if not exists marcado_incorreto_por  uuid references public.perfis(id),
   add column if not exists marcado_incorreto_em   timestamptz,
-  -- onde a conta DEVERIA ter sido lançada
-  add column if not exists conta_correta_id       uuid references public.contas(id),
+  -- Onde a conta DEVERIA ter sido lançada.
+  --
+  -- SEM "references contas(id)" de propósito. Com a chave estrangeira, a
+  -- tabela lancamentos passa a ter DUAS relações para contas (conta_id e
+  -- esta), e o PostgREST não consegue mais resolver o embed "contas ( ... )"
+  -- — devolve PGRST201 e derruba as 29 consultas do sistema que embutem
+  -- contas a partir de lancamentos. Foi exatamente o que aconteceu quando
+  -- esta migration rodou pela primeira vez.
+  add column if not exists conta_correta_id       uuid,
   -- o lançamento certo que nasceu desta correção
   add column if not exists corrigido_em_lancamento_id uuid references public.lancamentos(id),
   -- caminho inverso: de onde este lançamento veio, quando é o corrigido
