@@ -156,12 +156,32 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas, usuari
       }).eq("id", contaId);
 
       const agora = new Date();
+      // Compra vinda de chamado do GLPI NÃO entra na fila de Aprovações: ela
+      // já foi autorizada lá, no fluxo de compras. Entrar aqui de novo seria
+      // pedir a mesma assinatura duas vezes, em sistemas diferentes.
+      // Por isso nasce em "aprovado" — aparece em Lançamentos, em Contas e na
+      // fila de Pagamentos, mas não na de Aprovações.
       const { data: lanc, error } = await supabase.from("lancamentos").upsert({
-        conta_id: contaId, ano, mes, valor: item.valor_detectado, situacao: "lancado",
-        lancado_em: agora.toISOString(), codigo_barras: item.codigo_barras_detectado,
+        conta_id: contaId, ano, mes, valor: item.valor_detectado, situacao: "aprovado",
+        lancado_em: agora.toISOString(), lancado_por: usuarioId,
+        aprovado_em: agora.toISOString(),
+        codigo_barras: item.codigo_barras_detectado,
         comprovante_drive_url: item.drive_web_view_link,
       }, { onConflict: "conta_id,ano,mes" }).select("id").single();
       if (error || !lanc) { setToast("Não foi possível lançar."); setProcessando(null); return; }
+
+      // Fica registrado POR QUE não passou por aprovação. Sem isso, quem
+      // auditar vê uma conta aprovada sem aprovador e não entende.
+      await supabase.from("lancamento_historico").insert({
+        lancamento_id: lanc.id,
+        acao: "aprovacao_dispensada",
+        de: "—", para: "aprovado",
+        quem: usuarioId, em: agora.toISOString(),
+        motivo: "Compra autorizada no chamado do GLPI",
+        comentario: item.chamado_numero
+          ? `Compra do chamado ${item.chamado_numero}: aprovação já ocorreu no GLPI.`
+          : "Compra vinda do GLPI: aprovação já ocorreu lá.",
+      });
 
       await supabase.from("caixa_entrada_boletos").update({
         status: "confirmado", revisado_por: usuarioId ?? null, revisado_em: agora.toISOString(), lancamento_criado_id: lanc.id,
@@ -191,7 +211,7 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas, usuari
         "Compra lançada com sucesso!",
         item.chamado_numero ? `Chamado: ${item.chamado_numero}` : null,
         fornecedor ? `Fornecedor: ${fornecedor}` : null,
-        "Já está na fila de Aprovações.",
+        "Não passa por Aprovações (já foi autorizada no GLPI) — seguiu para Pagamentos.",
       ].filter(Boolean).join("\n"));
     } catch {
       setToast("Erro ao lançar a compra.");
