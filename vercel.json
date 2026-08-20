@@ -11,6 +11,10 @@
     {
       "path": "/api/importar-caixa-entrada",
       "schedule": "0 12 * * 1-5"
+    },
+    {
+      "path": "/api/sincronizar-indices",
+      "schedule": "0 13 * * *"
     }
   ]
 }
