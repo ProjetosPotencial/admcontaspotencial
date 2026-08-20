@@ -41,7 +41,7 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {}, 
   const [motivoRecusa, setMotivoRecusa] = useState("");
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [loteProcessando, setLoteProcessando] = useState(false);
-  const [confirmandoLote, setConfirmandoLote] = useState<null | "aprovar" | "recusar">(null);
+  const [confirmandoLote, setConfirmandoLote] = useState<null | "aprovar" | "recusar" | "excluir">(null);
   const [motivoLote, setMotivoLote] = useState("");
   const [busca, setBusca] = useState("");
   const [fEmpresa, setFEmpresa] = useState("todas");
@@ -191,6 +191,51 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {}, 
 
   // Decisão em LOTE: aplica aprovar/recusar a todos os selecionados, um a um,
   // reusando a mesma lógica de decisão individual. Recusa exige motivo.
+  /**
+   * Exclui várias da fila de uma vez, com um motivo só para o lote.
+   *
+   * Passa pela rota (e não por update direto como o decidirLote faz) porque
+   * a rota é quem checa o papel, barra lançamento já pago e escreve o
+   * histórico. Exclusão em massa é exatamente onde essas guardas importam.
+   */
+  async function excluirLote(motivo: string) {
+    setLoteProcessando(true);
+    const ids = Array.from(selecionados);
+    const saiu: string[] = [];
+    const recusados: string[] = [];
+
+    for (const id of ids) {
+      try {
+        const resp = await fetch("/api/excluir-lancamento", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lancamentoId: id, motivo }),
+        });
+        if (resp.ok) { saiu.push(id); continue; }
+        const j = await resp.json();
+        recusados.push(j.error ?? "erro");
+      } catch {
+        recusados.push("falha de rede");
+      }
+    }
+
+    // Some da tela SÓ o que saiu de fato. O que a rota recusou (um pago, por
+    // exemplo) continua visível — sumir com ele daria a impressão de que a
+    // exclusão funcionou quando não funcionou.
+    const ok = saiu.length;
+    if (ok > 0) setFila((f) => f.filter((x) => !saiu.includes(x.id)));
+    setLoteProcessando(false);
+    setConfirmandoLote(null);
+    setMotivoLote("");
+    limparSel();
+
+    const unicos = Array.from(new Set(recusados));
+    setToast(recusados.length === 0
+      ? ok + " removida(s) da fila. Os registros foram mantidos no histórico."
+      : ok + " removida(s), " + recusados.length + " não: " + unicos[0]);
+    setTimeout(() => setToast(null), 6000);
+    router.refresh();
+  }
+
   async function decidirLote(aprovar: boolean, motivo?: string) {
     setLoteProcessando(true);
     const ids = Array.from(selecionados);
@@ -511,6 +556,12 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {}, 
           <div className="h-5 w-px bg-white/20" />
           <button onClick={() => setConfirmandoLote("aprovar")} className="btn-sucesso text-[12.5px] py-2">Aprovar selecionadas</button>
           <button onClick={() => setConfirmandoLote("recusar")} className="btn-perigo text-[12.5px] py-2">Recusar selecionadas</button>
+          {/* Discreto de propósito: excluir não é decisão de aprovação, é
+              limpeza de fila — não deve competir visualmente com as outras duas. */}
+          <button onClick={() => { setConfirmandoLote("excluir"); setMotivoLote(""); }}
+            className="text-[12.5px] py-2 px-3 text-txt-2 hover:text-alerr border border-linha rounded-md transition-colors">
+            Excluir da fila
+          </button>
           <button onClick={limparSel} className="text-[13px] text-white/70 hover:text-white transition px-1">Limpar</button>
         </div>
       )}
@@ -521,26 +572,46 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {}, 
           <div className="absolute inset-0 bg-black/40" onClick={loteProcessando ? undefined : () => setConfirmandoLote(null)} />
           <div className="relative bg-white rounded-xl shadow-forte w-full max-w-md p-6">
             <h3 className="text-[16px] font-semibold text-txt">
-              {confirmandoLote === "aprovar" ? "Aprovar em lote" : "Recusar em lote"}
+              {confirmandoLote === "aprovar" ? "Aprovar em lote"
+                : confirmandoLote === "recusar" ? "Recusar em lote"
+                : "Excluir da fila em lote"}
             </h3>
             <p className="text-[13.5px] text-txt-2 mt-2 leading-relaxed">
-              Você vai {confirmandoLote === "aprovar" ? "aprovar" : "recusar"} <b>{selecionados.size}</b> {selecionados.size === 1 ? "conta" : "contas"} de uma vez. Essa ação é aplicada a todas as selecionadas.
+              Você vai {confirmandoLote === "aprovar" ? "aprovar" : confirmandoLote === "recusar" ? "recusar" : "remover da fila"} <b>{selecionados.size}</b> {selecionados.size === 1 ? "conta" : "contas"} de uma vez. Essa ação é aplicada a todas as selecionadas.
             </p>
-            {confirmandoLote === "recusar" && (
+
+            {confirmandoLote === "excluir" && (
+              <div className="text-[11.5px] text-info bg-info-bg rounded-md px-3 py-2.5 mt-3 leading-relaxed">
+                As contas saem da fila e dos totais, mas <b>não são apagadas</b>. Fica registrado
+                quem excluiu, quando e por quê. Lançamento já pago é recusado e continua na lista.
+              </div>
+            )}
+
+            {(confirmandoLote === "recusar" || confirmandoLote === "excluir") && (
               <div className="mt-3">
-                <label className="text-[12px] font-medium text-txt-2">Motivo da recusa (obrigatório)</label>
+                <label className="text-[12px] font-medium text-txt-2">
+                  {confirmandoLote === "recusar" ? "Motivo da recusa" : "Motivo da exclusão"} (obrigatório)
+                </label>
                 <textarea value={motivoLote} onChange={(e) => setMotivoLote(e.target.value)} rows={3}
-                  placeholder="Explique por que essas contas estão sendo recusadas..."
+                  placeholder={confirmandoLote === "recusar"
+                    ? "Explique por que essas contas estão sendo recusadas..."
+                    : "Ex: lançamentos duplicados da importação de 19/08"}
                   className="w-full mt-1 border border-linha2 rounded-md px-3 py-2 text-[13px] focus:outline-none focus:border-amarelo focus:ring-[3px] focus:ring-amarelo/10" />
               </div>
             )}
+
             <div className="flex items-center justify-end gap-2 mt-6">
               <button onClick={() => setConfirmandoLote(null)} disabled={loteProcessando} className="btn-secundario disabled:opacity-50">Cancelar</button>
               <button
-                onClick={() => decidirLote(confirmandoLote === "aprovar", confirmandoLote === "recusar" ? motivoLote.trim() : undefined)}
-                disabled={loteProcessando || (confirmandoLote === "recusar" && motivoLote.trim() === "")}
+                onClick={() => confirmandoLote === "excluir"
+                  ? excluirLote(motivoLote.trim())
+                  : decidirLote(confirmandoLote === "aprovar", confirmandoLote === "recusar" ? motivoLote.trim() : undefined)}
+                disabled={loteProcessando || (confirmandoLote !== "aprovar" && motivoLote.trim().length < 3)}
                 className={`${confirmandoLote === "aprovar" ? "btn-sucesso" : "btn-perigo"} disabled:opacity-50`}>
-                {loteProcessando ? "Processando..." : confirmandoLote === "aprovar" ? "Aprovar todas" : "Recusar todas"}
+                {loteProcessando ? "Processando..."
+                  : confirmandoLote === "aprovar" ? "Aprovar todas"
+                  : confirmandoLote === "recusar" ? "Recusar todas"
+                  : "Excluir todas"}
               </button>
             </div>
           </div>
