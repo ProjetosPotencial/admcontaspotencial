@@ -62,6 +62,7 @@ export async function enviarResumoDiarioSlack() {
     { data: aguardandoAprovacao, error: e2 },
     { data: boletosMovimento, error: e3 },
     { data: boletosNaCaixa, error: e4 },
+    { data: resolvidas },
     { data: historicoAno, error: e5 },
   ] = await Promise.all([
     // tudo do período: serve pra pendentes, vence hoje, próximos e atrasadas
@@ -86,6 +87,12 @@ export async function enviarResumoDiarioSlack() {
       .from("caixa_entrada_boletos")
       .select("id, nome_arquivo, confianca, observacao")
       .eq("status", "pendente"),
+    // o que SAIU da fila desde o último aviso — vira o reconhecimento no
+    // topo da mensagem. Sai de lancado_em, sem precisar guardar estado.
+    supabase
+      .from("lancamentos")
+      .select("id")
+      .gte("lancado_em", desdeISO),
     // meses anteriores do ano: a base pra saber o que é valor fora do padrão
     supabase
       .from("lancamentos")
@@ -161,11 +168,13 @@ export async function enviarResumoDiarioSlack() {
   // ==========================================================================
   const { calendario, regra } = await carregarCalendario(ano, supabase);
 
-  const paraAgente = (l: any) => ({
-    loja: l.contas?.lojas?.codigo ?? null,
-    diaVencimento: l.contas?.dia_vencimento ?? null,
-    atrasada: false,
-  });
+  const paraAgente = (l: any) => {
+    const dv = l.contas?.dia_vencimento ?? null;
+    // dias de atraso dentro da competência: é o número que cresce a cada dia
+    // e faz a mensagem de amanhã ser diferente da de hoje.
+    const diasAtraso = dv != null && dv < diaAtual ? diaAtual - dv : 0;
+    return { loja: l.contas?.lojas?.codigo ?? null, diaVencimento: dv, atrasada: diasAtraso > 0, diasAtraso };
+  };
 
   // Vencimentos em sábado, domingo ou feriado nos próximos dias. O agente
   // avisa ANTES da sexta de propósito: esperar sexta é esperar o problema.
@@ -194,6 +203,8 @@ export async function enviarResumoDiarioSlack() {
     aguardandoLancamento: naCaixa.length,
     problemasCadastro: baixaConfianca.length + semVencimento.length + semOrigem.length + semValor.length,
     foraDoPadrao: foraDoPadrao.slice(0, 5).map((f) => ({ loja: f.loja, fornecedor: f.fornecedor, vezes: f.vezes })),
+    resolvidasDesdeOntem: (resolvidas ?? []).length,
+    desdeQuando: rotuloDesde,
     ehSexta: diaSemanaHoje === 5,
     urlSistema: urlSite,
   });

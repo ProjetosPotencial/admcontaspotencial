@@ -24,6 +24,13 @@ export type ContaPendente = {
   loja: string | null;
   diaVencimento: number | null;
   atrasada: boolean;
+  /**
+   * Há quantos dias venceu. É o que transforma a lista em escalada: repetir
+   * "MG 062" todo dia com a mesma cara ensina a equipe que a mensagem não
+   * muda; dizer que ela está parada há nove dias mostra que o problema está
+   * envelhecendo.
+   */
+  diasAtraso?: number;
 };
 
 export type ContaNaoUtil = {
@@ -45,21 +52,45 @@ export type DadosAgente = {
   problemasCadastro: number;
   /** contas cobrando bem acima do padrão do fornecedor — só a máquina percebe */
   foraDoPadrao: { loja: string | null; fornecedor: string; vezes: number }[];
+  /**
+   * Quantas contas saíram da fila desde o último aviso.
+   *
+   * O agente não pode só cobrar. Um bot que nunca reconhece o trabalho feito
+   * é um bot que as pessoas aprendem a ignorar — e aí ele para de funcionar
+   * justamente quando mais precisa.
+   */
+  resolvidasDesdeOntem: number;
+  /** rótulo do período coberto, ex "sexta" ou "ontem" */
+  desdeQuando: string;
   /** sexta-feira muda o tom do aviso de fim de semana */
   ehSexta: boolean;
   urlSistema: string;
 };
 
-/** Lojas distintas, em ordem de relevância (as mais atrasadas primeiro). */
+/**
+ * Lojas distintas, as mais atrasadas primeiro.
+ *
+ * Quando a conta traz dias de atraso, o nome vem com ele junto — é a parte
+ * que muda de um dia para o outro e evita a mensagem virar carimbo.
+ */
 function lojasDe(contas: ContaPendente[]): string[] {
   const vistas = new Set<string>();
-  const ordenadas = [...contas].sort((a, b) => (a.diaVencimento ?? 99) - (b.diaVencimento ?? 99));
+  const ordenadas = [...contas].sort((a, b) => {
+    const atraso = (b.diasAtraso ?? 0) - (a.diasAtraso ?? 0);
+    if (atraso !== 0) return atraso;
+    return (a.diaVencimento ?? 99) - (b.diaVencimento ?? 99);
+  });
+
   const nomes: string[] = [];
   for (const c of ordenadas) {
     const nome = c.loja?.trim();
     if (!nome || vistas.has(nome)) continue;
     vistas.add(nome);
-    nomes.push(nome);
+    nomes.push(
+      c.diasAtraso && c.diasAtraso > 0
+        ? `${nome} — há ${c.diasAtraso} ${c.diasAtraso === 1 ? "dia" : "dias"}`
+        : nome
+    );
   }
   return nomes;
 }
@@ -106,6 +137,16 @@ export function montarAvisoAgente(d: DadosAgente): string | null {
   if (!temAlgo) return null;
 
   const p: string[] = ["*Bom dia, Equipe Potencial!* 👋", ""];
+
+  // Reconhecer o que andou vem ANTES de cobrar o que falta. Abrir sempre
+  // pela cobrança é o que faz o time parar de ler.
+  if (d.resolvidasDesdeOntem > 0) {
+    p.push(
+      `✅ ${d.resolvidasDesdeOntem} ${d.resolvidasDesdeOntem === 1 ? "conta saiu" : "contas saíram"} da fila desde ${d.desdeQuando}. Obrigado!`,
+      "",
+    );
+  }
+
   p.push("Passando para lembrar das contas que precisam de atenção hoje.", "");
 
   // ---- 1. atrasadas: a prioridade, e nunca só informativo ----
