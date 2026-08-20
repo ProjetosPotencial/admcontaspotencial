@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { TIPOS, ORIGENS } from "@/lib/types";
 import { money } from "@/lib/format";
@@ -61,7 +61,46 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas, usuari
   const chamados = itens.filter((i) => i.classe_documento === "chamado");
   const boletos = itens.filter((i) => i.classe_documento !== "nota_fiscal" && i.classe_documento !== "chamado");
   const [processando, setProcessando] = useState<string | null>(null);
+  // acumula as confirmações da rodada pra mandar UM aviso ao Slack, não sete
+  const loteAviso = useRef<{ loja: string | null; tipo: string; valor: number | null; fornecedor?: string | null }[]>([]);
+  const timerAviso = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  /**
+   * Avisa o grupo que uma conta virou lançamento.
+   *
+   * Agrupa de propósito: numa rodada de importação a pessoa confirma um card
+   * atrás do outro, e uma mensagem por clique jogaria sete avisos seguidos no
+   * canal. O aviso sai 4 segundos depois do último clique, com o que foi
+   * confirmado na sequência — uma mensagem em vez de sete.
+   *
+   * Falhar aqui nunca atrapalha quem está lançando: o lançamento já está
+   * gravado quando isto roda.
+   */
+  function avisarLancamento(dados: { loja: string | null; tipo: string; valor: number | null; fornecedor?: string | null }) {
+    loteAviso.current.push(dados);
+    if (timerAviso.current) clearTimeout(timerAviso.current);
+
+    timerAviso.current = setTimeout(() => {
+      const lote = loteAviso.current;
+      loteAviso.current = [];
+      if (lote.length === 0) return;
+
+      const total = lote.reduce((s, l) => s + Number(l.valor ?? 0), 0);
+      const texto = lote.length === 1
+        ? `✅ *Conta lançada* — ${lote[0].loja ?? "loja"} · ${lote[0].tipo}` +
+          (lote[0].fornecedor ? ` · ${lote[0].fornecedor}` : "") +
+          (lote[0].valor != null ? ` · ${money(lote[0].valor)}` : "") +
+          `\n_confirmada na Caixa de Entrada_`
+        : `✅ *${lote.length} contas lançadas* pela Caixa de Entrada · ${money(total)}\n` +
+          lote.map((l) => `• ${l.loja ?? "loja"} · ${l.tipo}${l.valor != null ? ` — ${money(l.valor)}` : ""}`).join("\n");
+
+      fetch("/api/notificar-evento", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ evento: "lancamento_lote", texto }),
+      }).catch(() => {});
+    }, 4000);
+  }
 
   async function importar() {
     setProcessando("__importar__");
@@ -294,6 +333,13 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas, usuari
       });
 
       setItens((lista) => lista.filter((i) => i.id !== item.id));
+      avisarLancamento({
+        loja: previa?.empresa ?? null,
+        tipo: TIPOS[tipo]?.n ?? tipo,
+        valor: item.valor_detectado,
+        fornecedor,
+      });
+
       setToast([
         "NF lançada com sucesso!",
         previa?.empresa ? `Empresa: ${previa.empresa}` : null,
@@ -337,6 +383,16 @@ export default function CaixaEntradaClient({ itens: itensIniciais, lojas, usuari
       }).eq("id", item.id);
 
       setItens((lista) => lista.filter((i) => i.id !== item.id));
+
+      // Avisa o grupo, igual ao lançamento feito pela ficha da conta. Esse é
+      // o caminho por onde entra a maior parte dos boletos (Drive e Slack já
+      // lidos pela IA) e era o único que não notificava ninguém.
+      avisarLancamento({
+        loja: previa?.loja ?? null,
+        tipo: TIPOS[tipo]?.n ?? tipo,
+        valor: item.valor_detectado,
+      });
+
       // mensagem detalhada: confirma o que saiu da caixa e virou lançamento
       setToast([
         "Conta lançada com sucesso!",

@@ -25,6 +25,8 @@ const TEMPLATES: Record<string, (d: any) => string> = {
   // fixo acordado com a operação, e precisa sair igual venha de onde vier.
   sem_documento: (d) => String(d.texto ?? ""),
   lancamento_incorreto: (d) => String(d.texto ?? ""),
+  // já vem montado pela Caixa de Entrada, que agrupa a rodada num aviso só
+  lancamento_lote: (d) => String(d.texto ?? ""),
   documento_anexado: (d) =>
     `📎 *Documento anexado* — ${d.loja ?? "loja"} · ${d.tipo ?? "conta"}${d.competencia ? ` · ${d.competencia}` : ""}\n_a conta tinha sido lançada sem documento_`,
 };
