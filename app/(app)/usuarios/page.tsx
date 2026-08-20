@@ -12,7 +12,7 @@ export default async function UsuariosPage() {
   const { data: meuPerfil } = await supabase.from("perfis").select("papel").eq("id", session?.user.id).maybeSingle();
   const ehAdmin = meuPerfil?.papel === "admin";
 
-  const { data } = await supabase.from("perfis").select("id, nome, email, papel, ativo").order("nome");
+  const { data } = await supabase.from("perfis").select("id, nome, email, papel, ativo, tipos_permitidos").order("nome");
   const { data: menuItens } = await supabase.from("menu_itens").select("id, label, papel_minimo, ordem").eq("ativo", true).order("ordem");
   const { data: overrides } = ehAdmin
     ? await supabase.from("perfil_menu").select("perfil_id, menu_item_id, permitido")

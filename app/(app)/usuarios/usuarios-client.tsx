@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { TIPOS } from "@/lib/types";
 
 const PAPEL_LABEL: Record<string, { label: string; cls: string }> = {
   admin: { label: "Admin", cls: "bg-alerr-bg text-alerr" },
@@ -12,7 +13,10 @@ const PAPEL_LABEL: Record<string, { label: string; cls: string }> = {
 const PAPEIS = ["leitura", "operador", "gestor", "admin"];
 const RANK: Record<string, number> = { leitura: 0, operador: 1, gestor: 2, admin: 3 };
 
-type Usuario = { id: string; nome: string; email: string; papel: string; ativo: boolean };
+type Usuario = { id: string; nome: string; email: string; papel: string; ativo: boolean; tipos_permitidos?: string[] | null };
+
+/** Os tipos reais do sistema — sair desta lista é criar conta órfã. */
+const TIPOS_LISTA = Object.entries(TIPOS).map(([valor, t]) => ({ valor, rotulo: t.n }));
 type MenuItem = { id: string; label: string; papel_minimo: string; ordem: number };
 type Override = { perfil_id: string; menu_item_id: string; permitido: boolean };
 
@@ -87,6 +91,37 @@ export default function UsuariosClient({
     setSalvandoId(null);
     if (error) { setAviso("Sem permissão para alterar este usuário."); return; }
     setUsuarios((lista) => lista.map((u) => (u.id === id ? { ...u, papel: novoPapel } : u)));
+  }
+
+  const [editandoTipos, setEditandoTipos] = useState<Usuario | null>(null);
+  const [tiposMarcados, setTiposMarcados] = useState<string[]>([]);
+  const [todosTipos, setTodosTipos] = useState(true);
+
+  function abrirTipos(u: Usuario) {
+    setEditandoTipos(u);
+    setTodosTipos(!u.tipos_permitidos);
+    setTiposMarcados(u.tipos_permitidos ?? []);
+  }
+
+  async function salvarTipos() {
+    if (!editandoTipos) return;
+    // null = vê todos. É a mesma convenção que a função pode_ver_tipo() usa
+    // no banco; se os dois lados discordassem, a tela mostraria uma coisa e
+    // a RLS entregaria outra.
+    const valor = todosTipos ? null : tiposMarcados;
+
+    if (!todosTipos && tiposMarcados.length === 0) {
+      setAviso("Marque ao menos um tipo, ou deixe em Todos — sem nenhum, a pessoa não enxerga conta alguma.");
+      return;
+    }
+
+    setSalvandoId(editandoTipos.id);
+    const { error } = await supabase.from("perfis").update({ tipos_permitidos: valor }).eq("id", editandoTipos.id);
+    setSalvandoId(null);
+    if (error) { setAviso("Não foi possível salvar os tipos: " + error.message); return; }
+
+    setUsuarios((lista) => lista.map((u) => (u.id === editandoTipos.id ? { ...u, tipos_permitidos: valor } : u)));
+    setEditandoTipos(null);
   }
 
   async function mudarAtivo(id: string, ativo: boolean) {
@@ -181,11 +216,23 @@ export default function UsuariosClient({
                   </td>
                   {ehAdmin && (
                     <td className="px-4">
+                      <div className="flex items-center gap-2">
                       <button onClick={() => abrirMenus(u)}
                         className="text-[12px] font-semibold text-info border border-info/30 bg-info-bg rounded-md px-3 py-1.5 hover:bg-info/10 transition">
                         {u.papel === "admin" ? "Ver menus" : "Definir menus"}
                         {qtdExcecoes > 0 && u.papel !== "admin" && <span className="ml-1.5 text-[10px] text-[#adb5bd]">({qtdExcecoes})</span>}
                       </button>
+                      {u.papel !== "admin" && (
+                        <button onClick={() => abrirTipos(u)}
+                          title="Quais tipos de conta esta pessoa enxerga"
+                          className="text-[12px] font-semibold text-amb border border-amarelo/40 bg-amb-bg rounded-md px-3 py-1.5 hover:bg-amarelo/10 transition">
+                          Tipos de conta
+                          {u.tipos_permitidos && (
+                            <span className="ml-1.5 text-[10px] text-[#adb5bd]">({u.tipos_permitidos.length})</span>
+                          )}
+                        </button>
+                      )}
+                      </div>
                     </td>
                   )}
                 </tr>
@@ -310,6 +357,52 @@ export default function UsuariosClient({
                 {salvandoNovo ? "Criando..." : "Criar usuário"}
               </button>
               <button onClick={() => setCriando(false)} className="btn-secundario">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editandoTipos && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div onClick={() => setEditandoTipos(null)} className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-white rounded-2xl shadow-forte border border-linha w-full max-w-[460px] p-5">
+            <div className="text-[15px] font-bold text-[#1a1a1a]">Tipos de conta</div>
+            <p className="text-[12.5px] text-[#6c757d] mt-1">{editandoTipos.nome}</p>
+
+            <label className="flex items-center gap-2.5 mt-4 p-3 rounded-lg border border-linha cursor-pointer hover:border-txt-3 transition">
+              <input type="checkbox" checked={todosTipos} onChange={(e) => setTodosTipos(e.target.checked)} className="w-4 h-4" />
+              <div>
+                <div className="text-[13px] font-medium text-[#1a1a1a]">Todos os tipos</div>
+                <div className="text-[11.5px] text-[#6c757d]">Enxerga qualquer conta, como hoje</div>
+              </div>
+            </label>
+
+            {!todosTipos && (
+              <div className="mt-3 border border-linha rounded-lg divide-y divide-linha2 max-h-[280px] overflow-y-auto">
+                {TIPOS_LISTA.map((t) => (
+                  <label key={t.valor} className="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-off transition">
+                    <input type="checkbox" className="w-4 h-4"
+                      checked={tiposMarcados.includes(t.valor)}
+                      onChange={(e) => setTiposMarcados((lista) =>
+                        e.target.checked ? [...lista, t.valor] : lista.filter((x) => x !== t.valor))} />
+                    <span className="text-[13px] text-[#1a1a1a]">{t.rotulo}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            <div className="text-[11.5px] text-info bg-info-bg rounded-md px-3 py-2.5 mt-3 leading-relaxed">
+              A restrição vale no banco, não só na tela: o que não estiver marcado
+              não aparece em Contas, Aprovações, Relatórios nem em exportação — e
+              também não volta se alguém chamar a API direto.
+            </div>
+
+            <div className="flex gap-2 mt-4">
+              <button onClick={salvarTipos} disabled={salvandoId === editandoTipos.id}
+                className="btn-primario flex-1 disabled:opacity-50">
+                {salvandoId === editandoTipos.id ? "Salvando..." : "Salvar"}
+              </button>
+              <button onClick={() => setEditandoTipos(null)} className="btn-secundario">Cancelar</button>
             </div>
           </div>
         </div>
