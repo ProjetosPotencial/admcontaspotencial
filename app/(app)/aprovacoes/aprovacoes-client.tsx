@@ -95,6 +95,59 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {}, 
   const total = filtrados.length;
   const totalPendenteValor = filtrados.reduce((s, i) => s + Number(i.valor ?? 0), 0);
 
+  const [excluindo, setExcluindo] = useState<Item | null>(null);
+  const [motivoExclusao, setMotivoExclusao] = useState("");
+  const [relendo, setRelendo] = useState<string | null>(null);
+
+  /**
+   * Relê o PDF anexado pra completar o código de barras que faltou.
+   * Só completa o que está vazio — correção manual nunca é sobrescrita.
+   */
+  async function relerPdf(item: Item) {
+    setRelendo(item.id);
+    try {
+      const resp = await fetch("/api/reler-boleto", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lancamentoId: item.id }),
+      });
+      const json = await resp.json();
+      if (!resp.ok) { setToast(json.error ?? "Não foi possível reler."); }
+      else if (!json.alterou) { setToast(json.mensagem); }
+      else {
+        const aviso = json.formatoValido === false
+          ? " Confira antes de pagar: o código lido não tem o tamanho esperado."
+          : "";
+        setToast(`Código de barras preenchido.${aviso}`);
+        setTimeout(() => window.location.reload(), 1600);
+      }
+    } catch {
+      setToast("Não foi possível reler agora.");
+    }
+    setRelendo(null);
+    setTimeout(() => setToast(null), 5000);
+  }
+
+  async function excluirDaFila() {
+    if (!excluindo) return;
+    const alvo = excluindo;
+    try {
+      const resp = await fetch("/api/excluir-lancamento", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lancamentoId: alvo.id, motivo: motivoExclusao }),
+      });
+      const json = await resp.json();
+      if (!resp.ok) { setToast(json.error ?? "Não foi possível excluir."); setTimeout(() => setToast(null), 5000); return; }
+      setFila((f) => f.filter((x) => x.id !== alvo.id));
+      setExcluindo(null);
+      setMotivoExclusao("");
+      setToast("Removido da fila. O registro foi mantido no histórico.");
+      setTimeout(() => setToast(null), 4000);
+    } catch {
+      setToast("Não foi possível excluir agora.");
+      setTimeout(() => setToast(null), 4000);
+    }
+  }
+
   async function decidir(item: Item, aprovar: boolean, motivo?: string) {
     setDecidindo(item.id);
     const { error } = await supabase
@@ -377,6 +430,25 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {}, 
                                   </button>
                                 </div>
                                 )}
+
+                                {/* Ações secundárias, separadas das decisões de aprovação.
+                                    Ficam discretas de propósito: são exceções, não o caminho normal. */}
+                                {item.situacao === "lancado" && (
+                                  <div className="mt-2 flex items-center gap-3 text-[11.5px]">
+                                    {!item.codigo_barras && (item.comprovante_url || item.comprovante_drive_url) && (
+                                      <button onClick={() => relerPdf(item)} disabled={relendo === item.id}
+                                        title="Relê o PDF anexado para preencher a linha digitável que faltou"
+                                        className="text-info font-semibold hover:underline disabled:opacity-50">
+                                        {relendo === item.id ? "Relendo PDF..." : "Reler PDF"}
+                                      </button>
+                                    )}
+                                    <button onClick={() => { setExcluindo(item); setMotivoExclusao(""); }}
+                                      title="Tira da fila mantendo o registro no histórico"
+                                      className="text-[#9E9E9E] hover:text-alerr transition-colors ml-auto">
+                                      Excluir da fila
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
@@ -470,6 +542,35 @@ export default function AprovacoesClient({ itens, resumoMes, solicitantes = {}, 
                 className={`${confirmandoLote === "aprovar" ? "btn-sucesso" : "btn-perigo"} disabled:opacity-50`}>
                 {loteProcessando ? "Processando..." : confirmandoLote === "aprovar" ? "Aprovar todas" : "Recusar todas"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {excluindo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div onClick={() => setExcluindo(null)} className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-white rounded-2xl shadow-forte border border-linha w-full max-w-[420px] p-5">
+            <div className="text-[15px] font-bold text-[#1a1a1a]">Excluir da fila</div>
+            <p className="text-[12.5px] text-[#6c757d] mt-1.5 leading-relaxed">
+              {excluindo.contas?.lojas?.codigo} · {TIPOS[excluindo.contas.tipo]?.n} · {money(Number(excluindo.valor ?? 0))}
+            </p>
+            <div className="text-[11.5px] text-info bg-info-bg rounded-md px-3 py-2.5 mt-3 leading-relaxed">
+              O lançamento sai da fila e dos totais, mas <b>não é apagado</b>. Fica registrado
+              quem excluiu, quando e por quê — dá para consultar depois no histórico.
+            </div>
+            <label className="block mt-3">
+              <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">
+                Motivo <span className="text-alerr">*</span>
+              </div>
+              <textarea value={motivoExclusao} onChange={(e) => setMotivoExclusao(e.target.value)} rows={2}
+                placeholder="Ex: lançamento duplicado, já existe outro para essa competência"
+                className="input-padrao w-full text-[12.5px]" />
+            </label>
+            <div className="flex gap-2 mt-4">
+              <button onClick={excluirDaFila} disabled={motivoExclusao.trim().length < 3}
+                className="btn-perigo flex-1 disabled:opacity-50">Excluir da fila</button>
+              <button onClick={() => setExcluindo(null)} className="btn-secundario">Cancelar</button>
             </div>
           </div>
         </div>
