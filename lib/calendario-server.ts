@@ -1,6 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { Calendario, calendarioDaLoja, type Feriado, type RegraVencimento } from "@/lib/calendario";
 
+/** só o que esta função usa do cliente Supabase — serve pro de sessão e pro de serviço */
+type SupabaseLike = { from: (tabela: string) => any };
+
 /**
  * Carrega o calendário da empresa (feriados + regra de vencimento).
  *
@@ -18,9 +21,14 @@ export type CalendarioCarregado = {
   considerarFacultativos: boolean;
 };
 
-export async function carregarCalendario(ano: number): Promise<CalendarioCarregado> {
+/**
+ * @param cliente cliente Supabase alternativo. O cron roda sem ninguém
+ * logado, então ele passa o cliente de serviço — sem isso, a leitura de
+ * feriados dependeria de uma sessão que não existe naquele contexto.
+ */
+export async function carregarCalendario(ano: number, cliente?: SupabaseLike): Promise<CalendarioCarregado> {
   const anos = [ano - 1, ano, ano + 1];
-  const supabase = createClient();
+  const supabase = cliente ?? createClient();
 
   let feriados: Feriado[] = [];
   let regra: RegraVencimento = "adiar";

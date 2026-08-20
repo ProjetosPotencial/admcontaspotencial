@@ -4,6 +4,8 @@ import { TIPOS } from "@/lib/types";
 import { money } from "@/lib/format";
 import { detectarValoresForaDoPadrao } from "@/lib/alertas-inteligentes";
 import { semValorInformado } from "@/lib/conta-zerada";
+import { carregarCalendario } from "@/lib/calendario-server";
+import { montarAvisoAgente, mensagemTudoEmDia, ANTECEDENCIA_DIAS } from "@/lib/agente-contas";
 
 /** Quantos dias à frente entram em "próximos vencimentos". */
 const JANELA_PROXIMOS = 3;
@@ -118,6 +120,21 @@ export async function enviarResumoDiarioSlack() {
   // conta zerada nunca saía desta lista.
   const semValor = fila.filter((l) => semValorInformado(l.valor));
 
+  // Conta cobrando muito acima do que aquele fornecedor costuma cobrar.
+  // Continua sendo um sinal do agente: é o tipo de coisa que só a máquina
+  // percebe, e é exatamente o que vale avisar — diferente de um total, que
+  // a tela já mostra.
+  const foraDoPadrao = detectarValoresForaDoPadrao(
+    itens,
+    (historicoAno ?? []).map((l: any) => ({
+      fornecedor: l.contas?.fornecedor_nome ?? null,
+      tipo: l.contas?.tipo ?? null,
+      valor: Number(l.valor ?? 0),
+    })),
+  );
+
+  const inconsistencias = [baixaConfianca, semVencimento, semOrigem, semValor].filter((a) => a.length > 0);
+
   const soma = (arr: any[], campo = "valor") => arr.reduce((s, l) => s + Number(l[campo] ?? 0), 0);
 
   function linha(l: any) {
@@ -133,114 +150,60 @@ export async function enviarResumoDiarioSlack() {
   const urlSite = process.env.APP_URL ?? "https://admcontaspotencial.vercel.app";
   const dataHoje = `${String(diaAtual).padStart(2, "0")}/${String(mes).padStart(2, "0")}`;
 
-  const blocos: any[] = [
-    { type: "header", text: { type: "plain_text", text: `☀️ Bom dia — resumo de ${dataHoje}`, emoji: true } },
-  ];
+  // ==========================================================================
+  // A mensagem é do AGENTE, não um relatório.
+  //
+  // Antes daqui saía um paredão de blocos com todos os totais e listas — o
+  // mesmo que a tela já mostra. Relatório completo todo dia vira paisagem: é
+  // lido uma semana e ignorado depois. Agora sai só o que pede AÇÃO hoje,
+  // com nome de loja no lugar de número, e sempre orientando o que fazer.
+  // O detalhe continua no sistema, que é o lugar dele.
+  // ==========================================================================
+  const { calendario, regra } = await carregarCalendario(ano, supabase);
 
-  // ---- 1. confirmação do que foi processado ----
-  const textoMovimento = confirmados.length === 0 && rejeitados.length === 0
-    ? `_Nenhum boleto foi revisado desde ${rotuloDesde}._`
-    : [
-        `✅ *${confirmados.length}* ${confirmados.length === 1 ? "boleto enviado" : "boletos enviados"} para lançamento` +
-          (soma(confirmados, "valor_detectado") > 0 ? ` · ${money(soma(confirmados, "valor_detectado"))}` : ""),
-        rejeitados.length > 0 ? `🗑️ *${rejeitados.length}* ${rejeitados.length === 1 ? "rejeitado" : "rejeitados"} na revisão` : null,
-      ].filter(Boolean).join("\n");
-
-  blocos.push({ type: "section", text: { type: "mrkdwn", text: `*📥 Movimento desde ${rotuloDesde}*\n${textoMovimento}` } });
-
-  // ---- 2. números do dia, lado a lado ----
-  blocos.push({ type: "divider" });
-  blocos.push({
-    type: "section",
-    fields: [
-      { type: "mrkdwn", text: `*Lançamentos pendentes*\n${pendentes.length} ${pendentes.length === 1 ? "conta" : "contas"}` },
-      { type: "mrkdwn", text: `*Aprovações pendentes*\n${fila.length} ${fila.length === 1 ? "item" : "itens"} · ${money(soma(fila))}` },
-      { type: "mrkdwn", text: `*Vence hoje*\n${venceHoje.length} · ${money(soma(venceHoje))}` },
-      { type: "mrkdwn", text: `*Próximos ${JANELA_PROXIMOS} dias*\n${proximos.length} · ${money(soma(proximos))}` },
-    ],
+  const paraAgente = (l: any) => ({
+    loja: l.contas?.lojas?.codigo ?? null,
+    diaVencimento: l.contas?.dia_vencimento ?? null,
+    atrasada: false,
   });
 
-  // ---- 3. vencimentos do dia (detalhado) ----
-  if (venceHoje.length > 0) {
-    blocos.push({ type: "section", text: { type: "mrkdwn", text: `*🟡 Vence hoje (${venceHoje.length})*\n${lista(venceHoje)}` } });
-  }
-  if (proximos.length > 0) {
-    blocos.push({ type: "section", text: { type: "mrkdwn", text: `*🟢 Vence nos próximos ${JANELA_PROXIMOS} dias (${proximos.length})*\n${lista(proximos, 5)}` } });
-  }
-  if (atrasadas.length > 0) {
-    blocos.push({ type: "divider" });
-    blocos.push({ type: "section", text: { type: "mrkdwn", text: `*🔴 Atrasadas, ninguém lançou ainda (${atrasadas.length})*\n${lista(atrasadas)}` } });
-  }
-
-  // ---- 4. fila de aprovação parada ----
-  if (fila.length > 0) {
-    const maisAntigo = fila
-      .map((l) => l.lancado_em).filter(Boolean)
-      .sort()[0];
-    const desde = maisAntigo ? new Date(maisAntigo).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : null;
-    blocos.push({ type: "divider" });
-    blocos.push({
-      type: "section",
-      text: { type: "mrkdwn", text: `*✍️ Esperando aprovação (${fila.length})*\n${money(soma(fila))} parado na fila${desde ? ` · mais antigo desde ${desde}` : ""}` },
-    });
+  // Vencimentos em sábado, domingo ou feriado nos próximos dias. O agente
+  // avisa ANTES da sexta de propósito: esperar sexta é esperar o problema.
+  const naoUteis: any[] = [];
+  for (let i = 0; i <= ANTECEDENCIA_DIAS; i++) {
+    const alvo = new Date(Date.UTC(ano, mes - 1, diaAtual + i, 12));
+    if (calendario.ehDiaUtil(alvo)) continue;
+    const motivo = calendario.motivoNaoUtil(alvo) ?? "dia não útil";
+    const diaAlvo = alvo.getUTCDate();
+    for (const l of pendentes) {
+      if (l.contas?.dia_vencimento !== diaAlvo) continue;
+      naoUteis.push({ loja: l.contas?.lojas?.codigo ?? null, data: new Date(ano, mes - 1, diaAlvo), motivo, regra });
+    }
   }
 
-  // ---- 5. valores fora do padrão do fornecedor ----
-  // Mesmo critério do alerta que já aparece no Painel (acima de 1,6× a média
-  // histórica), só que aqui com nome de loja e valor - é o que permite alguém
-  // desconfiar da conta antes de aprovar, não depois de pagar.
-  const foraDoPadrao = detectarValoresForaDoPadrao(
-    itens,
-    (historicoAno ?? []).map((l: any) => ({
-      fornecedor: l.contas?.fornecedor_nome ?? null,
-      tipo: l.contas?.tipo ?? null,
-      valor: Number(l.valor ?? 0),
-    })),
-  );
+  const venceAmanha = pendentes.filter((l) => l.contas?.dia_vencimento === diaAtual + 1);
+  const diaSemanaHoje = new Date(Date.UTC(ano, mes - 1, diaAtual, 12)).getUTCDay();
 
-  if (foraDoPadrao.length > 0) {
-    const linhas = foraDoPadrao.slice(0, 5).map((f) => {
-      const t = TIPOS[f.tipo ?? ""]?.n ?? f.tipo ?? "—";
-      return `• *${f.loja ?? "?"}* — ${t} · ${f.fornecedor} — ${money(f.valor)} _(${f.vezes.toFixed(1)}× a média de ${money(f.media)})_`;
-    }).join("\n");
-    const resto = foraDoPadrao.length > 5 ? `\n_… e mais ${foraDoPadrao.length - 5}_` : "";
-
-    blocos.push({ type: "divider" });
-    blocos.push({
-      type: "section",
-      text: { type: "mrkdwn", text: `*📈 Valores acima do padrão da loja (${foraDoPadrao.length})*\n${linhas}${resto}` },
-    });
-  }
-
-  // ---- 6. inconsistências ----
-  const inconsistencias = [
-    baixaConfianca.length > 0 ? `• ${baixaConfianca.length} ${baixaConfianca.length === 1 ? "boleto na caixa precisa" : "boletos na caixa precisam"} de conferência manual (leitura incerta)` : null,
-    naCaixa.length > 0 ? `• ${naCaixa.length} ${naCaixa.length === 1 ? "boleto aguarda" : "boletos aguardam"} revisão na Caixa de Entrada` : null,
-    semVencimento.length > 0 ? `• ${semVencimento.length} ${semVencimento.length === 1 ? "conta está" : "contas estão"} sem dia de vencimento definido` : null,
-    semOrigem.length > 0 ? `• ${semOrigem.length} ${semOrigem.length === 1 ? "conta está" : "contas estão"} sem origem definida` : null,
-    semValor.length > 0 ? `• ${semValor.length} ${semValor.length === 1 ? "lançamento foi enviado" : "lançamentos foram enviados"} sem valor` : null,
-  ].filter(Boolean);
-
-  if (inconsistencias.length > 0) {
-    blocos.push({ type: "divider" });
-    blocos.push({ type: "section", text: { type: "mrkdwn", text: `*⚠️ Pendências que precisam de atenção*\n${inconsistencias.join("\n")}` } });
-  }
-
-  // ---- rodapé + atalhos ----
-  blocos.push({ type: "context", elements: [{ type: "mrkdwn", text: "Sistema Potencial Contas · lança pelo sistema pra sair dessa lista" }] });
-  blocos.push({
-    type: "actions",
-    elements: [
-      { type: "button", text: { type: "plain_text", text: "Caixa de Entrada", emoji: true }, url: `${urlSite}/caixa-entrada`, style: "primary" },
-      { type: "button", text: { type: "plain_text", text: "Aprovações", emoji: true }, url: `${urlSite}/aprovacoes` },
-      { type: "button", text: { type: "plain_text", text: "Alertas", emoji: true }, url: `${urlSite}/alertas` },
-    ],
+  const texto = montarAvisoAgente({
+    atrasadas: atrasadas.map(paraAgente),
+    venceHoje: venceHoje.map(paraAgente),
+    venceAmanha: venceAmanha.map(paraAgente),
+    proximosDias: proximos.map(paraAgente),
+    naoUteis,
+    aguardandoAprovacao: fila.length,
+    aguardandoLancamento: naCaixa.length,
+    problemasCadastro: baixaConfianca.length + semVencimento.length + semOrigem.length + semValor.length,
+    foraDoPadrao: foraDoPadrao.slice(0, 5).map((f) => ({ loja: f.loja, fornecedor: f.fornecedor, vezes: f.vezes })),
+    ehSexta: diaSemanaHoje === 5,
+    urlSistema: urlSite,
   });
 
+  // Nada pedindo ação: confirma que a fila zerou, em uma linha.
+  const mensagem = texto ?? mensagemTudoEmDia();
   const resposta = await fetch(webhookUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ blocks: blocos, text: `Resumo do dia ${dataHoje}: ${pendentes.length} pendentes, ${fila.length} aguardando aprovação, ${atrasadas.length} atrasadas.` }),
+    body: JSON.stringify({ text: mensagem }),
   });
 
   if (!resposta.ok) {
