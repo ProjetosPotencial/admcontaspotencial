@@ -200,10 +200,12 @@ function FornecedorCell({ contaId, nome, logo }: { contaId: string; nome: string
   );
 }
 
-export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes, feriados = [], regraVencimento = "adiar", logos = {}, usuarioId = null, usuarioEmail = null, usuarioNome = null }: {
+export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes, feriados = [], regraVencimento = "adiar", logos = {}, usuarioId = null, usuarioEmail = null, usuarioNome = null, tiposLiberados = null }: {
   contas: Conta[]; situacaoPorConta: Record<string, string>; lojas: { id: string; codigo: string; empresa_id?: string | null; empresas?: { nome: string | null } | null }[]; ano: number; mes: number;
   feriados?: Feriado[]; regraVencimento?: RegraVencimento; logos?: Record<string, string>;
   usuarioId?: string | null; usuarioEmail?: string | null; usuarioNome?: string | null;
+  /** tipos que este usuário pode ver. null = todos (admin ou sem restrição) */
+  tiposLiberados?: string[] | null;
 }) {
   // calendário da empresa: vencimento em fim de semana ou feriado é ajustado
   // pela regra, e o que foi ajustado não conta como atraso.
@@ -304,7 +306,11 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
   const alternarSel = (id: string) => setSelecionados((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const limparSel = () => setSelecionados(new Set());
   const temFiltro = fTipo !== "todos" || fCoban !== "todos" || fStatus !== "todos" || fSituacao !== "todos" || busca !== "";
-  const chips = ["todos", ...Object.keys(TIPOS)];
+  // O filtro mostra só o que a pessoa pode ver. Oferecer um tipo bloqueado
+  // seria oferecer um clique que sempre volta vazio — e a RLS barra de
+  // qualquer jeito, então a opção só confundiria.
+  const tiposVisiveis = tiposLiberados ?? Object.keys(TIPOS);
+  const chips = ["todos", ...tiposVisiveis.filter((t) => TIPOS[t])];
 
   const COLUNAS: { label: string; campo?: "venc" | "loja" | "fornecedor" | "status"; sortable: boolean }[] = [
     { label: "Loja", campo: "loja", sortable: true },
@@ -503,7 +509,7 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
       </div>
 
       {aberta && <ContaDrawer conta={aberta} onClose={() => setAberta(null)} ano={ano} mes={mes} usuarioId={usuarioId} usuarioEmail={usuarioEmail} usuarioNome={usuarioNome} lojas={lojas} />}
-      {criando && <NovaContaDrawer lojas={lojas} onClose={() => setCriando(false)} />}
+      {criando && <NovaContaDrawer lojas={lojas} onClose={() => setCriando(false)} tiposLiberados={tiposLiberados} />}
 
       {/* Barra fixa de ações em lote — aparece quando há contas selecionadas */}
       {selecionados.size > 0 && (
@@ -2206,7 +2212,7 @@ function CampoIcone({ icone, label, valor, mono }: { icone: React.ReactNode; lab
   );
 }
 
-function NovaContaDrawer({ lojas, onClose }: { lojas: { id: string; codigo: string }[]; onClose: () => void }) {
+function NovaContaDrawer({ lojas, onClose, tiposLiberados }: { lojas: { id: string; codigo: string }[]; onClose: () => void; tiposLiberados: string[] | null }) {
   const router = useRouter();
   const { state, updateField, isLoading, error, salvar } = useContaForm(lojas[0]?.id ?? "");
   const [buscaLoja, setBuscaLoja] = useState("");
@@ -2261,7 +2267,9 @@ function NovaContaDrawer({ lojas, onClose }: { lojas: { id: string; codigo: stri
             <label>
               <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Tipo</div>
               <select value={state.tipo} onChange={(e) => updateField("tipo", e.target.value)} className="input-padrao w-full">
-                {Object.entries(TIPOS).map(([k, v]) => <option key={k} value={k}>{v.n}</option>)}
+                {/* mesma regra do filtro: criar conta de um tipo que a pessoa
+                    não enxerga faria a conta sumir no instante em que salvasse */}
+                {(tiposLiberados ?? Object.keys(TIPOS)).filter((k) => TIPOS[k]).map((k) => <option key={k} value={k}>{TIPOS[k].n}</option>)}
               </select>
             </label>
             <label>

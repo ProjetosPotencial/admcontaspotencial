@@ -11,6 +11,7 @@ import Link from "next/link";
 import { podeAcessar, SemPermissao } from "@/lib/permissoes";
 import ErroConsulta from "@/components/erro-consulta";
 import { usuarioAtual } from "@/lib/auth-usuario";
+import { permitidosDoUsuario } from "@/lib/tipos-permitidos";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ export default async function ContasPage() {
   // id e email vem do servidor: o cliente batia em auth.getUser() 5 vezes,
   // uma ida a rede por acao, so pra registrar quem fez.
   const usuario = await usuarioAtual();
+  const tiposLiberados = await permitidosDoUsuario();
   const { data: perfilUsuario } = usuario
     ? await supabase.from("perfis").select("nome").eq("id", usuario.id).maybeSingle()
     : { data: null };
@@ -110,7 +112,7 @@ export default async function ContasPage() {
             <KpiMini icon="pin" cor="#6B5B95" bg="#EDE7F6" value={semOrigem.length} label="Sem origem" extra={<span className="text-[11px] font-mono text-[#6c757d]">{money(somaValor(semOrigem))}</span>} />
           </div>
 
-          <ContasClient feriados={cal.feriados} regraVencimento={cal.regra} contas={contas} situacaoPorConta={situacaoPorConta} lojas={(lojas ?? []) as any} ano={ano} mes={mes} logos={logos} usuarioId={usuario?.id ?? null} usuarioEmail={usuario?.email ?? null} usuarioNome={perfilUsuario?.nome ?? null} />
+          <ContasClient feriados={cal.feriados} regraVencimento={cal.regra} contas={contas} situacaoPorConta={situacaoPorConta} lojas={(lojas ?? []) as any} ano={ano} mes={mes} logos={logos} usuarioId={usuario?.id ?? null} usuarioEmail={usuario?.email ?? null} usuarioNome={perfilUsuario?.nome ?? null} tiposLiberados={tiposLiberados} />
         </div>
 
         <div className="space-y-6">

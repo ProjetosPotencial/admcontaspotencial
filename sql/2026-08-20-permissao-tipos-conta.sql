@@ -35,6 +35,9 @@ comment on column public.perfis.tipos_permitidos is
 -- RLS de perfis. STABLE porque o resultado não muda dentro da mesma consulta,
 -- o que deixa o planner reaproveitar a chamada em vez de rodar por linha.
 -- ---------------------------------------------------------------------------
+-- Recebe TEXT, e as policies chamam com ::text. contas.tipo é o enum
+-- tipo_conta, e o Postgres não converte enum -> text sozinho na resolução de
+-- função: sem o cast explícito, a policy falha com "function does not exist".
 create or replace function public.pode_ver_tipo(p_tipo text)
 returns boolean
 language sql
@@ -69,7 +72,7 @@ grant execute on function public.pode_ver_tipo(text) to authenticated;
 drop policy if exists contas_select on public.contas;
 create policy contas_select on public.contas
   for select to authenticated
-  using (public.pode_ver_tipo(tipo));
+  using (public.pode_ver_tipo(tipo::text));
 
 
 -- ---------------------------------------------------------------------------
@@ -90,15 +93,18 @@ create policy lanc_select on public.lancamentos
     exists (
       select 1 from public.contas c
       where c.id = lancamentos.conta_id
-        and public.pode_ver_tipo(c.tipo)
+        and public.pode_ver_tipo(c.tipo::text)
     )
   );
 
 drop policy if exists lanc_write on public.lancamentos;
+drop policy if exists lanc_insert on public.lancamentos;
 create policy lanc_insert on public.lancamentos
   for insert to authenticated with check (public.eh_operador_ou_acima());
+drop policy if exists lanc_update on public.lancamentos;
 create policy lanc_update on public.lancamentos
   for update to authenticated using (public.eh_operador_ou_acima());
+drop policy if exists lanc_delete on public.lancamentos;
 create policy lanc_delete on public.lancamentos
   for delete to authenticated using (public.eh_operador_ou_acima());
 
@@ -120,7 +126,7 @@ end $$;
 
 create policy caixa_select on public.caixa_entrada_boletos
   for select to authenticated
-  using (tipo_detectado is null or public.pode_ver_tipo(tipo_detectado));
+  using (tipo_detectado is null or public.pode_ver_tipo(tipo_detectado::text));
 
 
 -- ---------------------------------------------------------------------------
