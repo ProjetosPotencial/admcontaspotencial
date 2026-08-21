@@ -27,6 +27,12 @@ const TEMPLATES: Record<string, (d: any) => string> = {
   lancamento_incorreto: (d) => String(d.texto ?? ""),
   // já vem montado pela Caixa de Entrada, que agrupa a rodada num aviso só
   lancamento_lote: (d) => String(d.texto ?? ""),
+  lancamento_retroativo: (d) =>
+    `⏮️ *Lançamento retroativo* — ${d.loja ?? "loja"} · ${d.tipo ?? "conta"}${d.valor ? ` · ${d.valor}` : ""}
+` +
+    `Competência *${d.competencia}*, lançada ${d.meses === 1 ? "um mês" : d.meses + " meses"} depois.
+` +
+    `_Motivo: ${d.motivo ?? "não informado"}_`,
   documento_anexado: (d) =>
     `📎 *Documento anexado* — ${d.loja ?? "loja"} · ${d.tipo ?? "conta"}${d.competencia ? ` · ${d.competencia}` : ""}\n_a conta tinha sido lançada sem documento_`,
 };

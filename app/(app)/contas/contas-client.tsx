@@ -16,6 +16,7 @@ import CriarGrupoModal from "./criar-grupo-modal";
 import { money, MES, nomeArquivoSeguro, formatarDataSemFuso } from "@/lib/format";
 import { MOTIVOS_SEM_DOCUMENTO, motivoValido, textoDoMotivo, mensagemSemDocumento, agoraBrasil } from "@/lib/sem-documento";
 import { MOTIVOS_ZERADO, motivoZeradoValido, textoMotivoZerado, lerValorDigitado, ehZerada } from "@/lib/conta-zerada";
+import { MOTIVOS_ATRASO, avaliarRetroatividade, motivoAtrasoValido, textoMotivoAtraso, observacaoRetroativa } from "@/lib/retroativo";
 import { mensagemLancamentoIncorreto, motivoIncorretoValido } from "@/lib/lancamento-incorreto";
 
 function StatusBadge({ status }: { status: string }) {
@@ -676,6 +677,10 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId
   const [motivoIncorreto, setMotivoIncorreto] = useState("");
   const [salvandoCorrecao, setSalvandoCorrecao] = useState(false);
   const [erroCorrecao, setErroCorrecao] = useState<string | null>(null);
+  const [motivoAtraso, setMotivoAtraso] = useState("");
+  const [motivoAtrasoOutro, setMotivoAtrasoOutro] = useState("");
+  // avaliado uma vez por render: compara a competência aberta com o mês real
+  const retro = avaliarRetroatividade(ANO_ATUAL, MES_ATUAL);
   const [motivoZerado, setMotivoZerado] = useState("");
   const [motivoZeradoOutro, setMotivoZeradoOutro] = useState("");
   const [salvandoSemDoc, setSalvandoSemDoc] = useState(false);
@@ -1208,6 +1213,9 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId
     if (ehZerada(valorNum) && !motivoZeradoValido(motivoZerado, motivoZeradoOutro)) {
       setErroSemDoc("Conta zerada: informe o motivo da conta estar em R$ 0,00."); return;
     }
+    if (retro.retroativo && !motivoAtrasoValido(motivoAtraso, motivoAtrasoOutro)) {
+      setErroSemDoc("Lançamento de competência anterior: informe o motivo do atraso."); return;
+    }
     // a regra de segurança: sem motivo, não lança
     if (!motivoValido(motivoSemDoc, motivoOutro)) {
       setErroSemDoc(motivoSemDoc === "outro"
@@ -1229,6 +1237,9 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId
       sem_documento: true,
       motivo_sem_documento: motivo,
       motivo_zerado: ehZerada(valorNum) ? textoMotivoZerado(motivoZerado, motivoZeradoOutro) : null,
+      retroativo: retro.retroativo,
+      meses_atraso: retro.retroativo ? retro.mesesAtraso : null,
+      motivo_atraso: retro.retroativo ? textoMotivoAtraso(motivoAtraso, motivoAtrasoOutro) : null,
       vencimento,
       observacao: obsSemDoc.trim() || null,
     }, { onConflict: "conta_id,ano,mes" }).select("id").single();
@@ -1288,6 +1299,10 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId
     if (ehZerada(lidoBoleto.valor) && !motivoZeradoValido(motivoZerado, motivoZeradoOutro)) {
       setErroLancamento("Conta zerada: informe o motivo da conta estar em R$ 0,00."); return;
     }
+    // Competência anterior ao mês corrente: exige dizer por que só agora.
+    if (retro.retroativo && !motivoAtrasoValido(motivoAtraso, motivoAtrasoOutro)) {
+      setErroLancamento("Lançamento de competência anterior: informe o motivo do atraso."); return;
+    }
     setSalvandoLancamento(true);
     setErroLancamento(null);
 
@@ -1328,6 +1343,9 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId
       conta_id: conta.id, ano: ANO_ATUAL, mes: MES_ATUAL,
       valor: lidoBoleto.valor,
       motivo_zerado: ehZerada(lidoBoleto.valor) ? textoMotivoZerado(motivoZerado, motivoZeradoOutro) : null,
+      retroativo: retro.retroativo,
+      meses_atraso: retro.retroativo ? retro.mesesAtraso : null,
+      motivo_atraso: retro.retroativo ? textoMotivoAtraso(motivoAtraso, motivoAtrasoOutro) : null,
       situacao: "lancado", comprovante_url: caminhoBoleto,
       lancado_em: new Date().toISOString(),
       codigo_barras: codigoBarras.trim() || null,
@@ -1380,6 +1398,22 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId
     setErroLancamento(null);
     setSucessoLancamento("Lançamento realizado com sucesso.");
     agente.evento("lancamento", { loja: conta.lojas?.codigo, tipo: conta.tipo });
+
+    // Retroativo merece aviso próprio: é informação de controle, não rotina.
+    if (retro.retroativo) {
+      fetch("/api/notificar-evento", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          evento: "lancamento_retroativo",
+          loja: conta.lojas?.codigo, tipo: T?.n ?? conta.tipo,
+          competencia: retro.competencia,
+          meses: retro.mesesAtraso,
+          valor: money(lidoBoleto.valor),
+          motivo: textoMotivoAtraso(motivoAtraso, motivoAtrasoOutro),
+          por: usuarioNome ?? usuarioEmail ?? undefined,
+        }),
+      }).catch(() => {});
+    }
     setTimeout(() => setSucessoLancamento(null), 6000);
     router.refresh(); // atualiza a lista de contas sem sair da página
   }
@@ -1954,6 +1988,23 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId
                 </div>
 
 
+
+                {/* Competência anterior ao mês corrente. Aparece antes de tudo
+                    porque muda o significado do que a pessoa está fazendo. */}
+                {retro.retroativo && (
+                  <div className="border-l-[3px] border-alerr bg-alerr-bg rounded-r-md p-3 mb-3">
+                    <div className="text-[11.5px] font-semibold text-alerr mb-1.5">{retro.aviso}</div>
+                    <select value={motivoAtraso} onChange={(e) => setMotivoAtraso(e.target.value)}
+                      className="input-padrao w-full text-[12.5px] mb-2">
+                      <option value="">Selecione o motivo do atraso...</option>
+                      {MOTIVOS_ATRASO.map((m) => (<option key={m.valor} value={m.valor}>{m.rotulo}</option>))}
+                    </select>
+                    {motivoAtraso === "outro" && (
+                      <input value={motivoAtrasoOutro} onChange={(e) => setMotivoAtrasoOutro(e.target.value)}
+                        placeholder="Descreva o motivo" className="input-padrao w-full text-[12.5px]" />
+                    )}
+                  </div>
+                )}
                 {/* Zero é valor informado, não campo vazio — mas exige explicação. */}
                 {ehZerada(lerValorDigitado(valorLancar).valor) && (
                   <div className="border border-amarelo/40 bg-amb-bg rounded-md p-3 mb-3">
@@ -2033,6 +2084,23 @@ function ContaDrawer({ conta, onClose, ano: ANO_ATUAL, mes: MES_ATUAL, usuarioId
                     placeholder="0,00" className="input-padrao w-full font-mono" />
                 </label>
 
+
+                {/* Competência anterior ao mês corrente. Aparece antes de tudo
+                    porque muda o significado do que a pessoa está fazendo. */}
+                {retro.retroativo && (
+                  <div className="border-l-[3px] border-alerr bg-alerr-bg rounded-r-md p-3 mb-3">
+                    <div className="text-[11.5px] font-semibold text-alerr mb-1.5">{retro.aviso}</div>
+                    <select value={motivoAtraso} onChange={(e) => setMotivoAtraso(e.target.value)}
+                      className="input-padrao w-full text-[12.5px] mb-2">
+                      <option value="">Selecione o motivo do atraso...</option>
+                      {MOTIVOS_ATRASO.map((m) => (<option key={m.valor} value={m.valor}>{m.rotulo}</option>))}
+                    </select>
+                    {motivoAtraso === "outro" && (
+                      <input value={motivoAtrasoOutro} onChange={(e) => setMotivoAtrasoOutro(e.target.value)}
+                        placeholder="Descreva o motivo" className="input-padrao w-full text-[12.5px]" />
+                    )}
+                  </div>
+                )}
                 {/* Zero é valor informado, não campo vazio — mas exige explicação. */}
                 {ehZerada(lerValorDigitado(valorLancar).valor) && (
                   <div className="border border-amarelo/40 bg-amb-bg rounded-md p-3 mb-3">

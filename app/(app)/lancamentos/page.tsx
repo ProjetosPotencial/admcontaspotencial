@@ -23,7 +23,7 @@ export default async function LancamentosPage() {
   const [{ data, error: erroLista }, { data: mesAtualDetalhado, error: erroMes }] = await Promise.all([
     supabase
       .from("lancamentos")
-      .select("id, ano, mes, valor, situacao, lancado_em, comprovante_url, comprovante_drive_url, codigo_barras, aprovado_por, aprovado_em, contas!inner ( tipo, dia_vencimento, fornecedor_nome, lojas ( codigo, coban ) )")
+      .select("id, ano, mes, valor, situacao, lancado_em, comprovante_url, comprovante_drive_url, codigo_barras, aprovado_por, aprovado_em, retroativo, motivo_atraso, meses_atraso, contas!inner ( tipo, dia_vencimento, fornecedor_nome, lojas ( codigo, coban ) )")
       .eq("ano", ano)
       .order("mes", { ascending: false }),
     supabase

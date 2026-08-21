@@ -11,6 +11,7 @@ import { useDebounce } from "@/lib/hooks/useDebounce";
 
 type Item = {
   id: string; ano: number; mes: number; valor: number | null; situacao: string; lancado_em?: string | null;
+  retroativo?: boolean | null; motivo_atraso?: string | null; meses_atraso?: number | null;
   comprovante_url?: string | null; comprovante_drive_url?: string | null;
   codigo_barras?: string | null; aprovado_por?: string | null; aprovado_em?: string | null;
   contas: { tipo: string; dia_vencimento: number | null; fornecedor_nome: string | null; lojas: { codigo: string; coban: string } | null };
@@ -171,7 +172,19 @@ export default function LancamentosClient({ itens, ano, resumo, logos = {} }: { 
                   <td className="px-4 text-[13px] text-[#666]">
                     <div className="flex items-center gap-2">
                       <LogoFornecedor nome={l.contas.fornecedor_nome ?? "?"} url={logos[(l.contas.fornecedor_nome ?? "").toLowerCase()]} size={24} />
-                      <span>{l.contas.fornecedor_nome ?? "—"}</span>
+                      <div className="min-w-0">
+                        <span>{l.contas.fornecedor_nome ?? "—"}</span>
+                        {/* A observação do retroativo fica junto do fornecedor,
+                            não numa coluna nova: só uma minoria dos lançamentos
+                            tem, e coluna vazia em 95% das linhas é ruído. */}
+                        {l.retroativo && (
+                          <div className="text-[11px] text-amb leading-snug" title={l.motivo_atraso ?? undefined}>
+                            ⏮️ Retroativo · {MES[l.mes - 1]}/{l.ano}
+                            {l.meses_atraso ? ` · ${l.meses_atraso} ${l.meses_atraso === 1 ? "mês" : "meses"} de atraso` : ""}
+                            {l.motivo_atraso ? ` · ${l.motivo_atraso}` : ""}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 text-[13px] font-mono font-semibold">{money(l.valor)}</td>
