@@ -12,6 +12,7 @@ import { formatarPeriodo, contaValidaNoPeriodo, estaAtrasada } from "@/lib/date-
 import { Calendario, type Feriado, type RegraVencimento } from "@/lib/calendario";
 import TipoIcon from "@/components/tipo-icon";
 import LogoFornecedor from "@/components/logo-fornecedor";
+import CriarGrupoModal from "./criar-grupo-modal";
 import { money, MES, nomeArquivoSeguro, formatarDataSemFuso } from "@/lib/format";
 import { MOTIVOS_SEM_DOCUMENTO, motivoValido, textoDoMotivo, mensagemSemDocumento, agoraBrasil } from "@/lib/sem-documento";
 import { MOTIVOS_ZERADO, motivoZeradoValido, textoMotivoZerado, lerValorDigitado, ehZerada } from "@/lib/conta-zerada";
@@ -220,6 +221,8 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
   const [fSituacao, setFSituacao] = useState(params.get("situacao") ?? "todos");
   const [busca, setBusca] = useState("");
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+  const [criandoGrupo, setCriandoGrupo] = useState(false);
+  const router = useRouter();
   const buscaDebounced = useDebounce(busca, 250);
   const [pagina, setPagina] = useState(1);
   const [itensPorPagina, setItensPorPagina] = useState(25);
@@ -516,8 +519,23 @@ export default function ContasClient({ contas, situacaoPorConta, lojas, ano, mes
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-ebano text-white rounded-xl shadow-forte flex items-center gap-4 pl-5 pr-3 py-3">
           <span className="text-[13px] font-medium">{selecionados.size} selecionada{selecionados.size !== 1 ? "s" : ""}</span>
           <div className="h-5 w-px bg-white/20" />
+          {selecionados.size >= 2 && (
+            <button onClick={() => setCriandoGrupo(true)}
+              className="flex items-center gap-1.5 bg-amarelo text-ebano font-semibold text-[13px] px-3.5 py-1.5 rounded-md hover:bg-amarelo-dark transition">
+              🔗 Criar grupo
+            </button>
+          )}
           <button onClick={limparSel} className="text-[13px] text-white/70 hover:text-white transition">Limpar</button>
         </div>
+      )}
+
+      {criandoGrupo && (
+        <CriarGrupoModal
+          contas={contas.filter((c) => selecionados.has(c.id))}
+          ano={ano} mes={mes}
+          onClose={() => setCriandoGrupo(false)}
+          onCriado={() => { setCriandoGrupo(false); limparSel(); router.refresh(); }}
+        />
       )}
     </>
   );
