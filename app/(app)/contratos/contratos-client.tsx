@@ -190,6 +190,68 @@ function ContratoDrawer({ contrato, lojas, empresas, onClose, onSalvar }: {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
+  // ---- campos que a leitura por IA preenche ----
+  const [locador, setLocador] = useState("");
+  const [locadorDoc, setLocadorDoc] = useState("");
+  const [enderecoImovel, setEnderecoImovel] = useState("");
+  const [diaVenc, setDiaVenc] = useState("");
+  const [indice, setIndice] = useState("");
+  const [percentualFixo, setPercentualFixo] = useState("");
+  const [periodicidade, setPeriodicidade] = useState("12");
+  const [valorCondominio, setValorCondominio] = useState("");
+  const [valorIptu, setValorIptu] = useState("");
+
+  // ---- leitura do PDF ----
+  const [lendo, setLendo] = useState(false);
+  const [alertas, setAlertas] = useState<string[]>([]);
+  const [naoEncontrados, setNaoEncontrados] = useState<string[]>([]);
+  const [lidoDe, setLidoDe] = useState<string | null>(null);
+
+  /**
+   * Manda o PDF pra leitura e PREENCHE os campos — não salva.
+   *
+   * Preenche só o que está vazio: se a pessoa já digitou algo, o que ela
+   * digitou vale mais que o que a IA leu. Reler não pode desfazer correção.
+   */
+  async function lerContrato(arquivo: File) {
+    setLendo(true); setErro(null); setAlertas([]); setNaoEncontrados([]);
+    try {
+      const form = new FormData();
+      form.append("arquivo", arquivo);
+      const resp = await fetch("/api/extrair-contrato", { method: "POST", body: form });
+      const json = await resp.json();
+      if (!resp.ok) { setErro(json.error ?? "Não consegui ler o contrato."); setLendo(false); return; }
+
+      const d = json.dados;
+      const preencher = (atual: string, novo: any, set: (v: string) => void) => {
+        if (atual.trim() !== "") return;          // respeita o que já foi digitado
+        if (novo === null || novo === undefined) return;
+        set(String(novo));
+      };
+
+      preencher(numero, d.numero_contrato, setNumero);
+      preencher(dataInicio, d.data_inicio, setDataInicio);
+      preencher(dataFim, d.data_fim, setDataFim);
+      preencher(valor, d.valor_aluguel, setValor);
+      preencher(locador, d.locador, setLocador);
+      preencher(locadorDoc, d.locador_documento, setLocadorDoc);
+      preencher(enderecoImovel, d.endereco_imovel, setEnderecoImovel);
+      preencher(diaVenc, d.dia_vencimento, setDiaVenc);
+      preencher(indice, d.indice_reajuste, setIndice);
+      preencher(percentualFixo, d.percentual_fixo, setPercentualFixo);
+      preencher(valorCondominio, d.valor_condominio, setValorCondominio);
+      preencher(valorIptu, d.valor_iptu, setValorIptu);
+      if (d.periodicidade_meses) setPeriodicidade(String(d.periodicidade_meses));
+
+      setAlertas(d.alertas ?? []);
+      setNaoEncontrados(d.campos_nao_encontrados ?? []);
+      setLidoDe(json.nomeArquivo);
+    } catch {
+      setErro("Não foi possível ler o contrato agora.");
+    }
+    setLendo(false);
+  }
+
   async function salvar() {
     if (!numero.trim()) { setErro("Informe o número do contrato."); return; }
     setSalvando(true);
@@ -198,6 +260,16 @@ function ContratoDrawer({ contrato, lojas, empresas, onClose, onSalvar }: {
       numero: numero.trim(), loja_id: lojaId || null, empresa_id: empresaId || null,
       tipo: tipo || null, data_inicio: dataInicio || null, data_fim: dataFim || null,
       valor: valor ? Number(valor.replace(",", ".")) : null, status, observacoes: observacoes.trim() || null,
+      locador: locador.trim() || null,
+      locador_documento: locadorDoc.replace(/D/g, "") || null,
+      endereco_imovel: enderecoImovel.trim() || null,
+      dia_vencimento: diaVenc ? Number(diaVenc) : null,
+      indice_reajuste: indice || null,
+      percentual_fixo: percentualFixo ? Number(percentualFixo.replace(",", ".")) : null,
+      periodicidade_meses: periodicidade ? Number(periodicidade) : null,
+      valor_condominio: valorCondominio ? Number(valorCondominio.replace(",", ".")) : null,
+      valor_iptu: valorIptu ? Number(valorIptu.replace(",", ".")) : null,
+      cadastrado_por_ia: !!lidoDe,
     };
     const query = contrato
       ? supabase.from("contratos").update(payload).eq("id", contrato.id).select("*, lojas ( codigo ), empresas ( nome )").single()
@@ -220,6 +292,46 @@ function ContratoDrawer({ contrato, lojas, empresas, onClose, onSalvar }: {
           <h3 className="text-[20px] font-bold text-[#1a1a1a]">{contrato ? "Editar contrato" : "Novo contrato"}</h3>
         </div>
         <div className="p-5 space-y-3.5">
+
+          {/* Leitura por IA: preenche o formulário, nunca salva sozinha.
+              Contrato cadastrado errado vira aluguel reajustado errado por
+              anos — a conferência humana é obrigatória, não opcional. */}
+          {!contrato && (
+            <div className="border border-dashed border-linha rounded-lg p-4 bg-off">
+              <div className="text-[12.5px] font-semibold text-[#1a1a1a]">Ler contrato em PDF</div>
+              <p className="text-[11.5px] text-[#6c757d] mt-1 leading-relaxed">
+                Envie o contrato e eu preencho o que conseguir ler. Você confere antes de salvar.
+              </p>
+              <input type="file" accept=".pdf,application/pdf" disabled={lendo}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) lerContrato(f); }}
+                className="mt-2.5 w-full text-[12px] file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-amarelo file:text-[12px] file:font-semibold file:cursor-pointer disabled:opacity-50" />
+              {lendo && (
+                <div className="text-[11.5px] text-info mt-2.5 flex items-center gap-2">
+                  <svg className="animate-spin" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 3a7 7 0 107 7" strokeLinecap="round" /></svg>
+                  Lendo o contrato... pode levar até um minuto.
+                </div>
+              )}
+              {lidoDe && !lendo && (
+                <div className="text-[11.5px] text-ok mt-2.5">Li <b>{lidoDe}</b>. Confira os campos abaixo.</div>
+              )}
+            </div>
+          )}
+
+          {alertas.length > 0 && (
+            <div className="border-l-[3px] border-amarelo bg-amb-bg rounded-r-md px-3 py-2.5">
+              <div className="text-[11.5px] font-semibold text-amb mb-1">Confira antes de salvar</div>
+              <ul className="text-[11.5px] text-[#7a5c00] space-y-1 leading-snug">
+                {alertas.map((a, i) => <li key={i}>• {a}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {naoEncontrados.length > 0 && (
+            <div className="text-[11.5px] text-[#6c757d] bg-off rounded-md px-3 py-2 leading-relaxed">
+              Não achei no documento: <b>{naoEncontrados.join(", ")}</b>. Preencha à mão se precisar.
+            </div>
+          )}
+
           <label>
             <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Número do contrato</div>
             <input value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="CT-2026-045" className="input-padrao w-full font-mono" />
@@ -268,6 +380,68 @@ function ContratoDrawer({ contrato, lojas, empresas, onClose, onSalvar }: {
             <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Valor mensal</div>
             <input value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" className="input-padrao w-full font-mono" />
           </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label>
+              <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Condomínio</div>
+              <input value={valorCondominio} onChange={(e) => setValorCondominio(e.target.value)} placeholder="0,00" className="input-padrao w-full font-mono" />
+            </label>
+            <label>
+              <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">IPTU</div>
+              <input value={valorIptu} onChange={(e) => setValorIptu(e.target.value)} placeholder="0,00" className="input-padrao w-full font-mono" />
+            </label>
+          </div>
+
+          <div className="pt-1 border-t border-linha2" />
+          <div className="text-[11px] font-semibold text-[#adb5bd] uppercase">Locador</div>
+          <div className="grid grid-cols-2 gap-3">
+            <label>
+              <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Nome</div>
+              <input value={locador} onChange={(e) => setLocador(e.target.value)} placeholder="quem recebe o aluguel" className="input-padrao w-full" />
+            </label>
+            <label>
+              <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">CPF / CNPJ</div>
+              <input value={locadorDoc} onChange={(e) => setLocadorDoc(e.target.value)} className="input-padrao w-full font-mono" />
+            </label>
+          </div>
+          <label>
+            <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Endereço do imóvel</div>
+            <input value={enderecoImovel} onChange={(e) => setEnderecoImovel(e.target.value)} className="input-padrao w-full" />
+          </label>
+
+          <div className="pt-1 border-t border-linha2" />
+          <div className="text-[11px] font-semibold text-[#adb5bd] uppercase">Reajuste</div>
+          <div className="grid grid-cols-3 gap-3">
+            <label>
+              <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Índice</div>
+              <select value={indice} onChange={(e) => setIndice(e.target.value)} className="input-padrao w-full text-[12.5px]">
+                <option value="">— nenhum —</option>
+                <option value="ipca">IPCA</option>
+                <option value="igpm">IGP-M</option>
+                <option value="inpc">INPC</option>
+                <option value="fixo">Percentual fixo</option>
+              </select>
+            </label>
+            <label>
+              <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">A cada (meses)</div>
+              <input value={periodicidade} onChange={(e) => setPeriodicidade(e.target.value)} className="input-padrao w-full font-mono" />
+            </label>
+            <label>
+              <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Dia venc.</div>
+              <input value={diaVenc} onChange={(e) => setDiaVenc(e.target.value)} placeholder="10" className="input-padrao w-full font-mono" />
+            </label>
+          </div>
+          {indice === "fixo" && (
+            <label>
+              <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Percentual fixo (%)</div>
+              <input value={percentualFixo} onChange={(e) => setPercentualFixo(e.target.value)} placeholder="5,00" className="input-padrao w-full font-mono" />
+            </label>
+          )}
+          {indice && indice !== "fixo" && (
+            <div className="text-[11.5px] text-info bg-info-bg rounded-md px-3 py-2 leading-relaxed">
+              O reajuste usa o <b>acumulado</b> do índice no período, composto mês a mês — não a variação de um mês só.
+            </div>
+          )}
+
           <label>
             <div className="text-[11px] font-semibold text-[#adb5bd] uppercase mb-1">Observações</div>
             <textarea value={observacoes} onChange={(e) => setObservacoes(e.target.value)} rows={3} className="w-full border border-linha rounded-md px-3 py-2 text-[13px]" />
