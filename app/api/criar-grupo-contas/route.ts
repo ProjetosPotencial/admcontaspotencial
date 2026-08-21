@@ -43,21 +43,19 @@ export async function POST(req: Request) {
 
   // ---- regra 9: conta não entra em dois grupos ativos na mesma competência ----
   const contaIds = itens.map((i: any) => i.contaId);
+  // A checagem aqui é cortesia: dá mensagem boa em vez de erro de banco. Quem
+  // garante de verdade é o índice único (conta_id, ano, mes) where ativo — sem
+  // ele, duas abas abertas ao mesmo tempo furariam a regra.
   const { data: jaAgrupadas } = await db
     .from("conta_grupo_itens")
-    .select("conta_id, conta_grupos!inner ( nome, ano, mes, status, excluido_em )")
-    .in("conta_id", contaIds);
+    .select("conta_id, conta_grupos ( nome )")
+    .in("conta_id", contaIds)
+    .eq("ano", ano).eq("mes", mes).eq("ativo", true);
 
-  const conflitos = (jaAgrupadas ?? []).filter((r: any) => {
-    const g = r.conta_grupos;
-    return g && g.ano === ano && g.mes === mes && !g.excluido_em
-      && !["contestado", "cancelado"].includes(g.status);
-  });
-
-  if (conflitos.length > 0) {
-    const nomes = Array.from(new Set(conflitos.map((c: any) => c.conta_grupos.nome)));
+  if ((jaAgrupadas ?? []).length > 0) {
+    const nomes = Array.from(new Set((jaAgrupadas ?? []).map((c: any) => c.conta_grupos?.nome).filter(Boolean)));
     return NextResponse.json({
-      error: `Há conta já agrupada nesta competência (grupo: ${nomes.join(", ")}). Nada foi criado.`,
+      error: `Há conta já agrupada nesta competência${nomes.length ? ` (grupo: ${nomes.join(", ")})` : ""}. Nada foi criado.`,
     }, { status: 409 });
   }
 
@@ -112,6 +110,7 @@ export async function POST(req: Request) {
     linhasItens.push({
       grupo_id: grupo.id,
       conta_id: item.contaId,
+      ano, mes, ativo: true,
       valor: Number(item.valor),
       lancamento_absorvido_id: individual?.id ?? null,
     });

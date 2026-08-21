@@ -48,25 +48,37 @@ create table if not exists public.conta_grupo_itens (
   grupo_id  uuid not null references public.conta_grupos(id) on delete cascade,
   conta_id  uuid not null,
   valor     numeric(12,2) not null,
+
+  -- Competência COPIADA do grupo, de propósito.
+  --
+  -- Índice em PostgreSQL não pode consultar outra tabela — expressão de
+  -- índice tem que ser imutável. Sem a cópia aqui, não existe jeito de o
+  -- BANCO garantir "uma conta em um grupo por competência", e a regra ficaria
+  -- só na tela, onde duas abas abertas a furam.
+  --
+  -- Os itens nascem junto com o grupo e nunca mudam de competência, então a
+  -- cópia não sai de sincronia.
+  ano       smallint not null,
+  mes       smallint not null,
+
+  -- Item deixa de valer quando o grupo é recusado ou cancelado e as contas
+  -- voltam para a fila. Mantido como histórico: some do índice, não do banco.
+  ativo     boolean not null default true,
+
   -- o lançamento individual daquela conta, que o grupo absorveu. Guardado
   -- para poder devolvê-lo à fila se o grupo for recusado.
   lancamento_absorvido_id uuid,
 
-  -- Regra 9 da especificação: conta não entra em dois grupos ao mesmo tempo.
-  -- No banco, não só na tela — é o que impede lançamento duplicado.
-  constraint item_unico_por_competencia unique (grupo_id, conta_id)
+  constraint item_unico_no_grupo unique (grupo_id, conta_id)
 );
 
 create index if not exists idx_grupo_itens_conta on public.conta_grupo_itens (conta_id);
 create index if not exists idx_grupo_itens_grupo on public.conta_grupo_itens (grupo_id);
 
--- Uma conta só pode estar em UM grupo ativo por competência. O índice parcial
--- é o que garante isso mesmo se alguém inserir por fora da tela.
+-- Regra 9: uma conta em UM grupo ativo por competência, garantido pelo banco.
 create unique index if not exists idx_conta_um_grupo_ativo
-  on public.conta_grupo_itens (conta_id, (
-    select g.ano * 100 + g.mes from public.conta_grupos g where g.id = grupo_id
-  ))
-  where lancamento_absorvido_id is not null;
+  on public.conta_grupo_itens (conta_id, ano, mes)
+  where ativo;
 
 
 -- ---------------------------------------------------------------------------
@@ -159,13 +171,10 @@ begin
     -- NOVO: conta já coberta por grupo ativo nesta competência não ganha
     -- lançamento individual.
     and not exists (
-      select 1
-      from conta_grupo_itens i
-      join conta_grupos g on g.id = i.grupo_id
+      select 1 from conta_grupo_itens i
       where i.conta_id = c.id
-        and g.ano = p_ano and g.mes = p_mes
-        and g.excluido_em is null
-        and g.status not in ('contestado', 'cancelado')
+        and i.ano = p_ano and i.mes = p_mes
+        and i.ativo
     )
   on conflict (conta_id, ano, mes) do nothing;
 
