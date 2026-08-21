@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import ContratosClient from "./contratos-client";
 import { podeAcessar, SemPermissao } from "@/lib/permissoes";
+import { usuarioAtual } from "@/lib/auth-usuario";
 
 export const dynamic = "force-dynamic";
 
@@ -8,10 +9,12 @@ export default async function ContratosPage({ searchParams }: { searchParams: { 
   if (!(await podeAcessar("/contratos"))) return <SemPermissao modulo="Contratos" />;
 
   const supabase = createClient();
+  const usuario = await usuarioAtual();
   const [{ data: contratos }, { data: lojas }, { data: empresas }] = await Promise.all([
     supabase
       .from("contratos")
       .select("id, numero, loja_id, empresa_id, tipo, data_inicio, data_fim, valor, status, observacoes, locador, locador_documento, endereco_imovel, dia_vencimento, indice_reajuste, percentual_fixo, periodicidade_meses, valor_condominio, valor_iptu, lojas ( codigo ), empresas ( nome )")
+      .is("excluido_em", null)
       .order("created_at", { ascending: false }),
     supabase.from("lojas").select("id, codigo").order("codigo"),
     supabase.from("empresas").select("id, nome").eq("ativa", true).order("nome"),
@@ -24,7 +27,7 @@ export default async function ContratosPage({ searchParams }: { searchParams: { 
         <p className="text-[14px] text-[#6c757d] mt-2.5">Contratos de aluguel, prestação de serviço e afins, ligados a loja e empresa</p>
       </div>
       <div className="px-4 sm:px-8 pb-6 sm:pb-8 max-w-[1100px]">
-        <ContratosClient contratos={(contratos ?? []) as any[]} lojas={lojas ?? []} empresas={empresas ?? []} buscaInicial={searchParams.loja ?? ""} />
+        <ContratosClient contratos={(contratos ?? []) as any[]} lojas={lojas ?? []} empresas={empresas ?? []} usuarioId={usuario?.id ?? null} buscaInicial={searchParams.loja ?? ""} />
       </div>
     </>
   );

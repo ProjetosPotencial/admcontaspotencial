@@ -22,8 +22,9 @@ const TIPOS_CONTRATO = ["aluguel", "prestacao_servico", "franquia", "outro"];
 const TIPO_LABEL: Record<string, string> = { aluguel: "Aluguel", prestacao_servico: "Prestação de serviço", franquia: "Franquia", outro: "Outro" };
 const STATUS_TOM: Record<string, Tom> = { ativo: "ok", encerrado: "alerta", suspenso: "aviso" };
 
-export default function ContratosClient({ contratos: iniciais, lojas, empresas, buscaInicial }: {
+export default function ContratosClient({ contratos: iniciais, lojas, empresas, buscaInicial, usuarioId = null }: {
   contratos: ContratoRow[]; lojas: { id: string; codigo: string }[]; empresas: { id: string; nome: string }[]; buscaInicial?: string;
+  usuarioId?: string | null;
 }) {
   const [contratos, setContratos] = useState(iniciais);
   const [busca, setBusca] = useState(buscaInicial ?? "");
@@ -171,15 +172,16 @@ export default function ContratosClient({ contratos: iniciais, lojas, empresas, 
         </table></div>
       </div>
 
-      {criando && <ContratoDrawer lojas={lojas} empresas={empresas} onClose={() => setCriando(false)} onSalvar={(c) => { upsertLocal(c); setCriando(false); }} />}
-      {editando && <ContratoDrawer contrato={editando} lojas={lojas} empresas={empresas} onClose={() => setEditando(null)} onSalvar={(c) => { upsertLocal(c); setEditando(null); }} />}
+      {criando && <ContratoDrawer lojas={lojas} empresas={empresas} usuarioId={usuarioId} onClose={() => setCriando(false)} onSalvar={(c) => { upsertLocal(c); setCriando(false); }} onExcluir={() => {}} />}
+      {editando && <ContratoDrawer contrato={editando} lojas={lojas} empresas={empresas} usuarioId={usuarioId} onClose={() => setEditando(null)} onSalvar={(c) => { upsertLocal(c); setEditando(null); }} onExcluir={(id) => { setContratos((l) => l.filter((x) => x.id !== id)); setEditando(null); }} />}
     </>
   );
 }
 
-function ContratoDrawer({ contrato, lojas, empresas, onClose, onSalvar }: {
+function ContratoDrawer({ contrato, lojas, empresas, onClose, onSalvar, onExcluir, usuarioId }: {
   contrato?: ContratoRow; lojas: { id: string; codigo: string }[]; empresas: { id: string; nome: string }[];
   onClose: () => void; onSalvar: (c: ContratoRow) => void;
+  onExcluir: (id: string) => void; usuarioId: string | null;
 }) {
   const supabase = createClient();
   const [numero, setNumero] = useState(contrato?.numero ?? "");
@@ -260,6 +262,28 @@ function ContratoDrawer({ contrato, lojas, empresas, onClose, onSalvar }: {
     setLendo(false);
   }
 
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
+
+  /**
+   * Exclusao LOGICA: some da tela, continua no banco.
+   *
+   * E o que a especificacao pede ("nenhuma informacao excluida fisicamente").
+   * E e o certo aqui: contrato costuma ter lancamento, historico e reajuste
+   * pendurados nele - apagar de verdade deixaria tudo isso orfao.
+   */
+  async function excluirContrato() {
+    if (!contrato) return;
+    setSalvando(true);
+    const { error } = await supabase.from("contratos").update({
+      excluido_em: new Date().toISOString(),
+      excluido_por: usuarioId,
+      status: "encerrado",
+    }).eq("id", contrato.id);
+    setSalvando(false);
+    if (error) { setErro("Nao foi possivel excluir o contrato."); return; }
+    onExcluir(contrato.id);
+  }
+
   async function salvar() {
     if (!numero.trim()) { setErro("Informe o número do contrato."); return; }
     setSalvando(true);
@@ -304,11 +328,16 @@ function ContratoDrawer({ contrato, lojas, empresas, onClose, onSalvar }: {
           {/* Leitura por IA: preenche o formulário, nunca salva sozinha.
               Contrato cadastrado errado vira aluguel reajustado errado por
               anos — a conferência humana é obrigatória, não opcional. */}
-          {!contrato && (
-            <div className="border border-dashed border-linha rounded-lg p-4 bg-off">
-              <div className="text-[12.5px] font-semibold text-[#1a1a1a]">Ler contrato em PDF</div>
+          {/* Vale também na edição: é como recuperar campo que ficou vazio,
+              sem precisar apagar o contrato e cadastrar de novo. */}
+          <div className="border border-dashed border-linha rounded-lg p-4 bg-off">
+              <div className="text-[12.5px] font-semibold text-[#1a1a1a]">
+                {contrato ? "Reler contrato em PDF" : "Ler contrato em PDF"}
+              </div>
               <p className="text-[11.5px] text-[#6c757d] mt-1 leading-relaxed">
-                Envie o contrato e eu preencho o que conseguir ler. Você confere antes de salvar.
+                {contrato
+                  ? "Preenche só os campos que estão vazios. O que já tem valor não é sobrescrito."
+                  : "Envie o contrato e eu preencho o que conseguir ler. Você confere antes de salvar."}
               </p>
               <input type="file" accept=".pdf,application/pdf" disabled={lendo}
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) lerContrato(f); }}
@@ -322,8 +351,7 @@ function ContratoDrawer({ contrato, lojas, empresas, onClose, onSalvar }: {
               {lidoDe && !lendo && (
                 <div className="text-[11.5px] text-ok mt-2.5">Li <b>{lidoDe}</b>. Confira os campos abaixo.</div>
               )}
-            </div>
-          )}
+          </div>
 
           {alertas.length > 0 && (
             <div className="border-l-[3px] border-amarelo bg-amb-bg rounded-r-md px-3 py-2.5">
@@ -458,6 +486,34 @@ function ContratoDrawer({ contrato, lojas, empresas, onClose, onSalvar }: {
           <button onClick={salvar} disabled={salvando} className="btn-primario w-full">
             {salvando ? "Salvando..." : contrato ? "Salvar alterações" : "Criar contrato"}
           </button>
+
+          {contrato && (
+            <div className="pt-3 mt-1 border-t border-linha2">
+              {!confirmandoExclusao ? (
+                <button onClick={() => setConfirmandoExclusao(true)}
+                  className="w-full text-[12px] text-[#9E9E9E] hover:text-alerr transition-colors py-1.5">
+                  Excluir contrato
+                </button>
+              ) : (
+                <div className="rounded-lg border border-alerr/30 bg-alerr-bg p-3">
+                  <div className="text-[12.5px] font-semibold text-alerr">Excluir {contrato.numero}?</div>
+                  <p className="text-[11.5px] text-[#7a3838] mt-1 leading-relaxed">
+                    O contrato sai da lista, mas <b>não é apagado</b> do banco — fica registrado
+                    quem excluiu e quando. Lançamentos e histórico ligados a ele continuam intactos.
+                  </p>
+                  <div className="flex gap-2 mt-3">
+                    <button onClick={excluirContrato} disabled={salvando}
+                      className="btn-perigo flex-1 text-[12.5px] py-2 disabled:opacity-50">
+                      {salvando ? "Excluindo..." : "Confirmar exclusão"}
+                    </button>
+                    <button onClick={() => setConfirmandoExclusao(false)} className="btn-secundario text-[12.5px] py-2">
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </aside>
     </>
