@@ -11,7 +11,7 @@ export default async function ContratosPage({ searchParams }: { searchParams: { 
   const [{ data: contratos }, { data: lojas }, { data: empresas }] = await Promise.all([
     supabase
       .from("contratos")
-      .select("id, numero, loja_id, empresa_id, tipo, data_inicio, data_fim, valor, status, observacoes, lojas ( codigo ), empresas ( nome )")
+      .select("id, numero, loja_id, empresa_id, tipo, data_inicio, data_fim, valor, status, observacoes, locador, locador_documento, endereco_imovel, dia_vencimento, indice_reajuste, percentual_fixo, periodicidade_meses, valor_condominio, valor_iptu, lojas ( codigo ), empresas ( nome )")
       .order("created_at", { ascending: false }),
     supabase.from("lojas").select("id, codigo").order("codigo"),
     supabase.from("empresas").select("id, nome").eq("ativa", true).order("nome"),

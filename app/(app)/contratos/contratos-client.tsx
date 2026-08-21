@@ -11,6 +11,10 @@ type ContratoRow = {
   id: string; numero: string; loja_id: string | null; empresa_id: string | null;
   tipo: string | null; data_inicio: string | null; data_fim: string | null; valor: number | null;
   status: string; observacoes: string | null;
+  locador?: string | null; locador_documento?: string | null; endereco_imovel?: string | null;
+  dia_vencimento?: number | null;
+  indice_reajuste?: string | null; percentual_fixo?: number | null; periodicidade_meses?: number | null;
+  valor_condominio?: number | null; valor_iptu?: number | null;
   lojas: { codigo: string } | null; empresas: { nome: string } | null;
 };
 
@@ -191,15 +195,19 @@ function ContratoDrawer({ contrato, lojas, empresas, onClose, onSalvar }: {
   const [erro, setErro] = useState<string | null>(null);
 
   // ---- campos que a leitura por IA preenche ----
-  const [locador, setLocador] = useState("");
-  const [locadorDoc, setLocadorDoc] = useState("");
-  const [enderecoImovel, setEnderecoImovel] = useState("");
-  const [diaVenc, setDiaVenc] = useState("");
-  const [indice, setIndice] = useState("");
-  const [percentualFixo, setPercentualFixo] = useState("");
-  const [periodicidade, setPeriodicidade] = useState("12");
-  const [valorCondominio, setValorCondominio] = useState("");
-  const [valorIptu, setValorIptu] = useState("");
+  // Toda inicialização parte do contrato existente. Abrir vazio na edição
+  // não é só exibir errado: como campo vazio vira null no salvamento, uma
+  // edição inocente APAGARIA o que já estava gravado.
+  const txt = (v: any) => (v === null || v === undefined ? "" : String(v));
+  const [locador, setLocador] = useState(txt(contrato?.locador));
+  const [locadorDoc, setLocadorDoc] = useState(txt(contrato?.locador_documento));
+  const [enderecoImovel, setEnderecoImovel] = useState(txt(contrato?.endereco_imovel));
+  const [diaVenc, setDiaVenc] = useState(txt(contrato?.dia_vencimento));
+  const [indice, setIndice] = useState(txt(contrato?.indice_reajuste));
+  const [percentualFixo, setPercentualFixo] = useState(txt(contrato?.percentual_fixo));
+  const [periodicidade, setPeriodicidade] = useState(txt(contrato?.periodicidade_meses) || "12");
+  const [valorCondominio, setValorCondominio] = useState(txt(contrato?.valor_condominio));
+  const [valorIptu, setValorIptu] = useState(txt(contrato?.valor_iptu));
 
   // ---- leitura do PDF ----
   const [lendo, setLendo] = useState(false);
